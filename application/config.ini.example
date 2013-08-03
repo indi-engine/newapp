@@ -11,7 +11,7 @@ dbname   = empty
 [view]
 encoding = utf-8
 scriptPath = application/views
-viewSuffix = php
+lang = ru
 
 [upload]
 uploadPath = www/data/upload

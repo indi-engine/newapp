@@ -1,5 +1,5 @@
 <?php
-class Project_View_Helper_SiteFooter extends Indi_View_Helper_Abstract{
+class Project_View_Helper_SiteFooter {
     public function siteFooter(){
         ob_start();?>
 	footer

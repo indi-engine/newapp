@@ -1,20 +1,25 @@
 [general]
 domain = empty.local
+seoUri = false
+title = false
 
 [db]
 adapter = mysql
+cache = false
 host = localhost
 username = empty
 password = empty
 dbname   = empty
 
+[lang]
+front = ru
+admin = ru
+
 [view]
-encoding = utf-8
 scriptPath = application/views
-lang = ru
 
 [upload]
-uploadPath = www/data/upload
+path = www/data/upload
 
 [ckeditor]
 uploadPath = fck

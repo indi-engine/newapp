@@ -8,7 +8,7 @@ class Admin_AccuralsController extends Indi_Controller_Admin {
     public function adjustGridDataRowset() {
         $this->rowset->foreign('clinicId,doctorId');
         foreach ($this->rowset as $r) {
-            $r->pic = $r->foreign($r->for . 'Id')->src('pic', 'grid', true);
+            $r->pic = $r->foreign($r->for . 'Id')->src('pic', 'grid', true, true);
         }
     }
 }

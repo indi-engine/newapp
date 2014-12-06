@@ -27,6 +27,15 @@ class Direction_Row extends Indi_Db_Table_Row {
         // Try to find complex tariff for clinic
         if (!$clinicTariffR = $this->foreign('clinicId')->tariff()) $this->mismatch('clinicId', 'Этот направитель на текущий момент не имеет тарифа');
 
+        // If we face combination of clinicId and doctorId, that is not yet exists as an entry within `doctorClinic` table - create it
+        if (!$doctorClinicR = Indi::model('DoctorClinic')->fetchRow(array(
+            '`doctorId` = "' . $this->doctorId . '"',
+            '`clinicId` = "' . $this->clinicId . '"',
+        ))) Indi::model('DoctorClinic')->createRow()->assign(array(
+            'doctorId' => $this->doctorId,
+            'clinicId' => $this->clinicId,
+        ))->save();
+
         // If any actual mismatch was detected - return
         if (count($this->mismatch())) return false;
 

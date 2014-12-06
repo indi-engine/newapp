@@ -1,4 +1,4 @@
-Ext.define('Indi.controller.accurals', {
+Ext.define('Indi.controller.doctorBasket', {
     extend: 'Indi.Controller',
     actionsConfig: {
         index: {
@@ -14,11 +14,11 @@ Ext.define('Indi.controller.accurals', {
                     ftype: 'summary'
                 }]
             },
-            gridColumn$SmearSum: function (column) {
+            gridColumn$Salary: function (column) {
                 return Ext.merge(column, {
                     summaryType: 'sum',
                     summaryRenderer: function(value, summaryData, dataIndex) {
-                        return '&sum;';
+                        return 'Итого';
                     }
                 });
             },
@@ -52,9 +52,6 @@ Ext.define('Indi.controller.accurals', {
                 groupedColumnA = me.gridColumnAGroup(groupedColumnA, [
                     {text: 'Фиксированный тариф', start: 'fixedTariffId', span: 3},
                     {text: 'Прогрессивный тариф', start: 'floatTariffId', span: 3},
-                    {text: 'Руководительский тариф', start: 'chiefTariffId', span: 3},
-                    {text: 'Кровь', start: 'bloodQty', span: 2},
-                    {text: 'Мазок', start: 'smearQty', span: 2},
                     {text: 'Суммы', start: 'totalSum', span: 3},
                 ]);
 

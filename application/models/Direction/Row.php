@@ -111,12 +111,88 @@ class Direction_Row extends Indi_Db_Table_Row {
         if (in($serviceRId_blood, $this->serviceIds)) {
             $clinicAccuralR->bloodQty ++;
             $clinicAccuralR->bloodSum += $clinicTariffR->blood;
+
+            // Get the entry, representing an accural summary for a special, non-existent 'blood-registrant' doctor,
+            // within the current month, or create it, if it is not yet exist
+            if (!$bloodAccuralR = $accuralM->fetchRow(array(
+                '`doctorId` = "6"', '`monthId` = "' . $this->monthId .'"',
+                '`for` = "doctor"', '`clinicId` = "'. $this->clinicId . '"'
+            ))) {
+
+                // Create new
+                $bloodAccuralR = $accuralM->createRow()->assign(array(
+                    'doctorId' => 6,
+                    'clinicId' => $this->clinicId,
+                    'monthId' => $this->monthId,
+                    'for' => 'doctor',
+                    'accuralId' => $clinicAccuralR->id,
+                    'bloodPrice' => $clinicTariffR->blood,
+                ));
+
+                // If try to create is unsuccessful
+                if (!$bloodAccuralR->save()) {
+
+                    // Setup error message
+                    $this->mismatch('#bloodAccural', 'Mismatch detected while trying: $bloodAccuralR->save()');
+
+                    // Return
+                    return false;
+                }
+            }
+
+            // Update blood stat
+            $bloodAccuralR->bloodQty ++;
+            $bloodAccuralR->bloodSum += $clinicTariffR->blood;
+
+            // Update *Qty and *Sum for a clinic's accural
+            $bloodAccuralR->save(); if ($bloodAccuralR->mismatch()) {
+                $this->mismatch('#bloodAccural', 'Problem with *Qty and *Sum props update for a blood accural');
+                return false;
+            }
         }
 
         // If smear is in the list of ordered services, increase qty and sum for it within clinic accural entry
         if (in($serviceRId_smear, $this->serviceIds)) {
             $clinicAccuralR->smearQty ++;
             $clinicAccuralR->smearSum += $clinicTariffR->smear;
+
+            // Get the entry, representing an accural summary for a special, non-existent 'smear-registrant' doctor,
+            // within the current month, or create it, if it is not yet exist
+            if (!$smearAccuralR = $accuralM->fetchRow(array(
+                '`doctorId` = "7"', '`monthId` = "' . $this->monthId .'"',
+                '`for` = "doctor"', '`clinicId` = "'. $this->clinicId . '"'
+            ))) {
+
+                // Create new
+                $smearAccuralR = $accuralM->createRow()->assign(array(
+                    'doctorId' => 7,
+                    'clinicId' => $this->clinicId,
+                    'monthId' => $this->monthId,
+                    'for' => 'doctor',
+                    'accuralId' => $clinicAccuralR->id,
+                    'smearPrice' => $clinicTariffR->smear,
+                ));
+
+                // If try to create is unsuccessful
+                if (!$smearAccuralR->save()) {
+
+                    // Setup error message
+                    $this->mismatch('#smearAccural', 'Mismatch detected while trying: $smearAccuralR->save()');
+
+                    // Return
+                    return false;
+                }
+            }
+
+            // Update smear stat
+            $smearAccuralR->smearQty ++;
+            $smearAccuralR->smearSum += $clinicTariffR->smear;
+
+            // Update *Qty and *Sum for a clinic's accural
+            $smearAccuralR->save(); if ($smearAccuralR->mismatch()) {
+                $this->mismatch('#smearAccural', 'Problem with *Qty and *Sum props update for a smear accural');
+                return false;
+            }
         }
 
         // Backup serviceIds

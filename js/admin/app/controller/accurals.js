@@ -14,6 +14,47 @@ Ext.define('Indi.controller.accurals', {
                     ftype: 'summary'
                 }]
             },
+            storeFieldA: function() {
+                var me = this, a = me.callParent(); a.push({name: 'pic', type: 'string'});
+                return a;
+            },
+            gridColumn$FixedTariffQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
+            gridColumn$Title: function(column) {
+                return Ext.merge(column, {
+                    renderer: function(v, m, r) {
+                        if (r) {
+                            return r.raw._system.indent
+                                + '<img src="' + r.get('pic') + '" style="position: absolute; margin: -3px 0 0 -5px;"/>'
+                                + '&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
+                                + v.replace(/&nbsp;/g, '');
+                        }
+                    }
+                });
+            },
+            gridColumn$FloatTariffQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
+            gridColumn$ChiefTariffQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
+            gridColumn$BloodQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
+            gridColumn$SmearQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
             gridColumn$SmearSum: function (column) {
                 return Ext.merge(column, {
                     summaryType: 'sum',

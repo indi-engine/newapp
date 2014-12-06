@@ -14,6 +14,16 @@ Ext.define('Indi.controller.doctorBasket', {
                     ftype: 'summary'
                 }]
             },
+            gridColumn$FixedTariffQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
+            gridColumn$FloatTariffQty: function(column) {
+                return Ext.merge(column, {
+                    cls: 'i-column-header-orderedQty'
+                });
+            },
             gridColumn$Salary: function (column) {
                 return Ext.merge(column, {
                     summaryType: 'sum',

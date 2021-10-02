@@ -13,7 +13,8 @@ dbname   = empty
 
 [lang]
 front = ru
-admin = ru
+admin = en
+gapi.key =
 
 [view]
 scriptPath = application/views
@@ -22,4 +23,19 @@ scriptPath = application/views
 path = www/data/upload
 
 [ckeditor]
+key = 
 uploadPath = fck
+
+[ws]
+enabled = true
+realtime = true
+socket = empty.local
+port = 8888
+log = true
+
+[rabbitmq]
+enabled = true
+host = localhost
+port = 5672
+user = guest
+pass = guest

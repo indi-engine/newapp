@@ -1,0 +1,78 @@
+###################
+## General stuff ##
+###################
+DirectoryIndex index.php index.html
+AddDefaultCharset UTF-8
+php_value short_open_tag On
+php_value magic_quotes_gpc Off
+php_value error_reporting 30711
+Options FollowSymLinks
+<Files config.ini>
+  Require all denied
+</Files>
+<Files .git>
+  Require all denied
+</Files>
+<Files ws.pem>
+  Require all denied
+</Files>
+
+#################
+## Compression ##
+#################
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html
+</IfModule>
+<FilesMatch "\.js$">
+  Header set Access-Control-Allow-Origin: *
+</FilesMatch>
+
+###################
+## Rewrite rules ##
+###################
+RewriteEngine On
+
+# Set up potential levels and uris, relative to these levels
+SetEnvIf REQUEST_URI "((/[^\/]+){1})(/.*)" L1=$1 URI1=$3
+SetEnvIf REQUEST_URI "((/[^\/]+){2})(/.*)" L2=$1 URI2=$3
+SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
+
+# Using ordinary SetEnv is not working somewhy
+SetEnvIf REQUEST_URI .* VDR=vendor/perminov
+
+# Check each level to detect
+RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d
+RewriteRule .* - [E=URI:%{REQUEST_URI}]
+
+RewriteCond %{ENV:URI} ^$
+RewriteCond %{DOCUMENT_ROOT}%{ENV:L1}/%{ENV:VDR}/system -d
+RewriteRule .* - [E=STD:%{ENV:L1},E=URI:%{ENV:URI1}]
+
+RewriteCond %{ENV:URI} ^$
+RewriteCond %{DOCUMENT_ROOT}%{ENV:L2}/%{ENV:VDR}/system -d
+RewriteRule .* - [E=STD:%{ENV:L2},E=URI:%{ENV:URI2}]
+
+RewriteCond %{ENV:URI} ^$
+RewriteCond %{DOCUMENT_ROOT}%{ENV:L3}/%{ENV:VDR}/system -d
+RewriteRule .* - [E=STD:%{ENV:L3},E=URI:%{ENV:URI3}]
+
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}%{ENV:URI} !-f
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/%{ENV:VDR}/public%{ENV:URI} -f
+RewriteRule .* %{ENV:VDR}/public%{ENV:URI} [L]
+
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}%{ENV:URI} !-f
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/%{ENV:VDR}/system%{ENV:URI} -f
+RewriteRule .* %{ENV:VDR}/system%{ENV:URI} [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} resources|classic
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/%{ENV:VDR}/client -d
+RewriteRule .* %{ENV:VDR}/client%{ENV:URI} [L]
+RewriteRule ^admin(.*) %{ENV:VDR}/client$1 [L]
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule \.(jpg|jpeg|png|gif|css|js|ico|txt)$ system/application/static404.php
+
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/index.php -f
+RewriteRule .* index.php [L]

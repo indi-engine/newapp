@@ -1,2 +1,9 @@
 debug.txt
 log/*
+vendor/
+ws.*.data
+ws.*.msg
+ws.pid
+ws.err
+ws.run
+.idea/

@@ -20,7 +20,7 @@ gapi.key =
 scriptPath = application/views
 
 [upload]
-path = www/data/upload
+path = data/upload
 
 [ckeditor]
 key = 

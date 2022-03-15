@@ -1,19 +1,19 @@
 {
-    "name": "perminov/custom",
-    "description": "Indi Engine blank/template project, to be cloned and customized",
+    "name": "indi-engine/custom",
+    "description": "Entry point for a blank Indi Engine project development from scratch",
     "type": "project",
     "repositories": [
-       {"type": "git", "url": "https://github.com/perminov/system.git"}, 
-       {"type": "git", "url": "https://github.com/perminov/client.git"}, 
-       {"type": "git", "url": "https://github.com/perminov/public.git"},
-       {"type": "git", "url": "https://github.com/perminov/ckeditor.git"},
-       {"type": "git", "url": "https://github.com/perminov/ckfinder.git"}
+       {"type": "git", "url": "https://github.com/indi-engine/system.git"}, 
+       {"type": "git", "url": "https://github.com/indi-engine/client.git"}, 
+       {"type": "git", "url": "https://github.com/indi-engine/public.git"},
+       {"type": "git", "url": "https://github.com/indi-engine/ckeditor.git"},
+       {"type": "git", "url": "https://github.com/indi-engine/ckfinder.git"}
     ],
     "require": {
-        "perminov/system": "dev-master",
-        "perminov/client": "dev-master",
-        "perminov/public": "dev-master",
-        "perminov/ckeditor": "dev-master",
-        "perminov/ckfinder": "dev-master"
+        "indi-engine/system": "dev-master",
+        "indi-engine/client": "dev-master",
+        "indi-engine/public": "dev-master",
+        "indi-engine/ckeditor": "dev-master",
+        "indi-engine/ckfinder": "dev-master"
     }
 }

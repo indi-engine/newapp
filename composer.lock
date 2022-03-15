@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "be796f2dc3cb6f392fdc44aab893c861",
+    "content-hash": "64a67067692119647670fb648bd79b3f",
     "packages": [
         {
             "name": "ezyang/htmlpurifier",
@@ -841,6 +841,79 @@
             "time": "2021-10-06T17:43:30+00:00"
         },
         {
+            "name": "indi-engine/ckeditor",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/indi-engine/ckeditor.git",
+                "reference": "59f185a137d56f3e6ffd46ae0b128df33512d98f"
+            },
+            "default-branch": true,
+            "type": "library",
+            "description": "Special version of ckeditor adopted for use with Indi Engine projects having public areas.",
+            "time": "2022-03-15T11:45:49+00:00"
+        },
+        {
+            "name": "indi-engine/ckfinder",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/indi-engine/ckfinder.git",
+                "reference": "4c11dd3cb4fca565b8f8fb844b37f8f39fb08830"
+            },
+            "default-branch": true,
+            "type": "library",
+            "description": "Special version of ckfinder adopted for use with Indi Engine projects having public areas.",
+            "time": "2022-03-15T11:51:08+00:00"
+        },
+        {
+            "name": "indi-engine/client",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/indi-engine/client.git",
+                "reference": "f8147ccb5c46615002fd858cd3c04739b5e2571f"
+            },
+            "default-branch": true,
+            "type": "library",
+            "description": "Client app for Indi Engine",
+            "time": "2022-03-15T11:54:40+00:00"
+        },
+        {
+            "name": "indi-engine/public",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/indi-engine/public.git",
+                "reference": "dab77fed70bc25a41e91de9ee0dc3925fd7cda55"
+            },
+            "default-branch": true,
+            "type": "library",
+            "description": "Special package for Indi Engine projects having public area, covering frontend needs",
+            "time": "2022-03-15T11:55:57+00:00"
+        },
+        {
+            "name": "indi-engine/system",
+            "version": "dev-master",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/indi-engine/system.git",
+                "reference": "29734e627c00ca769d668363ad250d836d676c72"
+            },
+            "require": {
+                "google/cloud-translate": "1.6.0",
+                "mpdf/mpdf": "^8.0",
+                "php-amqplib/php-amqplib": "2.12.0",
+                "phpmailer/phpmailer": "^6.5",
+                "phpoffice/phpspreadsheet": "^1.21",
+                "phpoffice/phpword": "^0.18.2"
+            },
+            "default-branch": true,
+            "type": "package",
+            "description": "Indi Engine system package, should be used as composer dependency only",
+            "time": "2022-03-15T11:59:39+00:00"
+        },
+        {
             "name": "laminas/laminas-escaper",
             "version": "2.9.0",
             "source": {
@@ -1082,16 +1155,16 @@
         },
         {
             "name": "monolog/monolog",
-            "version": "2.3.5",
+            "version": "2.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/Seldaek/monolog.git",
-                "reference": "fd4380d6fc37626e2f799f29d91195040137eba9"
+                "reference": "d7fd7450628561ba697b7097d86db72662f54aef"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/fd4380d6fc37626e2f799f29d91195040137eba9",
-                "reference": "fd4380d6fc37626e2f799f29d91195040137eba9",
+                "url": "https://api.github.com/repos/Seldaek/monolog/zipball/d7fd7450628561ba697b7097d86db72662f54aef",
+                "reference": "d7fd7450628561ba697b7097d86db72662f54aef",
                 "shasum": ""
             },
             "require": {
@@ -1113,7 +1186,7 @@
                 "phpstan/phpstan": "^0.12.91",
                 "phpunit/phpunit": "^8.5",
                 "predis/predis": "^1.1",
-                "rollbar/rollbar": "^1.3",
+                "rollbar/rollbar": "^1.3 || ^2 || ^3",
                 "ruflin/elastica": ">=0.90@dev",
                 "swiftmailer/swiftmailer": "^5.3|^6.0"
             },
@@ -1165,7 +1238,7 @@
             ],
             "support": {
                 "issues": "https://github.com/Seldaek/monolog/issues",
-                "source": "https://github.com/Seldaek/monolog/tree/2.3.5"
+                "source": "https://github.com/Seldaek/monolog/tree/2.4.0"
             },
             "funding": [
                 {
@@ -1177,7 +1250,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2021-10-01T21:08:31+00:00"
+            "time": "2022-03-14T12:44:37+00:00"
         },
         {
             "name": "mpdf/mpdf",
@@ -1256,28 +1329,29 @@
         },
         {
             "name": "myclabs/deep-copy",
-            "version": "1.10.2",
+            "version": "1.11.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/myclabs/DeepCopy.git",
-                "reference": "776f831124e9c62e1a2c601ecc52e776d8bb7220"
+                "reference": "14daed4296fae74d9e3201d2c4925d1acb7aa614"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/776f831124e9c62e1a2c601ecc52e776d8bb7220",
-                "reference": "776f831124e9c62e1a2c601ecc52e776d8bb7220",
+                "url": "https://api.github.com/repos/myclabs/DeepCopy/zipball/14daed4296fae74d9e3201d2c4925d1acb7aa614",
+                "reference": "14daed4296fae74d9e3201d2c4925d1acb7aa614",
                 "shasum": ""
             },
             "require": {
                 "php": "^7.1 || ^8.0"
             },
-            "replace": {
-                "myclabs/deep-copy": "self.version"
+            "conflict": {
+                "doctrine/collections": "<1.6.8",
+                "doctrine/common": "<2.13.3 || >=3,<3.2.2"
             },
             "require-dev": {
-                "doctrine/collections": "^1.0",
-                "doctrine/common": "^2.6",
-                "phpunit/phpunit": "^7.1"
+                "doctrine/collections": "^1.6.8",
+                "doctrine/common": "^2.13.3 || ^3.2.2",
+                "phpunit/phpunit": "^7.5.20 || ^8.5.23 || ^9.5.13"
             },
             "type": "library",
             "autoload": {
@@ -1302,7 +1376,7 @@
             ],
             "support": {
                 "issues": "https://github.com/myclabs/DeepCopy/issues",
-                "source": "https://github.com/myclabs/DeepCopy/tree/1.10.2"
+                "source": "https://github.com/myclabs/DeepCopy/tree/1.11.0"
             },
             "funding": [
                 {
@@ -1310,7 +1384,7 @@
                     "type": "tidelift"
                 }
             ],
-            "time": "2020-11-13T09:40:50+00:00"
+            "time": "2022-03-03T13:19:32+00:00"
         },
         {
             "name": "myclabs/php-enum",
@@ -1421,79 +1495,6 @@
                 "source": "https://github.com/paragonie/random_compat"
             },
             "time": "2020-10-15T08:29:30+00:00"
-        },
-        {
-            "name": "perminov/ckeditor",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/perminov/ckeditor.git",
-                "reference": "54ab33223e358e279c53c745ea757e96c7d5996a"
-            },
-            "default-branch": true,
-            "type": "library",
-            "description": "Special version of ckeditor adopted for use with Indi Engine projects having public areas.",
-            "time": "2022-02-13T12:20:35+00:00"
-        },
-        {
-            "name": "perminov/ckfinder",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/perminov/ckfinder.git",
-                "reference": "4451fa941bdb00bb0047ba4df5615130c9dd6e09"
-            },
-            "default-branch": true,
-            "type": "library",
-            "description": "Special version of ckfinder adopted for use with Indi Engine projects having public areas.",
-            "time": "2022-02-18T16:06:49+00:00"
-        },
-        {
-            "name": "perminov/client",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/perminov/client.git",
-                "reference": "1bea8a2fdd2323deea2b00de3698ee4f8d891806"
-            },
-            "default-branch": true,
-            "type": "library",
-            "description": "Client app for Indi Engine",
-            "time": "2022-02-18T15:45:49+00:00"
-        },
-        {
-            "name": "perminov/public",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/perminov/public.git",
-                "reference": "423deaf75734dead1ce31afecc660307c2a27ea3"
-            },
-            "default-branch": true,
-            "type": "library",
-            "description": "Special package for Indi Engine projects having public area, covering frontend needs",
-            "time": "2022-02-26T23:06:53+00:00"
-        },
-        {
-            "name": "perminov/system",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/perminov/system.git",
-                "reference": "fd5d42aff31868945b519635cc675ca010c8e928"
-            },
-            "require": {
-                "google/cloud-translate": "1.6.0",
-                "mpdf/mpdf": "^8.0",
-                "php-amqplib/php-amqplib": "2.12.0",
-                "phpmailer/phpmailer": "^6.5",
-                "phpoffice/phpspreadsheet": "^1.21",
-                "phpoffice/phpword": "^0.18.2"
-            },
-            "default-branch": true,
-            "type": "project",
-            "description": "Indi Engine",
-            "time": "2022-02-28T02:14:28+00:00"
         },
         {
             "name": "php-amqplib/php-amqplib",
@@ -2532,7 +2533,7 @@
         },
         {
             "name": "symfony/polyfill-mbstring",
-            "version": "v1.24.0",
+            "version": "v1.25.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/polyfill-mbstring.git",
@@ -2595,7 +2596,7 @@
                 "shim"
             ],
             "support": {
-                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.24.0"
+                "source": "https://github.com/symfony/polyfill-mbstring/tree/v1.25.0"
             },
             "funding": [
                 {
@@ -2618,11 +2619,11 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "perminov/system": 20,
-        "perminov/client": 20,
-        "perminov/public": 20,
-        "perminov/ckeditor": 20,
-        "perminov/ckfinder": 20
+        "indi-engine/system": 20,
+        "indi-engine/client": 20,
+        "indi-engine/public": 20,
+        "indi-engine/ckeditor": 20,
+        "indi-engine/ckfinder": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,

@@ -6,6 +6,7 @@ AddDefaultCharset UTF-8
 php_value short_open_tag On
 php_value magic_quotes_gpc Off
 php_value error_reporting 30711
+php_value display_errors On
 Options FollowSymLinks
 <Files config.ini>
   Require all denied
@@ -39,6 +40,7 @@ SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
 
 # Using ordinary SetEnv is not working somewhy
 SetEnvIf REQUEST_URI .* VDR=vendor/indi-engine
+SetEnvIf REQUEST_URI .* WSP=8800
 
 # Check each level to detect
 RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d
@@ -72,6 +74,10 @@ RewriteRule ^admin(.*) %{ENV:VDR}/client$1 [L]
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteRule \.(jpg|jpeg|png|gif|css|js|ico|txt)$ system/application/static404.php
+
+RewriteCond %{HTTP:Upgrade} websocket [NC]
+RewriteCond %{HTTP:Connection} upgrade [NC]
+RewriteRule ^/?(.*) "ws://%{SERVER_NAME}:%{ENV:WSP}/$1" [P]
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/index.php -f

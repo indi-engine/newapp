@@ -40,7 +40,6 @@ SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
 
 # Using ordinary SetEnv is not working somewhy
 SetEnvIf REQUEST_URI .* VDR=vendor/indi-engine
-SetEnvIf REQUEST_URI .* WSP=8800
 
 # Check each level to detect
 RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d

@@ -3,7 +3,8 @@ FROM mysql:8.0.29 as builder
 RUN ["sed", "-i", "s/exec \"$@\"/echo \"not running $@\"/", "/usr/local/bin/docker-entrypoint.sh"]
 ENV MYSQL_ROOT_PASSWORD=root
 WORKDIR /docker-entrypoint-initdb.d
-COPY vendor/indi-engine/system/sql/system.sql system.sql
+ADD https://github.com/indi-engine/system/raw/master/sql/system.sql system.sql
+RUN chmod 777 system.sql
 RUN prepend="\
   CREATE DATABASE ``custom`` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; \n \
   CREATE USER 'custom'@'localhost' IDENTIFIED BY 'custom'; \n \
@@ -36,13 +37,13 @@ RUN echo "ServerName indi-engine"      >> apache2.conf  && \
 ## <PHP> ##
 RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg && \
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list && \
-    apt update && apt -y install php7.4 php7.4-mysql php7.4-curl
+    apt update && apt -y install php7.4 php7.4-mysql php7.4-curl php7.4-mbstring php7.4-dom php7.4-gd php7.4-zip
 ## </PHP> ##
 
 ## <RabbitMQ> ##
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.deb.sh' | /bin/bash
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.deb.sh' | /bin/bash
-RUN apt-get install -y erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
+RUN apt-get install -y --fix-missing erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
     erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key erlang-runtime-tools erlang-snmp \
     erlang-ssl erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl rabbitmq-server
 ## </RabbitMQ> ##
@@ -50,7 +51,12 @@ RUN apt-get install -y erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang
 ## <IndiEngine> ##
 WORKDIR /var/www/html
 COPY . .
+RUN [ ! -f "application/config.ini" ] && cp application/config.ini.example application/config.ini
 ## </IndiEngine> ##
+
+## <Composer> ##
+RUN apt -y install composer && [ ! -d "vendor" ] && composer install
+### </Composer> ##
 
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

@@ -1,5 +1,5 @@
 [general]
-domain = empty.local
+domain = custom.local
 seoUri = false
 title = false
 
@@ -7,9 +7,10 @@ title = false
 adapter = mysql
 cache = false
 host = localhost
-username = empty
-password = empty
-dbname   = empty
+username = custom
+password = custom
+dbname   = custom
+cfgField = true
 
 [lang]
 front = ru
@@ -29,7 +30,7 @@ uploadPath = fck
 [ws]
 enabled = true
 realtime = true
-socket = empty.local
+host = localhost
 port = 8888
 log = true
 

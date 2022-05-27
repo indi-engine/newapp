@@ -52,12 +52,13 @@ RUN apt-get install -y --fix-missing erlang-base erlang-asn1 erlang-crypto erlan
 WORKDIR /var/www/html
 COPY . .
 RUN [ ! -f "application/config.ini" ] && cp application/config.ini.example application/config.ini
+RUN chown -R www-data .
 ## </IndiEngine> ##
 
 ## <Composer> ##
 RUN apt -y install composer && [ ! -d "vendor" ] && composer install
 ### </Composer> ##
 
-RUN chmod +x docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

@@ -58,5 +58,6 @@ RUN [ ! -f "application/config.ini" ] && cp application/config.ini.example appli
 RUN apt -y install composer && [ ! -d "vendor" ] && composer install
 ### </Composer> ##
 
+RUN chmod +x docker-entrypoint.sh
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

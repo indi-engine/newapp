@@ -62,4 +62,3 @@ RUN apt -y install composer && [ ! -d "vendor" ] && composer install
 RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80
-EXPOSE 8888

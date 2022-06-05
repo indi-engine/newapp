@@ -43,9 +43,11 @@ RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 ## <RabbitMQ> ##
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.deb.sh' | /bin/bash
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.deb.sh' | /bin/bash
-RUN apt-get install -y --fix-missing erlang-base erlang-asn1 erlang-crypto erlang-eldap erlang-ftp erlang-inets \
-    erlang-mnesia erlang-os-mon erlang-parsetools erlang-public-key erlang-runtime-tools erlang-snmp \
-    erlang-ssl erlang-syntax-tools erlang-tftp erlang-tools erlang-xmerl rabbitmq-server
+ENV rmqv 1:24.3.4-1
+RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-crypto=$rmqv erlang-eldap=$rmqv \
+    erlang-ftp=$rmqv erlang-inets=$rmqv erlang-mnesia=$rmqv erlang-os-mon=$rmqv erlang-parsetools=$rmqv \
+    erlang-public-key=$rmqv erlang-runtime-tools=$rmqv erlang-snmp=$rmqv erlang-ssl=$rmqv erlang-syntax-tools=$rmqv \
+    erlang-tftp=$rmqv erlang-tools=$rmqv erlang-xmerl=$rmqv rabbitmq-server
 ## </RabbitMQ> ##
 
 ## <IndiEngine> ##

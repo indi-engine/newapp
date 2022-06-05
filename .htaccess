@@ -60,7 +60,7 @@ RewriteRule .* - [E=STD:%{ENV:L3},E=URI:%{ENV:URI3}]
 RewriteCond %{HTTP:Sec-WebSocket-Version} 13 [NC]
 RequestHeader set Connection Upgrade
 RequestHeader set Upgrade websocket
-RewriteRule ^/?(.*) "ws://%{SERVER_NAME}:%{ENV:WSP}%{REQUEST_URI}" [P]
+RewriteRule ^/?(.*) "ws://localhost:%{ENV:WSP}%{REQUEST_URI}" [P]
 
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}%{ENV:URI} !-f
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/%{ENV:VDR}/public%{ENV:URI} -f

@@ -41,6 +41,15 @@ SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
 # Using ordinary SetEnv is not working somewhy
 SetEnvIf REQUEST_URI .* VDR=vendor/indi-engine
 
+# Below SetEnvIf-expression should be uncommented if your Indi Engine instance is running not inside
+# a docker container, so WSP-env (WebSocket Port) is not auto-set up by docker-entrypoint.sh script,
+# and that is why we need to specify it here explicitly. This means that this port number has duplicated
+# definitions - first one here and second one in application/config.ini->ws->port but this is the price we
+# pay for using same port for the connections from the outside, and for solving problems with ssl-certificates
+# whose previously had to be picked up by websocket server directly despite they are not always accessible
+# and periodically became outdated
+# SetEnvIf REQUEST_URI .* WSP=8888
+
 # Check each level to detect
 RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d
 RewriteRule .* - [E=URI:%{REQUEST_URI}]

@@ -906,7 +906,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "889318523eb8f42a08ceb09797601dc3e8780ea9"
+                "reference": "d82483e5706505bd063a42f7d58d5dda296daef0"
             },
             "require": {
                 "google/cloud-translate": "1.6.0",
@@ -919,7 +919,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2022-06-25T16:44:47+00:00"
+            "time": "2022-06-29T12:23:02+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2537,7 +2537,7 @@
         },
         {
             "name": "symfony/deprecation-contracts",
-            "version": "v2.5.1",
+            "version": "v2.5.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/symfony/deprecation-contracts.git",
@@ -2584,7 +2584,7 @@
             "description": "A generic function and convention to trigger deprecation notices",
             "homepage": "https://symfony.com",
             "support": {
-                "source": "https://github.com/symfony/deprecation-contracts/tree/v2.5.1"
+                "source": "https://github.com/symfony/deprecation-contracts/tree/v2.5.2"
             },
             "funding": [
                 {

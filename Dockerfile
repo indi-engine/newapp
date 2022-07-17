@@ -1,5 +1,5 @@
 ## <MySQL> ##
-FROM mysql:8.0.29 as builder
+FROM mysql:8.0.29-debian as builder
 RUN ["sed", "-i", "s/exec \"$@\"/echo \"not running $@\"/", "/usr/local/bin/docker-entrypoint.sh"]
 ENV MYSQL_ROOT_PASSWORD=root
 WORKDIR /docker-entrypoint-initdb.d
@@ -11,7 +11,7 @@ RUN prepend="\
   GRANT ALL ON ``custom``.* TO 'custom'@'localhost'; \n \
   USE ``custom``;" && sed -i.old '1 i\'"$prepend" system.sql
 RUN ["/usr/local/bin/docker-entrypoint.sh", "mysqld", "--datadir", "/prefilled-db"]
-FROM mysql:8.0.29
+FROM mysql:8.0.29-debian
 RUN echo 'sql-mode=STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' >> /etc/mysql/my.cnf
 COPY --from=builder /prefilled-db /var/lib/mysql
 ## </MySQL> ##
@@ -44,7 +44,7 @@ RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 ## <RabbitMQ> ##
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.deb.sh' | /bin/bash
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.deb.sh' | /bin/bash
-ENV rmqv 1:24.3.4-1
+ENV rmqv 1:25.0.3-1
 RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-crypto=$rmqv erlang-eldap=$rmqv \
     erlang-ftp=$rmqv erlang-inets=$rmqv erlang-mnesia=$rmqv erlang-os-mon=$rmqv erlang-parsetools=$rmqv \
     erlang-public-key=$rmqv erlang-runtime-tools=$rmqv erlang-snmp=$rmqv erlang-ssl=$rmqv erlang-syntax-tools=$rmqv \
@@ -54,12 +54,12 @@ RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-
 ## <IndiEngine> ##
 WORKDIR /var/www/html
 COPY . .
-RUN [ ! -f "application/config.ini" ] && cp application/config.ini.example application/config.ini
+RUN if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi
 RUN chown -R www-data .
 ## </IndiEngine> ##
 
 ## <Composer> ##
-RUN apt -y install composer && [ ! -d "vendor" ] && composer install
+RUN apt -y install composer && if [[ ! -d "vendor" ]] ; then composer install ; fi
 ### </Composer> ##
 
 RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh

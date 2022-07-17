@@ -54,12 +54,12 @@ RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-
 ## <IndiEngine> ##
 WORKDIR /var/www/html
 COPY . .
-RUN if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi
+RUN bash -c 'if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi'
 RUN chown -R www-data .
 ## </IndiEngine> ##
 
 ## <Composer> ##
-RUN apt -y install composer && if [[ ! -d "vendor" ]] ; then composer install ; fi
+RUN apt -y install composer && bash -c 'if [[ ! -d "vendor" ]] ; then composer install ; fi'
 ### </Composer> ##
 
 RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh

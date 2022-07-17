@@ -5,12 +5,10 @@ title = false
 
 [db]
 adapter = mysql
-cache = false
 host = localhost
 username = custom
 password = custom
 dbname   = custom
-cfgField = true
 
 [lang]
 front = ru

@@ -934,12 +934,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "85b5c752dcc124df2ddd9f162724538d27662cb4"
+                "reference": "33763f3fc34d4eb41f91f722e60052e4e7306360"
             },
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2022-10-23T12:17:40+00:00"
+            "time": "2022-10-24T10:06:31+00:00"
         },
         {
             "name": "indi-engine/public",

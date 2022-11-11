@@ -16,8 +16,9 @@
         "indi-engine/ckeditor": "dev-master",
         "indi-engine/ckfinder": "dev-master"
     },
-    "scripts": {
-        "post-update-cmd" : "php -r \"copy('vendor/indi-engine/system/library/custom-pcm', '.git/hooks/prepare-commit-msg')\";",
-        "post-install-cmd": "php -r \"copy('vendor/indi-engine/system/library/custom-pcm', '.git/hooks/prepare-commit-msg')\";"
+    "scripts": {    
+        "post-update-cmd" : "@hook",
+        "post-install-cmd": "@hook",
+        "hook": "php vendor/indi-engine/system/hook/init"
     }
 }

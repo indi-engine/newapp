@@ -49,6 +49,7 @@ RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-
     erlang-ftp=$rmqv erlang-inets=$rmqv erlang-mnesia=$rmqv erlang-os-mon=$rmqv erlang-parsetools=$rmqv \
     erlang-public-key=$rmqv erlang-runtime-tools=$rmqv erlang-snmp=$rmqv erlang-ssl=$rmqv erlang-syntax-tools=$rmqv \
     erlang-tftp=$rmqv erlang-tools=$rmqv erlang-xmerl=$rmqv rabbitmq-server
+RUN rabbitmq-plugins enable rabbitmq_event_exchange rabbitmq_stomp rabbitmq_web_stomp
 ## </RabbitMQ> ##
 
 ## <IndiEngine> ##

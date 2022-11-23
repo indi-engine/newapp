@@ -6,9 +6,9 @@ title = false
 [db]
 adapter = mysql
 host = localhost
-username = custom
-password = custom
-dbname   = custom
+user = custom
+pass = custom
+name = custom
 
 [lang]
 front = ru
@@ -24,13 +24,6 @@ path = data/upload
 [ckeditor]
 key = 
 uploadPath = fck
-
-[ws]
-enabled = true
-realtime = true
-host = localhost
-port = 8888
-log = true
 
 [rabbitmq]
 enabled = true

@@ -954,11 +954,11 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "8dec6ac947064e270c61ec5fe5a5a7ae25947a77"
+                "reference": "b778f0b03f5aa7dc10998ee821ad82a3437cece3"
             },
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2022-11-22T09:45:54+00:00"
+            "time": "2022-11-24T10:38:44+00:00"
         },
         {
             "name": "indi-engine/public",

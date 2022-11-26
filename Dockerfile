@@ -50,6 +50,9 @@ RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-
     erlang-public-key=$rmqv erlang-runtime-tools=$rmqv erlang-snmp=$rmqv erlang-ssl=$rmqv erlang-syntax-tools=$rmqv \
     erlang-tftp=$rmqv erlang-tools=$rmqv erlang-xmerl=$rmqv rabbitmq-server
 RUN rabbitmq-plugins enable rabbitmq_event_exchange rabbitmq_stomp rabbitmq_web_stomp
+WORKDIR /etc/rabbitmq
+RUN echo "web_stomp.cowboy_opts.idle_timeout = 60000"  >> rabbitmq.conf && \
+    echo "web_stomp.ws_opts.idle_timeout = 3600000"    >> rabbitmq.conf
 ## </RabbitMQ> ##
 
 ## <IndiEngine> ##

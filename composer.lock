@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fccc4307dd5d2accf8f702bc69ba9899",
+    "content-hash": "b87361e8f639aa8b85b1ab1002ab9a58",
     "packages": [
         {
             "name": "ezyang/htmlpurifier",
@@ -950,15 +950,16 @@
         },
         {
             "name": "indi-engine/client",
-            "version": "dev-stomp",
+            "version": "dev-master",
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "f723b551827868db639b7391b7f8b1548d35a273"
+                "reference": "bae42e63b9c299dbef0b19f98c2a185288542513"
             },
+            "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2022-11-27T11:52:29+00:00"
+            "time": "2022-12-03T14:41:57+00:00"
         },
         {
             "name": "indi-engine/public",
@@ -975,11 +976,11 @@
         },
         {
             "name": "indi-engine/system",
-            "version": "dev-stomp",
+            "version": "dev-master",
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "9e394731b1e7b548233d02eb9b2bfd39bc587ab7"
+                "reference": "ede3cfa5e1ad2cbcc9f2020fe1360753e47c306d"
             },
             "require": {
                 "google/cloud-translate": "1.6.0",
@@ -989,9 +990,10 @@
                 "phpoffice/phpspreadsheet": "^1.21",
                 "phpoffice/phpword": "^0.18.2"
             },
+            "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2022-11-27T19:07:54+00:00"
+            "time": "2022-12-03T14:10:20+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

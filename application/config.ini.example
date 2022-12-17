@@ -28,6 +28,7 @@ uploadPath = fck
 
 [rabbitmq]
 enabled = true
+maxwell = true
 host = localhost
 port = 5672
 user = guest

@@ -19,15 +19,27 @@
             "url": "https://github.com/stomp-js/stompjs.git"
           }
         }
-      } 
+      },
+      {
+        "type": "package",
+        "package": {
+          "name": "zendesk/maxwell",
+          "version": "1.39.4",
+          "dist": {
+            "type": "tar",
+            "url": "https://github.com/zendesk/maxwell/releases/download/v1.39.4/maxwell-1.39.4.tar.gz"
+          }
+        }
+      }
     ],
     "require": {
-        "indi-engine/system": "dev-master",
+        "indi-engine/system": "dev-maxwell",
         "indi-engine/client": "dev-master",
         "indi-engine/public": "dev-master",
         "indi-engine/ckeditor": "dev-master",
         "indi-engine/ckfinder": "dev-master",
-        "stomp-js/stompjs": "6.1.2"
+        "stomp-js/stompjs": "6.1.2",
+        "zendesk/maxwell": "1.39.4"
     },
     "scripts": {    
         "post-update-cmd" : "@hook",

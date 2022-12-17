@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "b87361e8f639aa8b85b1ab1002ab9a58",
+    "content-hash": "0efe95956771dd91a6aeaf12b0908bbc",
     "packages": [
         {
             "name": "ezyang/htmlpurifier",
@@ -976,11 +976,11 @@
         },
         {
             "name": "indi-engine/system",
-            "version": "dev-master",
+            "version": "dev-maxwell",
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "417a5da92d1533080f1815ab32aa7caecc5876b3"
+                "reference": "2d2f0e7f14dc05820544e5970c4dc3d1ebd1d0e9"
             },
             "require": {
                 "google/cloud-translate": "1.6.0",
@@ -990,10 +990,9 @@
                 "phpoffice/phpspreadsheet": "^1.21",
                 "phpoffice/phpword": "^0.18.2"
             },
-            "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2022-12-17T05:28:56+00:00"
+            "time": "2022-12-17T17:47:08+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2782,6 +2781,15 @@
                 }
             ],
             "time": "2022-11-03T14:55:06+00:00"
+        },
+        {
+            "name": "zendesk/maxwell",
+            "version": "1.39.4",
+            "dist": {
+                "type": "tar",
+                "url": "https://github.com/zendesk/maxwell/releases/download/v1.39.4/maxwell-1.39.4.tar.gz"
+            },
+            "type": "library"
         }
     ],
     "packages-dev": [],

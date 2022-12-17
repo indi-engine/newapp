@@ -9,6 +9,8 @@ RUN prepend="\
   CREATE DATABASE ``custom`` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; \n \
   CREATE USER 'custom'@'%' IDENTIFIED WITH mysql_native_password BY 'custom'; \n \
   GRANT ALL ON ``custom``.* TO 'custom'@'%'; \n \
+  GRANT ALL ON ``maxwell``.* TO 'custom'@'%'; \n \
+  GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'custom'@'%'; \n \
   USE ``custom``;" && sed -i.old '1 i\'"$prepend" system.sql
 RUN ["/usr/local/bin/docker-entrypoint.sh", "mysqld", "--datadir", "/prefilled-db"]
 FROM mysql:8.0.29-debian

@@ -3,7 +3,7 @@ FROM mysql:8.0.29-debian as builder
 RUN ["sed", "-i", "s/exec \"$@\"/echo \"not running $@\"/", "/usr/local/bin/docker-entrypoint.sh"]
 ENV MYSQL_ROOT_PASSWORD=root
 WORKDIR /docker-entrypoint-initdb.d
-ADD https://github.com/indi-engine/system/raw/stomp/sql/system.sql system.sql
+ADD https://github.com/indi-engine/system/raw/master/sql/system.sql system.sql
 RUN chmod 777 system.sql
 RUN prepend="\
   CREATE DATABASE ``custom`` CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci; \n \

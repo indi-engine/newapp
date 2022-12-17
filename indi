@@ -1,0 +1,2 @@
+<?php
+require 'vendor/indi-engine/system/application/indi';

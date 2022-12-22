@@ -57,6 +57,10 @@ RUN echo "web_stomp.cowboy_opts.idle_timeout = 60000"  >> rabbitmq.conf && \
     echo "web_stomp.ws_opts.idle_timeout = 3600000"    >> rabbitmq.conf
 ## </RabbitMQ> ##
 
+## <JRE> ##
+RUN apt-get install -y default-jre
+## </JRE> ##
+
 ## <IndiEngine> ##
 WORKDIR /var/www/html
 COPY . .

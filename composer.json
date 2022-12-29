@@ -33,7 +33,7 @@
       }
     ],
     "require": {
-        "indi-engine/system": "dev-maxwell",
+        "indi-engine/system": "dev-master",
         "indi-engine/client": "dev-master",
         "indi-engine/public": "dev-master",
         "indi-engine/ckeditor": "dev-master",

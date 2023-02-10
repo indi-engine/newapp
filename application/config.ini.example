@@ -3,6 +3,8 @@ domain = custom.local
 seoUri = false
 title = false
 demo = false
+logo.auth = 
+logo.main = 
 
 [db]
 adapter = mysql
@@ -15,6 +17,7 @@ name = custom
 front = ru
 admin = en
 gapi.key =
+gapi.off = false
 
 [view]
 scriptPath = application/views

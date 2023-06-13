@@ -46,7 +46,7 @@ RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 ## <RabbitMQ> ##
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-erlang/setup.deb.sh' | /bin/bash
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/rabbitmq/rabbitmq-server/setup.deb.sh' | /bin/bash
-ENV rmqv 1:25.3-1
+ENV rmqv 1:26.0.1-1
 RUN apt-get install -y --fix-missing erlang-base=$rmqv erlang-asn1=$rmqv erlang-crypto=$rmqv erlang-eldap=$rmqv \
     erlang-ftp=$rmqv erlang-inets=$rmqv erlang-mnesia=$rmqv erlang-os-mon=$rmqv erlang-parsetools=$rmqv \
     erlang-public-key=$rmqv erlang-runtime-tools=$rmqv erlang-snmp=$rmqv erlang-ssl=$rmqv erlang-syntax-tools=$rmqv \

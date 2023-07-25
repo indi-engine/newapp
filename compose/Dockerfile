@@ -1,7 +1,7 @@
 FROM debian:11-slim
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy mc curl wget lsb-release
+RUN apt-get update && apt-get install -fy mc curl wget lsb-release ncat
 ## </Misc> ##
 
 ## <Apache> ##
@@ -40,6 +40,6 @@ RUN chown -R www-data .
 RUN apt -y install composer && bash -c 'if [[ ! -d "vendor" ]] ; then composer install ; fi'
 ### </Composer> ##
 
-RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh vendor/indi-engine/system/application/tkill
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

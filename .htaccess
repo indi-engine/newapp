@@ -41,6 +41,9 @@ SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
 # Using ordinary SetEnv is not working somewhy
 SetEnvIf REQUEST_URI .* VDR=vendor/indi-engine
 
+# If RABBITMQ_HOST variable is not set - use localhost
+SetEnvIf ^ RABBITMQ_HOST= RABBITMQ_HOST=localhost
+
 # Check each level to detect
 RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d
 RewriteRule .* - [E=URI:%{REQUEST_URI}]
@@ -60,7 +63,7 @@ RewriteRule .* - [E=STD:%{ENV:L3},E=URI:%{ENV:URI3}]
 RewriteCond %{HTTP:Sec-WebSocket-Version} 13 [NC]
 RequestHeader set Connection Upgrade
 RequestHeader set Upgrade websocket
-RewriteRule ^/?(.*) "ws://localhost:15674/ws" [P]
+RewriteRule ^/?(.*) "ws://%{ENV:RABBITMQ_HOST}:15674/ws" [P]
 
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}%{ENV:URI} !-f
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/%{ENV:VDR}/public%{ENV:URI} -f

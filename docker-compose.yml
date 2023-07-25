@@ -1,0 +1,45 @@
+version: '3.4'
+
+services:
+
+  apache:
+    build:
+      dockerfile: compose/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - mysql
+      - rabbitmq
+    environment:
+      MYSQL_HOST: mysql
+      RABBITMQ_HOST: rabbitmq
+
+  mysql:
+    image: mysql:8.0.29-debian
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb_buffer_pool_size=2147483648
+    ports:
+      - "3306:3306"
+    environment:
+      TZ: Europe/Berlin
+      MYSQL_ROOT_PASSWORD: custom
+      MYSQL_USER: custom
+      MYSQL_PASSWORD: custom
+      MYSQL_DATABASE: custom
+    volumes:
+    - ./vendor/indi-engine/system/sql/system.sql:/docker-entrypoint-initdb.d/system.sql
+    - ./vendor/indi-engine/system/sql/maxwell.sql:/docker-entrypoint-initdb.d/maxwell.sql
+
+  rabbitmq:
+    image: rabbitmq:3.10-management-alpine
+    ports:
+      - "15672:15672"
+    volumes:
+      - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
+      - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    command: rabbitmq-server
+

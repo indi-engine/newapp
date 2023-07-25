@@ -31,8 +31,8 @@ services:
       MYSQL_PASSWORD: custom
       MYSQL_DATABASE: custom
     volumes:
-    - ./vendor/indi-engine/system/sql/system.sql:/docker-entrypoint-initdb.d/system.sql
-    - ./vendor/indi-engine/system/sql/maxwell.sql:/docker-entrypoint-initdb.d/maxwell.sql
+      - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
+    entrypoint: /usr/local/bin/custom-entrypoint.sh
 
   rabbitmq:
     image: rabbitmq:3.10-management-alpine

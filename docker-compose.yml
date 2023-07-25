@@ -13,7 +13,8 @@ services:
     environment:
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
-
+    volumes:
+      - ./data/upload:/var/www/html/data/upload/
   mysql:
     image: mysql:8.0.29-debian
     command:
@@ -30,8 +31,10 @@ services:
       MYSQL_USER: custom
       MYSQL_PASSWORD: custom
       MYSQL_DATABASE: custom
+      MYSQL_DUMP: ${MYSQL_DUMP:-custom-bare.sql}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
+      - ./sql/:/docker-entrypoint-initdb.d/custom/
     entrypoint: /usr/local/bin/custom-entrypoint.sh
 
   rabbitmq:

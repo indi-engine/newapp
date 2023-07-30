@@ -1,9 +1,6 @@
-debug.txt
-log/*
-vendor/
-ws.*.data
-ws.*.msg
-ws.pid
-ws.err
-ws.run
 .idea/
+log/*
+sql/custom-prod.sql
+sql/custom-prod.sql.gz
+vendor/
+debug.txt

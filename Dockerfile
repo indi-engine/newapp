@@ -72,6 +72,6 @@ RUN chown -R www-data .
 RUN apt -y install composer && bash -c 'if [[ ! -d "vendor" ]] ; then composer install ; fi'
 ### </Composer> ##
 
-RUN chmod +x docker-entrypoint.sh && sed -i 's/\r$//' docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

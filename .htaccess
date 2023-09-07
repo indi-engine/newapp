@@ -14,9 +14,6 @@ Options FollowSymLinks
 <Files .git>
   Require all denied
 </Files>
-<Files ws.pem>
-  Require all denied
-</Files>
 
 #################
 ## Compression ##
@@ -42,7 +39,8 @@ SetEnvIf REQUEST_URI "((/[^\/]+){3})(/.*)" L3=$1 URI3=$3
 SetEnvIf REQUEST_URI .* VDR=vendor/indi-engine
 
 # If RABBITMQ_HOST variable is not set - use localhost
-SetEnvIf RABBITMQ_HOST ^$ RABBITMQ_HOST=localhost
+RewriteCond %{ENV:RABBITMQ_HOST} ^$
+RewriteRule .* - [E=RABBITMQ_HOST:localhost]
 
 # Check each level to detect
 RewriteCond %{DOCUMENT_ROOT}/%{ENV:VDR}/system -d

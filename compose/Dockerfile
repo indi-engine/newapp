@@ -33,7 +33,8 @@ RUN apt-get install -y default-jre
 WORKDIR /var/www/html
 COPY . .
 RUN bash -c 'if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi'
-RUN chown -R www-data .
+RUN chown -R www-data /var/www
+RUN usermod -s /bin/bash www-data
 ## </IndiEngine> ##
 
 ## <Composer> ##

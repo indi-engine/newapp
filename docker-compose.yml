@@ -8,8 +8,11 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - mysql
-      - rabbitmq
+      mysql:
+        condition: service_healthy
+        restart: true
+      rabbitmq:
+        condition: service_healthy
     environment:
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
@@ -35,6 +38,10 @@ services:
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
       - ./sql/:/docker-entrypoint-initdb.d/custom/
+    healthcheck:
+      test: mysqladmin ping
+      timeout: 20s
+      retries: 10
     entrypoint: /usr/local/bin/custom-entrypoint.sh
 
   rabbitmq:
@@ -44,5 +51,9 @@ services:
     volumes:
       - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      timeout: 20s
+      retries: 10
     command: rabbitmq-server
 

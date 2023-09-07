@@ -69,7 +69,7 @@ RUN chown -R www-data .
 ## </IndiEngine> ##
 
 ## <Composer> ##
-RUN apt -y install composer && bash -c 'if [[ ! -d "vendor" ]] ; then composer install ; fi'
+RUN apt -y install composer && composer install
 ### </Composer> ##
 
 RUN sed -i 's/\r$//' docker-entrypoint.sh

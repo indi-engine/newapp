@@ -1,7 +1,7 @@
 FROM debian:11-slim
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy mc curl wget lsb-release ncat
+RUN apt-get update && apt-get install -fy mc curl wget lsb-release
 ## </Misc> ##
 
 ## <Apache> ##
@@ -32,15 +32,15 @@ RUN apt-get install -y default-jre
 ## <IndiEngine> ##
 WORKDIR /var/www/html
 COPY . .
-RUN bash -c 'if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi'
-RUN chown -R www-data /var/www
-RUN usermod -s /bin/bash www-data
 ## </IndiEngine> ##
 
 ## <Composer> ##
-RUN apt -y install composer && bash -c 'if [[ ! -d "vendor" ]] ; then composer install ; fi'
+ENV user www-data
+RUN usermod -s /bin/bash $user && chown -R $user /var/www && apt -y install composer
+USER $user
+RUN composer install && mv vendor ../vendor
+USER root
 ### </Composer> ##
 
-RUN sed -i 's/\r$//' docker-entrypoint.sh vendor/indi-engine/system/application/tkill
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

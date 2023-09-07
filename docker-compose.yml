@@ -17,7 +17,7 @@ services:
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
     volumes:
-      - ./data/upload:/var/www/html/data/upload/
+      - ./:/var/www/html/
   mysql:
     image: mysql:8.0.29-debian
     command:

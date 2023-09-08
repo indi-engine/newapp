@@ -26,14 +26,15 @@ services:
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
       --innodb_buffer_pool_size=2147483648
+      --wait_timeout=31536000
     ports:
       - "3306:3306"
     environment:
       TZ: Europe/Berlin
-      MYSQL_ROOT_PASSWORD: custom
-      MYSQL_USER: custom
-      MYSQL_PASSWORD: custom
-      MYSQL_DATABASE: custom
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-custom}
+      MYSQL_USER: ${MYSQL_USER:-custom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
       MYSQL_DUMP: ${MYSQL_DUMP:-custom-bare.sql}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh

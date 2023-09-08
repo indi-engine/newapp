@@ -4,6 +4,11 @@ FROM debian:11-slim
 RUN apt-get update && apt-get install -fy mc curl wget lsb-release
 ## </Misc> ##
 
+## <User> ##
+ENV user www-data
+RUN usermod -s /bin/bash $user
+## </User> ##
+
 ## <Apache> ##
 RUN apt-get install -y apache2
 WORKDIR /etc/apache2
@@ -16,6 +21,7 @@ RUN echo "ServerName indi-engine"      >> apache2.conf  && \
     cp mods-available/proxy.load          mods-enabled/ && \
     cp mods-available/proxy_http.load     mods-enabled/ && \
     cp mods-available/proxy_wstunnel.load mods-enabled/
+WORKDIR /var/www/html
 ## </Apache> ##
 
 ## <PHP> ##
@@ -29,18 +35,19 @@ RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg
 RUN apt-get install -y default-jre
 ## </JRE> ##
 
-## <IndiEngine> ##
-WORKDIR /var/www/html
-COPY . .
-## </IndiEngine> ##
-
 ## <Composer> ##
-ENV user www-data
-RUN usermod -s /bin/bash $user && chown -R $user /var/www && apt -y install composer
+RUN apt -y install composer
+COPY composer.json composer.lock .
+RUN chown $user ../ .
 USER $user
 RUN composer install && mv vendor ../vendor
-USER root
 ### </Composer> ##
+
+## <IndiEngine> ##
+USER root
+COPY . .
+RUN chown -R $user .
+## </IndiEngine> ##
 
 ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
 EXPOSE 80

@@ -14,7 +14,7 @@ $run 'if [[ -f "debug.txt" ]] ; then rm debug.txt ; fi'
 $run 'if [[ ! -d "log" ]] ; then mkdir log ; fi'
 
 # If '../vendor'-dir is not yet moved back to /var/www - do move
-$run 'if [[ -d "../vendor" ]] ; then echo "Moving ../vendor here ..." ; mv ../vendor vendor ; echo "Moved vendor" ; fi'
+$run 'if [[ ! -d "vendor" && -d "../vendor" ]] ; then echo "Moving ../vendor back here..." ; mv ../vendor vendor ; echo "Moved." ; fi'
 
 # Copy config.ini file from example one, if not exist
 $run 'if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi'

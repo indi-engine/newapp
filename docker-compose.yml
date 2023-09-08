@@ -39,9 +39,9 @@ services:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
       - ./sql/:/docker-entrypoint-initdb.d/custom/
     healthcheck:
-      test: mysqladmin ping
-      timeout: 20s
-      retries: 10
+      test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
+      start_period: 3m
+      interval: 5s
     entrypoint: /usr/local/bin/custom-entrypoint.sh
 
   rabbitmq:

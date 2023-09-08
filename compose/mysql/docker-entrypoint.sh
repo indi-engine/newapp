@@ -19,7 +19,7 @@ if ! command -v wget &>/dev/null; then
   if [[ $MYSQL_DUMP == http* ]]; then
 
     # Download it right here
-    echo "Fetching MySQL dump from $MYSQL_DUMP..." && wget "$MYSQL_DUMP"
+    echo "Fetching MySQL dump from $MYSQL_DUMP..." && wget --no-check-certificate "$MYSQL_DUMP"
 
   # Else assume it's a local path pointing to some file inside
   # /docker-entrypoint-initdb.d/custom/ directory mapped as a volume
@@ -49,6 +49,8 @@ if ! command -v wget &>/dev/null; then
     echo "Fetching from $url..." && wget "$url"
   done
 
+  # Append touch-command to create empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
+  sed -i 's~Ready for start up."~&\n\t\t\ttouch /var/lib/mysql/init.done~' /usr/local/bin/docker-entrypoint.sh
 fi
 
 # Call the original entrypoint script

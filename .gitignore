@@ -1,3 +1,4 @@
+.env
 .idea/
 log/*
 sql/custom-prod.sql

@@ -1,4 +1,5 @@
 #!/bin/bash
+set -eu -o pipefail
 
 # If wget is not yet installed
 if ! command -v wget &>/dev/null; then

@@ -16,6 +16,8 @@ services:
     environment:
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
+      GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
+      GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
     volumes:
       - ./:/var/www/html/
   mysql:

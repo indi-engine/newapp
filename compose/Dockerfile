@@ -20,7 +20,8 @@ RUN echo "ServerName indi-engine"      >> apache2.conf  && \
     cp mods-available/headers.load        mods-enabled/ && \
     cp mods-available/proxy.load          mods-enabled/ && \
     cp mods-available/proxy_http.load     mods-enabled/ && \
-    cp mods-available/proxy_wstunnel.load mods-enabled/
+    cp mods-available/proxy_wstunnel.load mods-enabled/ && \
+    echo "export HOME=/var/www"        >> envvars
 WORKDIR /var/www/html
 ## </Apache> ##
 
@@ -38,7 +39,7 @@ RUN apt-get install -y default-jre
 ## <Composer> ##
 RUN apt -y install composer
 COPY composer.json composer.lock .
-RUN chown $user ../ .
+RUN chown $user .. .
 USER $user
 RUN composer install && mv vendor ../vendor
 ### </Composer> ##

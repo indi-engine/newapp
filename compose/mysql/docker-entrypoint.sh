@@ -96,6 +96,14 @@ if ! command -v wget &>/dev/null; then
   # Spoof mysql user name inside maxwell.sql, if need
   [[ $MYSQL_USER != "custom" ]] && sed -i "s~custom~$MYSQL_USER~" maxwell.sql
 
+  # Create directory and copy 'mysql' and 'mysqldump' command-line utilities into it, so that
+  # we can share those two binaries with apache-container to be able to export/import sql-files
+  src="/usr/bin"
+  vmd="/usr/bin/volumed"
+  if [[ ! -d $vmd ]] ; then mkdir $vmd; fi
+  cp "$src/mysql"     "$vmd/mysql"
+  cp "$src/mysqldump" "$vmd/mysqldump"
+
   # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
   sed -i 's~Ready for start up."~&\n\t\t\ttouch /var/lib/mysql/init.done~' /usr/local/bin/docker-entrypoint.sh
 fi

@@ -20,6 +20,8 @@ services:
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
     volumes:
       - ./:/var/www/html/
+      - mysql_client_binaries:/usr/bin/mysql_client_binaries
+
   mysql:
     image: mysql:8.0.29-debian
     command:
@@ -41,6 +43,7 @@ services:
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
       - ./sql/:/docker-entrypoint-initdb.d/custom/
+      - mysql_client_binaries:/usr/bin/volumed
     healthcheck:
       test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
       start_period: 3m
@@ -60,3 +63,5 @@ services:
       retries: 10
     command: rabbitmq-server
 
+volumes:
+  mysql_client_binaries:

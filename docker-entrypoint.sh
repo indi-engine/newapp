@@ -6,6 +6,10 @@
 # If $MYSQL_HOST is not given - start mysql right here as well
 [ -z "$MYSQL_HOST" ] && /usr/local/bin/docker-entrypoint.sh mysqld &
 
+# Set ownership here, as current dir is a volume so Dockerfile's chown doesn't take effect
+echo "Running chown.."
+chown $user .. && chown -R $user:$user .
+
 # Setup git commit author identity
 if [[ ! -z "$GIT_COMMIT_NAME"  && -z $(git config user.name) ]];   then git config user.name "$GIT_COMMIT_NAME"; fi
 if [[ ! -z "$GIT_COMMIT_EMAIL" && -z $(git config user.email)  ]]; then git config user.email "$GIT_COMMIT_EMAIL"; fi
@@ -32,6 +36,9 @@ pid_file="/var/run/apache2/apache2.pid"
 
 # Remove pid-file, if kept from previous start of apache container
 if [ -f "$pid_file" ]; then rm "$pid_file" && echo "Apache old pid-file removed"; fi
+
+# Copy 'mysql' and 'mysqldump' binaries to /usr/bin, to make it possible to restore/backup the whole database as sql-file
+cp /usr/bin/mysql_client_binaries/* /usr/bin/
 
 # Start apache process
 echo "Apache started" && apachectl -D FOREGROUND

@@ -917,12 +917,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/ckeditor.git",
-                "reference": "59f185a137d56f3e6ffd46ae0b128df33512d98f"
+                "reference": "9d1e583c64f8cdeb2303ba8f8427ca240af43f97"
             },
             "default-branch": true,
             "type": "library",
             "description": "Special version of ckeditor adopted for use with Indi Engine projects having public areas.",
-            "time": "2022-03-15T11:45:49+00:00"
+            "time": "2023-11-10T08:46:10+00:00"
         },
         {
             "name": "indi-engine/ckfinder",
@@ -943,12 +943,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "47e6f0641ceb2be7cf64ae2aa67e814305e0a61c"
+                "reference": "e6931d2dcfd704561c610cce4b68531c47849a7a"
             },
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2023-11-08T17:18:43+00:00"
+            "time": "2023-11-10T08:44:29+00:00"
         },
         {
             "name": "indi-engine/public",
@@ -969,7 +969,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "ac8b74f3e4ac10691f2f70e1c17edf851147580a"
+                "reference": "2558f883385f94cbfb92aa6abb6cba5a636369d2"
             },
             "require": {
                 "google/cloud-translate": "1.6.0",
@@ -982,7 +982,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2023-11-08T19:02:56+00:00"
+            "time": "2023-11-10T11:07:19+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2786,5 +2786,5 @@
     "prefer-lowest": false,
     "platform": [],
     "platform-dev": [],
-    "plugin-api-version": "2.6.0"
+    "plugin-api-version": "2.0.0"
 }

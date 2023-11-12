@@ -39,9 +39,13 @@ RUN apt-get install -y default-jre
 ## <Composer> ##
 RUN apt -y install composer
 COPY composer.json composer.lock .
-RUN chown $user .. .
+RUN chown -R $user:$user ..
 USER $user
-RUN composer install && mv vendor ../vendor
+RUN composer install && \
+  sed -i 's~\tpushurl\s*=\s*.*~~' vendor/indi-engine/system/.git/config && \
+  sed -i 's~\tpushurl\s*=\s*.*~~' vendor/indi-engine/client/.git/config && \
+  mv vendor ../vendor && \
+  mv .idea  ../.idea
 ### </Composer> ##
 
 ## <IndiEngine> ##

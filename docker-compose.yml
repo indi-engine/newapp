@@ -39,7 +39,7 @@ services:
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
-      MYSQL_DUMP: ${MYSQL_DUMP:-custom-bare.sql}
+      MYSQL_DUMP: ${MYSQL_DUMP}
       GH_TOKEN: ${GH_TOKEN}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro

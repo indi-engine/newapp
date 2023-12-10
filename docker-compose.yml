@@ -40,13 +40,15 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
       MYSQL_DUMP: ${MYSQL_DUMP:-custom-bare.sql}
+      GH_TOKEN: ${GH_TOKEN}
     volumes:
-      - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh
+      - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./sql/:/docker-entrypoint-initdb.d/custom/
+      - ./.git/config:/docker-entrypoint-initdb.d/.gitconfig:ro
       - mysql_client_binaries:/usr/bin/volumed
     healthcheck:
       test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
-      start_period: 3m
+      start_period: 7m
       interval: 5s
     entrypoint: /usr/local/bin/custom-entrypoint.sh
 

@@ -48,6 +48,31 @@ if ! command -v wget &>/dev/null; then
       # Shortcut
       local="custom/$dump"
 
+      # If that local dump file does NOT really exists in sql/ directory on host machine
+      # e.g does NOT exists in custom/ directory in mysql-container due to bind volume mapping
+      # but GH_TOKEN variable is set - assume this dump file should be downloaded from github
+      if [[ ! -f "$local" && ! -z "$GH_TOKEN" ]]; then
+
+        # Install GitHub CLI, if not yet installed
+        if ! command -v gh &>/dev/null; then
+          echo "Installing GitHub CLI"
+          ghgpg=/usr/share/keyrings/githubcli-archive-keyring.gpg
+          apt-get install curl -y
+          curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=$ghgpg && chmod go+r $ghgpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=$ghgpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+          apt update && apt install gh -y
+        fi
+
+        # Get repo 'owner/name'
+        repo=$(sed -n 's#.*\/\([a-zA-Z0-9_\-]\+\/[a-zA-Z0-9_\-]\+\)\.git#\1#p' .gitconfig | sed -n '1p')
+
+        # Print where we are
+        echo "Downloading $dump from '$repo'-repo's assets on github"
+
+        # Download dump
+        gh release download latest -D custom -p "$dump" -R "$repo"
+      fi
+
       # If that local dump file really exists in sql/ directory on host machine
       # e.g exists  in custom/ directory in mysql-container due to bind volume mapping
       if [ -f "$local" ]; then

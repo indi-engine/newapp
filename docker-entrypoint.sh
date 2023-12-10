@@ -14,8 +14,8 @@ chown -R $user:$user ..
 run='/sbin/runuser '$user' -s /bin/bash -c'
 
 # Setup git commit author identity
-if [[ ! -z "$GIT_COMMIT_NAME"   && -z $($run 'git config user.name')  ]]; then $run 'git config user.name  "$GIT_COMMIT_NAME"' ; fi
-if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $($run 'git config user.email') ]]; then $run 'git config user.email "$GIT_COMMIT_EMAIL"'; fi
+if [[ ! -z "$GIT_COMMIT_NAME"   && -z $($run 'git config user.name')  ]]; then $run 'git config --global user.name  "$GIT_COMMIT_NAME"' ; fi
+if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $($run 'git config user.email') ]]; then $run 'git config --global user.email "$GIT_COMMIT_EMAIL"'; fi
 
 # Remove debug.txt file, if exists, and create log/ directory if not exists
 $run 'if [[ -f "debug.txt" ]] ; then rm debug.txt ; fi'

@@ -1,12 +1,13 @@
-version: '3.4'
-
 services:
 
   apache:
     build:
       dockerfile: compose/Dockerfile
+      args:
+        - DOC=${DOC}
     ports:
       - "80:80"
+      - "443:443"
     depends_on:
       mysql:
         condition: service_healthy
@@ -14,23 +15,28 @@ services:
       rabbitmq:
         condition: service_healthy
     environment:
+      DOC: ${DOC}
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
+      LETS_ENCRYPT_DOMAIN: ${LETS_ENCRYPT_DOMAIN:-}
     volumes:
-      - ./:/var/www/html/
+      - ./:${DOC}/
+      - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/mysql_client_binaries
 
   mysql:
-    image: mysql:8.0.29-debian
+    image: mysql:8.0.36-debian
     command:
       --default-authentication-plugin=mysql_native_password
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci
-      --innodb_buffer_pool_size=2147483648
+      --innodb_buffer_pool_size=4294967296
       --wait_timeout=31536000
+      --max_execution_time=20000
+      --slow_query_log=ON
     ports:
       - "3306:3306"
     environment:
@@ -45,6 +51,7 @@ services:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./sql/:/docker-entrypoint-initdb.d/custom/
       - ./.git/config:/docker-entrypoint-initdb.d/.gitconfig:ro
+      - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/volumed
     healthcheck:
       test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
@@ -66,4 +73,5 @@ services:
     command: rabbitmq-server
 
 volumes:
+  mysql_server_data:
   mysql_client_binaries:

@@ -1,8 +1,11 @@
 #!/bin/bash
 set -eu -o pipefail
 
-# If wget is not yet installed
-if ! command -v wget &>/dev/null; then
+# Path to a file to be created once init is done
+done=/var/lib/mysql/init.done
+
+# If init is not done
+if [[ ! -f "$done" ]]; then
 
   # Install it
   apt-get update && apt-get install -y wget
@@ -31,7 +34,7 @@ if ! command -v wget &>/dev/null; then
     # If dump is an URL
     if [[ $dump == http* ]]; then
 
-      # Extract the filename from the URL and add counter-prefix 
+      # Extract the filename from the URL and add counter-prefix
       name="$prefix-$(basename "$dump")"
 
       # Download it right here
@@ -121,11 +124,10 @@ if ! command -v wget &>/dev/null; then
   # Spoof mysql user name inside maxwell.sql, if need
   [[ $MYSQL_USER != "custom" ]] && sed -i "s~custom~$MYSQL_USER~" maxwell.sql
 
-  # Create directory and copy 'mysql' and 'mysqldump' command-line utilities into it, so that
-  # we can share those two binaries with apache-container to be able to export/import sql-files
+  # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
+  # those two binaries with apache-container to be able to export/import sql-files
   src="/usr/bin"
   vmd="/usr/bin/volumed"
-  if [[ ! -d $vmd ]] ; then mkdir $vmd; fi
   cp "$src/mysql"     "$vmd/mysql"
   cp "$src/mysqldump" "$vmd/mysqldump"
 

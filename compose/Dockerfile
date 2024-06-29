@@ -1,7 +1,7 @@
-FROM debian:11-slim
+FROM debian:12-slim
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy mc curl wget lsb-release
+RUN apt-get update && apt-get install -fy mc curl wget lsb-release cron certbot python3-certbot-apache
 ## </Misc> ##
 
 ## <User> ##
@@ -10,10 +10,12 @@ RUN usermod -s /bin/bash $user
 ## </User> ##
 
 ## <Apache> ##
+ARG DOC
+ENV DOC $DOC
 RUN apt-get install -y apache2
 WORKDIR /etc/apache2
 RUN echo "ServerName indi-engine"      >> apache2.conf  && \
-    echo "<Directory /var/www/html>"   >> apache2.conf  && \
+    echo "<Directory $DOC>"            >> apache2.conf  && \
     echo "  AllowOverride All"         >> apache2.conf  && \
     echo "</Directory>"                >> apache2.conf  && \
     cp mods-available/rewrite.load        mods-enabled/ && \
@@ -22,7 +24,7 @@ RUN echo "ServerName indi-engine"      >> apache2.conf  && \
     cp mods-available/proxy_http.load     mods-enabled/ && \
     cp mods-available/proxy_wstunnel.load mods-enabled/ && \
     echo "export HOME=/var/www"        >> envvars
-WORKDIR /var/www/html
+WORKDIR $DOC
 ## </Apache> ##
 
 ## <PHP> ##
@@ -44,13 +46,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 ## </GitHub CLI>
 
 ## <Composer> ##
-RUN apt -y install composer
+RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
+  php composer-setup.php --install-dir=/usr/local/bin --filename=composer --version=2.0.9 && \
+  php -r "unlink('composer-setup.php');"
 COPY composer.json composer.lock .
 RUN chown -R $user:$user ..
 USER $user
 RUN composer install && \
-  sed -i 's~\tpushurl\s*=\s*.*~~' vendor/indi-engine/system/.git/config && \
-  sed -i 's~\tpushurl\s*=\s*.*~~' vendor/indi-engine/client/.git/config && \
+  sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/client/.git/config && \
+  sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/system/.git/config && \
   mv vendor ../vendor && \
   mv .idea  ../.idea
 ### </Composer> ##
@@ -61,5 +65,5 @@ COPY . .
 RUN chown -R $user .
 ## </IndiEngine> ##
 
-ENTRYPOINT ["/var/www/html/docker-entrypoint.sh"]
+ENTRYPOINT $DOC/docker-entrypoint.sh
 EXPOSE 80

@@ -30,8 +30,8 @@ WORKDIR $DOC
 ## <PHP> ##
 RUN wget -O /etc/apt/trusted.gpg.d/php.gpg https://packages.sury.org/php/apt.gpg && \
     echo "deb https://packages.sury.org/php/ $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/php.list && \
-    apt update && apt -y install php7.4 php7.4-mysql php7.4-curl php7.4-mbstring php7.4-dom php7.4-gd php7.4-zip php7.4-imagick && \
-    update-alternatives --set php /usr/bin/php7.4
+    apt update && apt -y install php8.3 php8.3-mysql php8.3-curl php8.3-mbstring php8.3-dom php8.3-gd php8.3-zip php8.3-imagick php8.3-intl && \
+    update-alternatives --set php /usr/bin/php8.3
 ## </PHP> ##
 
 ## <JRE> ##
@@ -46,9 +46,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | d
 ## </GitHub CLI>
 
 ## <Composer> ##
-RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
-  php composer-setup.php --install-dir=/usr/local/bin --filename=composer --version=2.0.9 && \
-  php -r "unlink('composer-setup.php');"
+RUN apt -y install composer
 COPY composer.json composer.lock .
 RUN chown -R $user:$user ..
 USER $user

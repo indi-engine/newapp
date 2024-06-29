@@ -1,11 +1,5 @@
 #!/bin/bash
 
-# If $RABBITMQ_HOST is not given - start rabbitmq server right here
-[ -z "$RABBITMQ_HOST" ] && service rabbitmq-server start
-
-# If $MYSQL_HOST is not given - start mysql right here as well
-[ -z "$MYSQL_HOST" ] && /usr/local/bin/docker-entrypoint.sh mysqld &
-
 # Set ownership here, as current dir is a volume so Dockerfile's chown doesn't take effect
 echo "Running chown.."
 chown -R $user:$user ..

@@ -58,5 +58,8 @@ jobs='compose/crontab'
 sed -i "s~\$DOC~$DOC~" $jobs && crontab -u $user $jobs && $run 'git checkout '$jobs
 service cron start
 
+# Start postfix to be able to send emails via sendmail used by php
+service postfix start
+
 # Start apache process
 echo "Apache started" && apachectl -D FOREGROUND

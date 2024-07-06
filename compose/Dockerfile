@@ -55,13 +55,17 @@ RUN composer install && \
   sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/system/.git/config && \
   mv vendor ../vendor && \
   mv .idea  ../.idea
-### </Composer> ##
+## </Composer> ##
 
 ## <IndiEngine> ##
 USER root
 COPY . .
 RUN chown -R $user .
 ## </IndiEngine> ##
+
+## <Sendmail> ##
+RUN bash -c "apt -y install postfix <<< $'2'"
+## </Sendmail> ##
 
 ENTRYPOINT $DOC/docker-entrypoint.sh
 EXPOSE 80

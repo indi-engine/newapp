@@ -94,7 +94,7 @@ sed -i "s~\$DOC~$DOC~" $jobs && crontab -u $user $jobs && $run 'git checkout '$j
 service cron start
 
 # Start opendkim and postfix to be able to send DKIM-signed emails via sendmail used by php
-service opendkim start
+if [[ -f "/etc/opendkim/trusted.hosts" ]]; then service opendkim start; fi
 service postfix start
 
 # Start apache process

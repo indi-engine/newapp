@@ -64,7 +64,7 @@ RUN chown -R $user .
 ## </IndiEngine> ##
 
 ## <Sendmail> ##
-RUN bash -c "apt -y install postfix <<< $'2'"
+RUN bash -c "apt install -y postfix <<< $'2' && apt install -y opendkim opendkim-tools"
 ## </Sendmail> ##
 
 ENTRYPOINT $DOC/docker-entrypoint.sh

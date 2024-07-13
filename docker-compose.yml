@@ -25,6 +25,7 @@ services:
       - ./:${DOC}/
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/mysql_client_binaries
+      - ./compose/opendkim.conf:/etc/opendkim.conf
 
   mysql:
     image: mysql:8.0.36-debian

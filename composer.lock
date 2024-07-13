@@ -1038,7 +1038,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "9569dc2e3a9ca709328f270370258f4bd59f5cd6"
+                "reference": "91c04640191fa5f021f1ff6a0e30c366a7804fd1"
             },
             "require": {
                 "google/cloud-translate": "1.6.0",
@@ -1051,7 +1051,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2024-07-09T12:08:07+00:00"
+            "time": "2024-07-13T07:25:30+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

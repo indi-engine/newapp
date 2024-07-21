@@ -21,10 +21,13 @@ services:
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
       LETS_ENCRYPT_DOMAIN: ${LETS_ENCRYPT_DOMAIN:-}
+      EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-}
     volumes:
       - ./:${DOC}/
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/mysql_client_binaries
+      - letsencrypt:/etc/letsencrypt
+      - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
 
   mysql:
@@ -76,3 +79,5 @@ services:
 volumes:
   mysql_server_data:
   mysql_client_binaries:
+  letsencrypt:
+  opendkim:

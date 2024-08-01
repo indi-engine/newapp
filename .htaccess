@@ -8,12 +8,7 @@ php_value magic_quotes_gpc Off
 php_value error_reporting 30711
 php_value display_errors On
 Options FollowSymLinks
-<Files config.ini>
-  Require all denied
-</Files>
-<Files .git>
-  Require all denied
-</Files>
+RedirectMatch 404 (\.(sql|ini|git|env)|log/)
 
 #################
 ## Compression ##

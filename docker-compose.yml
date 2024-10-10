@@ -29,6 +29,8 @@ services:
       - letsencrypt:/etc/letsencrypt
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
+      - ./compose/php.system.ini:/etc/php/8.3/apache2/conf.d/php.system.ini
+      - ./compose/php.system.ini:/etc/php/8.3/cli/conf.d/php.system.ini
 
   mysql:
     image: mysql:8.0.36-debian

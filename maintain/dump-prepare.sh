@@ -8,6 +8,11 @@ pass=$MYSQL_PASSWORD
 name=$MYSQL_DATABASE
 dump="$dir/$MYSQL_DUMP"
 
+# Clear last X lines
+clear_last_lines() {
+  for ((i = 0; i < $1; i++)); do tput cuu1 && tput el; done
+}
+
 # Goto project root
 cd $DOC
 

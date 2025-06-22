@@ -1,6 +1,0 @@
-HOME=$DOC
-* * * * * php indi cron/minute
-0 * * * * php indi cron/hourly
-0 1 * * * php indi cron/daily
-0 1 * * 1 php indi cron/weekly
-0 1 1 * * php indi cron/monthly

@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# Cleanup docker stuff
+docker compose down
+docker volume prune -af
+docker system prune -af
+
+# Get current dir name
+dir=$(basename "$PWD")
+
+# Remove cd-command from bashrc
+sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/c\\" /root/.bashrc
+
+# Remove current dir
+cd ../
+rm -R $dir

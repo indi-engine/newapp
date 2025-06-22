@@ -1,0 +1,97 @@
+#!/bin/bash
+
+# Clear the terminal log
+clear
+
+# If docker is installed - it means backup-command is being run on host
+if command -v docker >/dev/null 2>&1; then
+
+  # Execute backup-command within the container environment passing all arguments, if any
+  docker compose exec -it -e TERM="$TERM" wrapper bash "$(basename "${BASH_SOURCE[0]}")" $@
+
+# Else it means we're in the wrapper-container, so proceed with the backup
+else
+
+  # Make sure execution stops on any error
+  set -eu -o pipefail
+
+  # Load functions
+  source maintain/functions.sh
+
+  # Setup GH_TOKEN
+  [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+
+  # If we're in detached HEAD state - it means we did an unconfirmed restore
+  # so make sure new backups won't be created until restore is confirmed or cancelled
+  if is_uncommitted_restore; then
+    echo "Your MUST commit or cancel the restore you've done before."
+    echo "Do this using 'source restore commit' or 'source restore cancel' commands."
+    echo "Creation of ANY new backups is prevented until then."
+    echo ""
+
+  # Else if we're NOT in detached HEAD state - do the backup
+  else
+
+    # Set up backup scenario based on 1st arg
+    if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" ]]; then
+      scenario="${1:-}"
+    else
+      scenario="full"
+    fi
+
+    # Set up most_recent flag
+    if [[ "$scenario" != "full" && "${2:-}" = "--recent" ]]; then
+      most_recent=1
+    else
+      most_recent=0
+    fi
+
+    # If first argument is 'dump' or 'uploads'
+    if [[ "$scenario" != "full" ]]; then
+
+      # Print that we're going to update dump (or uploads) inside already existing backup
+      if [[ $most_recent = 0 ]]; then
+        echo -e "\nBACKUP ONLY: $scenario\n"
+      fi
+
+      # Ask user to select which backup should be patched with new dump or uploads
+      release_choices "to be patched" $most_recent
+
+      # If there was a manual choice for backup version to be patched
+      if [[ $most_recent = 0 ]]; then
+
+        # Print that version
+        echo -e "SELECTED VERSION: $(get_release_title $selected)\n"
+
+      # Else
+      else
+
+        # If most recent version's environment does match the current instance's environment
+        if [[ "${selected:0:1}" == "${APP_ENV:0:1}" ]]; then
+
+          # Print version to be patched
+          echo -e "VERSION TO PATCH: ${g}$(get_release_title $selected)${d}\n"
+
+        # Else
+        else
+
+          # Print a message there is nothing can be patched
+          echo -e "VERSION TO PATCH: ${r}no $APP_ENV backups created so far,${d}"
+          echo -e "                  ${g}so creating new custom $APP_ENV backup ${d}\n"
+
+          # Pivot backup scenario to full new custom backup
+          scenario="full"
+        fi
+      fi
+
+      # Do backup as per scenario
+        if [[ "$scenario" = "dump"    ]]; then backup_dump "$selected";
+      elif [[ "$scenario" = "uploads" ]]; then backup_uploads "$selected";
+      elif [[ "$scenario" = "full"    ]]; then backup "custom"; fi
+
+    # Else do full custom backup
+    else
+      backup "${1:-custom}"
+    fi
+  fi
+fi

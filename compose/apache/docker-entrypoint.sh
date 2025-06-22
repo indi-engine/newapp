@@ -1,31 +1,13 @@
 #!/bin/bash
 
-# Set ownership here, as current dir is a volume so Dockerfile's chown doesn't take effect
-echo "Running chown.."
-chown -R $user:$user ..
+# If '../vendor'-dir is not yet moved back to /var/www - do move
+if [[ ! -d "vendor" && -d "../vendor" ]]; then echo "Moving ../vendor back here... "; mv ../vendor vendor; echo "Done"; fi
+
+# Copy config.ini file from example one, if not exist
+ini="application/config.ini"; if [[ ! -f "$ini" ]]; then cp "$ini.example" "$ini"; fi
 
 # Command prefix to run something on behalf on www-data user
 run='/sbin/runuser '$user' -s /bin/bash -c'
-
-# Setup git commit author identity
-if [[ ! -z "$GIT_COMMIT_NAME"   && -z $($run 'git config user.name')  ]]; then $run 'git config --global user.name  "$GIT_COMMIT_NAME"' ; fi
-if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $($run 'git config user.email') ]]; then $run 'git config --global user.email "$GIT_COMMIT_EMAIL"'; fi
-
-# Setup git filemode
-$run 'git config --global core.filemode false'
-
-# Remove debug.txt file, if exists, and create log/ directory if not exists
-$run 'if [[ -f "debug.txt" ]] ; then rm debug.txt ; fi'
-$run 'if [[ ! -d "log" ]] ; then mkdir log ; fi'
-
-# If '../vendor'-dir is not yet moved back to /var/www - do move
-$run 'if [[ ! -d "vendor" && -d "../vendor" ]] ; then echo "Moving ../vendor back here..." ; mv ../vendor vendor ; echo "Moved." ; fi'
-
-# If '../.idea'-dir is not yet moved back to /var/www - do move
-$run 'if [[ ! -d ".idea" && -d "../.idea" ]] ; then echo "Moving ../.idea back here..." ; mv ../.idea .idea ; echo "Moved." ; fi'
-
-# Copy config.ini file from example one, if not exist
-$run 'if [[ ! -f "application/config.ini" ]] ; then cp application/config.ini.example application/config.ini ; fi'
 
 # Start php background processes
 $run 'php indi -d realtime/closetab'
@@ -37,8 +19,8 @@ pid_file="/var/run/apache2/apache2.pid"
 # Remove pid-file, if kept from previous start of apache container
 if [ -f "$pid_file" ]; then rm "$pid_file" && echo "Apache old pid-file removed"; fi
 
-# Copy 'mysql' and 'mysqldump' binaries to /usr/bin, to make it possible to restore/backup the whole database as sql-file
-cp /usr/bin/mysql_client_binaries/* /usr/bin/
+# Logs dir
+logs="/var/log/apache2"
 
 # Trim leading/trailing whitespaces from domain name(s)
 LETS_ENCRYPT_DOMAIN=$(echo "$LETS_ENCRYPT_DOMAIN" | xargs)
@@ -60,9 +42,9 @@ if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
   # Obtain certificate and stop apache in background
   # and setup cron job for certificate renewal check
   domainsArg=$(echo "$LETS_ENCRYPT_DOMAIN" | sed 's/ / -d /g')
-  certbot --apache -n -d $domainsArg -m "$GIT_COMMIT_EMAIL" --agree-tos -v
+  certbot --apache -n -d $domainsArg -m "$LETS_ENCRYPT_NOTIFY" --agree-tos -v --logs-dir "$logs"
   service apache2 stop
-  echo "0 */12 * * * certbot renew" | crontab -
+  echo "0 */12 * * * certbot renew --logs-dir $logs" | crontab -
 
   # If $EMAIL_SENDER_DOMAIN is empty - use LETS_ENCRYPT_DOMAIN by default
   if [[ -z "$EMAIL_SENDER_DOMAIN" ]]; then EMAIL_SENDER_DOMAIN=$LETS_ENCRYPT_DOMAIN; fi
@@ -84,7 +66,11 @@ if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 
   # Setup postfix to use opendkim as milter
   if ! grep -q $sock <<< "$(<"$conf")"; then
-    echo -e "smtpd_milters = $sock\nnon_smtpd_milters = $sock" >> $conf
+    echo "smtpd_milters = $sock"            >> $conf
+    echo "non_smtpd_milters = $sock"        >> $conf
+    echo "maillog_file = $logs/postfix.log" >> $conf
+    echo "debug_peer_level = 2"             >> $conf
+    echo "debug_peer_list = 127.0.0.1"      >> $conf
   fi
 
   # Split LETS_ENCRYPT_DOMAIN into an array
@@ -117,14 +103,33 @@ if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 fi
 
 # Setup crontab
-env | grep -E "(MYSQL|RABBITMQ)_HOST|GIT_COMMIT_(NAME|EMAIL)|DOC" >> /etc/environment
-jobs='compose/crontab'
-sed -i "s~\$DOC~$DOC~" $jobs && crontab -u $user $jobs && $run 'git checkout '$jobs
+env | grep -E "TERM|(MYSQL|RABBITMQ)_HOST|DOC" >> /etc/environment
+sed "s~\$DOC~$DOC~" '/var/www/crontab' | crontab -u www-data -
 service cron start
 
 # Start opendkim and postfix to be able to send DKIM-signed emails via sendmail used by php
 if [[ -f "/etc/opendkim/trusted.hosts" ]]; then service opendkim start; fi
 service postfix start
 
-# Start apache process
-echo "Apache started" && apachectl -D FOREGROUND
+# Set ServerName, if missing
+if ! grep -q "ServerName " /etc/apache2/apache2.conf; then
+  echo "ServerName localhost" >> /etc/apache2/apache2.conf
+fi
+
+# Set DOC to be visible to apache, if missing
+if ! grep -q "SetEnv DOC " /etc/apache2/apache2.conf; then
+  echo "SetEnv DOC $DOC" >> /etc/apache2/apache2.conf
+fi
+
+# Make logs dir is writable
+chown "www-data:www-data" "$DOC/application/config.ini" "/var/log/custom" "/var/www/tmp"
+
+# Add executable right for $DOC
+chmod +x $DOC
+
+# Add executable right for $DOC/data and $DOC/data/upload dirs for du-command to be executable on behalf www-data user
+if [ -d "$DOC/data" ]; then chmod +x "$DOC/data"; fi
+if [ -d "$DOC/data/upload" ]; then chmod +x "$DOC/data/upload"; fi
+
+# Run original entrypoint script provided by base image
+echo "Apache started" && source /usr/local/bin/docker-php-entrypoint "apache2-foreground"

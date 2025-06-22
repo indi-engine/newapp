@@ -1,0 +1,14 @@
+HOME=$DOC
+SHELL=/bin/bash
+
+# Hourly backup at 5th minute of the each hour
+5 * * * * source backup hourly   >> var/log/compose/wrapper/backup.hourly.log 2>&1
+
+# Daily backup at 1 AM every day
+0 1 * * * source backup daily   >> var/log/compose/wrapper/backup.daily.log 2>&1
+
+# Weekly backup at 2 AM every Monday
+0 2 * * 1 source backup weekly  >> var/log/compose/wrapper/backup.weekly.log 2>&1
+
+# Monthly backup at 3 AM on the 1st day of each month
+0 3 1 * * source backup monthly >> var/log/compose/wrapper/backup.monthly.log 2>&1

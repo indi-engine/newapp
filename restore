@@ -1,0 +1,250 @@
+#!/bin/bash
+
+# Clear the terminal log
+clear
+
+# Load functions
+source maintain/functions.sh
+
+# If docker is installed - it means restore-command is being run on host
+if command -v docker >/dev/null 2>&1; then
+
+  # Execute restore-command within the container environment passing all arguments, if any
+  docker compose exec -it -e TERM="$TERM" wrapper bash "$(basename "${BASH_SOURCE[0]}")" $@
+
+# Else it means we're in the wrapper-container, so proceed with the restore
+else
+
+  # Set up restore scenario based on 1st arg
+  if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" || "${1:-}" = "cancel" || "${1:-}" = "commit" ]]; then
+    scenario="${1:-}"
+  else
+    scenario="full"
+  fi
+
+  # Set current_repo variable to be globally accessible
+  current_repo="$(get_current_repo)"
+
+  # If --parent flag is given - try to detect parent repo, and if failed - stop with error
+  if has_flag "--parent" "$@"; then
+    parent_repo="$(get_parent_repo "$current_repo")";
+    if [[ "$parent_repo" = "null" ]]; then
+      echo "Unable to detect parent repo for $(get_current_repo)" >&2
+      return 1
+    fi
+  # Else indicate parent repo won't be involved
+  else
+    parent_repo="false"
+  fi
+
+  # Make sure execution stops on any error
+  set -eu -o pipefail
+
+  # Setup GH_TOKEN
+  [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+
+  # If first arg is 'cancel' or 'commit'
+  if [[ "$scenario" = "cancel" || "$scenario" = "commit" ]]; then
+
+    # If we're in an uncommitted restore state
+    if is_uncommitted_restore; then
+
+      # Prevent restoring from parent repo if we're in an 'uncommitted restore' state
+      if [[ "$parent_repo" != "false" ]]; then
+        echo "You can't involve parent repo while you're in an 'uncommitted restore' state"
+        set +e
+        return 1
+      fi
+
+      # If first arg is 'cancel' - cancel restore for source code, database and uploads, i.e. revert all to the state
+      # before restore. We don't have something like 'cancel_restore_dump', because dump.sql.gz will be moved into
+      # data/ from data/before/ and then will be picked by mysql re-init
+      if [[ "$scenario" = "cancel" ]]; then
+        cancel_restore_uploads_and_dump
+        echo ""
+        cancel_restore_source
+
+      # Else if first argument is 'commit' - backup the original version
+      # and make restored version to be the new latest
+      else
+        backup_before_restore
+        commit_restore
+      fi
+
+    # Else we're in ordinary state - print error message
+    else
+      echo "Your current ${APP_ENV:-} instance is NOT in an 'uncommitted restore' state, "
+      echo "so there is nothing to be committed or cancelled"
+      echo ""
+      set +e
+      return 1
+    fi
+
+  # Else if first arg is NOT 'cancel' or 'commit'
+  else
+
+    # Set up restore choice based on 1st arg for "full" scenario or based on 2nd arg for "dump" and "uploads" scenarios
+    if [[ "$scenario" = "full" ]]; then
+      tag="${1:-}"
+    elif [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
+      if [[ "$parent_repo" = "false" || "$parent_repo" != "${2:-}" ]]; then
+        tag="${2:-}"
+      else
+        tag=""
+      fi
+    else
+      tag=""
+    fi
+
+    # If first argument is 'dump' or 'uploads'
+    if [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
+      if [[ -z "$tag" ]]; then
+        echo -en "\nRESTORE ONLY: ${g}${1:-}${d}"
+        if [[ "$parent_repo" != "false" ]]; then echo -e ", FROM: ${g}$parent_repo${d}"; fi
+        echo
+      fi
+
+    # Else prevent full restore from parent repo, if needed
+    elif [[ "$parent_repo" != "false" ]]; then
+      echo "You can't involve parent repo for full restore"
+      set +e
+      return 1
+    fi
+
+    # Declare global associative $releases array
+    declare -gA releases=()
+
+    # If CACHED=1 was prepended to 'source restore ...' command,
+    # which is the case only when command is triggered by Flask
+    if [[ "${CACHED:-}" = "1" ]]; then
+
+      # Set cache filename
+      file="var/tmp/choices.json"
+
+      # If cache file exists
+      if [[ -f "$file" ]]; then
+
+        # Get file change time in seconds
+        ctime=$(stat -c %Y "$file")
+
+        # Get current time in seconds
+        now=$(date +%s)
+
+        # Calculate the age in seconds
+        age=$(( now - ctime ))
+
+        # If cache file is updated less than 5 minutes ago
+        if (( age < 300 )); then
+
+          # Detect key in json object under which the info for the right repo is stored
+          if [[ "$parent_repo" != "false" ]]; then
+            which="parent"
+          else
+            which="current"
+          fi
+
+          # Parse cache file json and populate that array
+          while IFS=$'\t' read -r tagName name; do releases["$tagName"]="$name";
+          done < <(jq -r '.'$which'.list[] | "\(.tag_name)\t\(.name)"' "$file")
+        fi
+      fi
+    fi
+
+    # Get repo name from where to restore dump or uploads
+    if [[ "$parent_repo" != "false" ]]; then
+      from_repo="$parent_repo"
+    else
+      from_repo="$(get_current_repo)"
+    fi
+
+    # If $releases has at least one item
+    if (( ${#releases[@]} > 0 )); then
+
+      # Set up $selected as $tag
+      selected="$tag"
+
+    # Else
+    else
+
+      # Load backups list and ask user to select one unless $tag is not empty
+      release_choices "to be restored" "$tag" "$from_repo"
+      if [[ $? -eq 1 ]]; then set +e; echo ""; return 1; fi
+    fi
+
+    # If nothing was selected - return
+    if [[ -z "${selected:-}" ]]; then
+      echo "No version selected for restore"
+      set +e
+      return 1
+    fi
+
+    # Get selected
+    choice_title=$(get_release_title $selected)
+
+    # Print selected
+    echo -e "SELECTED VERSION: ${g}${choice_title}${d}\n"
+
+    # If full restore needed
+    if [[ "$scenario" = "full" ]]; then
+
+      # If we're going to enter into an 'uncommitted restore' state then
+      # do a preliminary local backup of current state so that we'll be
+      # able to get back if restore will be cancelled
+      backup_current_state_locally "data/before"
+    fi
+
+    # If first argument is NOT given or is given as "uploads"
+    if [[ "$scenario" = "full" || "$scenario" = "uploads" ]]; then
+
+      # Restore uploads
+      restore_uploads "$selected" "$from_repo"
+
+      # If $tag is given - print a new line
+      [[ ! -z "$tag" ]] && echo ""
+    fi
+
+    # If first argument is NOT given or is given as "dump"
+    if [[ "$scenario" = "full" || "$scenario" = "dump" ]]; then
+
+      # Download dump, stop MySQL, purge MySQL data, and wait for mysql re-init
+      restore_dump "$selected" "$from_repo"
+
+      # If $tag is given - print a new line
+      [[ ! -z "$tag" ]] && echo ""
+    fi
+
+    # If full restore needed - restore source code in custom/ dir
+    if [[ "$scenario" = "full" ]]; then
+      restore_source "$selected" "custom"
+    fi
+  fi
+
+  # If we're in an uncommitted restore state
+  if is_uncommitted_restore; then
+
+    # Print the restored version
+    echo -e "RESTORED VERSION: ${g}$(git notes show)${d}\n"
+
+    # Print the clarification
+    echo "Your development instance is now in an 'uncommitted restore' state. Now you can"
+    echo "look around and decide whether the version you've just restored - is REALLY the"
+    echo "right one for keeping this instance at and for switching other instances to, if"
+    echo "any, once any updated. If so - run 'source restore commit' command. Otherwise,"
+    echo "you can either restore backup for another version via 'source restore' command,"
+    echo "or you can cancel the restore via 'source restore cancel' command."
+    echo ""
+    echo "IMPORTANT: Creation of ANY new backups for this instance - is prevented until"
+    echo "           your current restore is committed or cancelled."
+    echo ""
+
+  # Else if we've cancelled restore - print corresponding message
+  elif [[ "$scenario" = "cancel" ]]; then
+    echo ""
+    echo "Your $APP_ENV instance is now reverted to the original version,"
+    echo "which was active BEFORE you've entered in an 'uncommitted restore' state,"
+    echo "so your instance is not in that state anymore and this means that"
+    echo "backups creation is not prevented anymore as well."
+    echo ""
+  fi
+fi
+

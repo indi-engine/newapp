@@ -8,7 +8,7 @@ php_value magic_quotes_gpc Off
 php_value error_reporting 30711
 php_value display_errors On
 Options FollowSymLinks
-RedirectMatch 404 (\.(sql|ini|git|env)|log/)
+RedirectMatch 404 \.(ini|git)
 
 #################
 ## Compression ##

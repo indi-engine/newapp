@@ -1,0 +1,43 @@
+#!/bin/bash
+
+# Clear the terminal log
+clear
+
+# Get current dir name as it's used as prefix for all container names
+dir=$(basename "$PWD")
+
+# Load functions
+source maintain/functions.sh
+
+# If .env file does not exist - create it with prompting some values where
+# needed, and get the whole project up and running for the very first time
+if [[ ! -f ".env" ]]; then
+  prepare_env ".env.dist"
+  getup
+
+# Else if .env file exists and named volumes exist for the project, it means
+# the whole project have been previously got up and running, so now we get it
+# up and running again with preliminary (re)creation of missing containers, if need
+elif docker volume ls --format '{{.Name}}' | grep -q "^${dir//./}_"; then
+  docker compose up -d
+
+# Else if .env and .env.hard files - exist, but volumes - not exist, it means
+# it's a hard copy that has NOT been previously got up and running, so we do all
+# the normal getup steps except that .env file (which already exists due to comes
+# with hard copy) will be overwritten with a new one created based on .env.hard
+# instead of .env.dist, so that user is NOT prompted for GH_*_TOKEN variables because
+# it's pre-filled with a valid value in .env.dist file, but user will still be
+# prompted for empty others, e.g. LET_ENCRYPT_DOMAIN, EMAIL_SENDER_DOMAIN and APP_ENV
+elif [[ -f ".env.hard" ]]; then
+  prepare_env ".env.hard"
+  getup
+
+# Else if we have .env file, but have NO volumes and have NO .env.hard file
+# it means the whole project have been previously got up and running but at
+# least volumes and .env.hard file were removed for some reason, so to get
+# the project up and running we do all of the ordinary steps except that .env
+# file (re)creation is skipped
+else
+  getup
+fi
+

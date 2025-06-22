@@ -2,38 +2,49 @@ services:
 
   apache:
     build:
-      dockerfile: compose/Dockerfile
+      dockerfile: compose/apache/Dockerfile
       args:
         - DOC=${DOC}
+        - GH_TOKEN_SYSTEM=${GH_TOKEN_SYSTEM}
     ports:
       - "80:80"
       - "443:443"
     depends_on:
-      mysql:
-        condition: service_healthy
-        restart: true
+      wrapper:
+        condition: service_started
       rabbitmq:
         condition: service_healthy
+    #restart: always
     environment:
       DOC: ${DOC}
       MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
-      GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
-      GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
+      MYSQL_USER: ${MYSQL_USER:-custom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
+      MYSQL_NAME: ${MYSQL_DATABASE:-custom}
       LETS_ENCRYPT_DOMAIN: ${LETS_ENCRYPT_DOMAIN:-}
+      LETS_ENCRYPT_NOTIFY: ${GIT_COMMIT_EMAIL:-}
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-}
+      GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
+      APP_ENV: ${APP_ENV}
+    working_dir: ${DOC}
     volumes:
-      - ./:${DOC}/
-      - mysql_server_data:/var/lib/mysql
-      - mysql_client_binaries:/usr/bin/mysql_client_binaries
+      - ./custom/:${DOC}/
       - letsencrypt:/etc/letsencrypt
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
-      - ./compose/php.system.ini:/etc/php/8.3/apache2/conf.d/php.system.ini
-      - ./compose/php.system.ini:/etc/php/8.3/cli/conf.d/php.system.ini
+      - ./compose/apache/php.system.ini:/usr/local/etc/php/conf.d/php.system.ini
+      - ./compose/apache/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./compose/apache/apache2.conf:/etc/apache2/conf-enabled/custom.conf:ro
+      - ./compose/apache/htpasswd.conf:/etc/apache2/conf-available/htpasswd.conf:ro
+      - ./compose/apache/crontab:/var/www/crontab:ro
+      - ./var/log/compose/apache/:/var/log/apache2
+      - ./var/log/custom:/var/log/custom
+      - ./var/tmp/:/var/www/tmp
 
   mysql:
     image: mysql:8.0.36-debian
+    #restart: always
     command:
       --default-authentication-plugin=mysql_native_password
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
@@ -43,32 +54,36 @@ services:
       --wait_timeout=31536000
       --max_execution_time=20000
       --slow_query_log=ON
-    ports:
-      - "3306:3306"
+      --general-log=OFF
+      --general-log-file=/var/log/mysql/general.log
+      --slow-query-log-file=/var/log/mysql/slow.log
     environment:
-      TZ: Europe/Berlin
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-custom}
+      TZ: ${TIMEZONE}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
       MYSQL_DUMP: ${MYSQL_DUMP}
-      GH_TOKEN: ${GH_TOKEN}
+      GH_TOKEN_CUSTOM: ${GH_TOKEN_CUSTOM}
+      GH_TOKEN_PARENT: ${GH_TOKEN_PARENT}
+      GH_TOKEN_SYSTEM: ${GH_TOKEN_SYSTEM}
+      APP_ENV: ${APP_ENV}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
-      - ./sql/:/docker-entrypoint-initdb.d/custom/
+      - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
+      - ./data/:/docker-entrypoint-initdb.d/custom/
       - ./.git/config:/docker-entrypoint-initdb.d/.gitconfig:ro
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/volumed
+      - ./var/log/compose/mysql:/var/log/mysql
     healthcheck:
       test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
-      start_period: 7m
+      start_period: 3m
       interval: 5s
-    entrypoint: /usr/local/bin/custom-entrypoint.sh
+    entrypoint: ["bash", "custom-entrypoint.sh"]
 
   rabbitmq:
     image: rabbitmq:3.10-management-alpine
-    ports:
-      - "15672:15672"
     volumes:
       - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
@@ -77,6 +92,38 @@ services:
       timeout: 20s
       retries: 10
     command: rabbitmq-server
+
+  wrapper:
+    build:
+      dockerfile: compose/wrapper/Dockerfile
+      args:
+        - DOC=${DOC}
+    restart: always
+    environment:
+      DOC: ${DOC}
+      GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
+      GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
+      GH_TOKEN_CUSTOM: ${GH_TOKEN_CUSTOM:-}
+      GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
+      MYSQL_USER: ${MYSQL_USER:-custom}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
+      MYSQL_DUMP: ${MYSQL_DUMP}
+      EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-$LETS_ENCRYPT_DOMAIN}
+      BACKUPS: ${BACKUPS:-}
+      APP_ENV: ${APP_ENV}
+      PYTHONUNBUFFERED: 1
+    working_dir: ${DOC}
+    depends_on:
+      mysql:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - ./:${DOC}/
+      - opendkim:/etc/opendkim
+      - ./compose/opendkim.conf:/etc/opendkim.conf
+      - mysql_server_data:/var/lib/mysql
+      - mysql_client_binaries:/usr/bin/mysql_client_binaries
 
 volumes:
   mysql_server_data:

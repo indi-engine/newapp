@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# Remove containers
+docker compose down
+
+# Recreate containers
+docker compose up -d

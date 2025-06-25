@@ -25,8 +25,14 @@ rm -f $base
 qty=$(find $source -mindepth 1 | wc -l)
 msg="Zipping $source into $uploads..."
 
-# Save current dir and goto dir to be zipped
-dir="$(pwd)"; cd "$source"
+# Save current dir
+dir="$(pwd)";
+
+# Create dir to be zipped, if not created so far
+[[ ! -d "$source" ]] && mkdir -p "$source"
+
+# Goto dir to be zipped
+cd "$source"
 
 # If source directory (current dir) is empty
 if [ -z "$(ls -A ".")" ]; then

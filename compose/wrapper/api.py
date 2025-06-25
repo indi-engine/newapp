@@ -173,6 +173,12 @@ def backup():
     if data.get('scenario') in ['dump', 'uploads']:
         command += f" {data.get('scenario')} --recent"
 
+    # If repo param is given - prepend as variable
+    if data.get('token'): command = f"TOKEN={data.get('token')} {command}"
+
+    # If repo param is given - prepend as variable
+    if data.get('repo'): command = f"REPO={data.get('repo')} {command}"
+
     # Run bash script and stream stdout/stderr
     return bash_stream(command, data)
 
@@ -277,4 +283,8 @@ def restore():
 
     # Run bash script and stream stdout/stderr
     return bash_stream(command, data)
+
+@app.route('/repo/name', methods=['GET'])
+def print_current_repo():
+    return jsonify({'success': True, 'name': get_current_repo()}), 200
 

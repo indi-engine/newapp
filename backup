@@ -18,6 +18,59 @@ else
   # Load functions
   source maintain/functions.sh
 
+  # If current repo is 'indi-engine/custom' - it means it's a clone of Indi Engine blank repo,
+  # so to be able to create a backup - we have to ask user to create own repo with access token
+  if [[ "$(get_current_repo)" = "indi-engine/custom" ]]; then
+
+    # If repo name is not given by $REPO variable from outside - prompt for it
+    if [[ "${REPO:-}" = "" ]]; then
+      href="${g}https://github.com/new${d}${gray}";
+      read_text "# Please create a repository at $href and input it's name:" "OWNER/REPO" true
+      repo="$INPUT_VALUE"
+      echo
+    else
+      repo="$REPO"
+    fi
+
+    # If access token is not given by $TOKEN variable from outside - prompt for it
+    if [[ "${TOKEN:-}" = "" ]]; then
+      href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
+      line1="# Please goto $href,"
+      line2="# create there and then input here a fine-grained personal access token"
+      line3="# granted with read-write access to the contents of that specific repository:"
+      read_text "$line1\n$line2\n$line3" "GH_TOKEN_CUSTOM" true
+      token="$INPUT_VALUE"
+      echo
+    else
+      token="$TOKEN"
+    fi
+
+    # Set value for GH_TOKEN_CUSTOM in .env
+    echo -n "Updating .env with GH_TOKEN_CUSTOM..."
+    sed -Ei 's~^(GH_TOKEN_CUSTOM=).*?$~\1'"$token"'~' .env && echo " Done"
+
+    # Export token and into current shell session
+    export GH_TOKEN_CUSTOM="$token"; export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+
+    # Change repo url in .git/config
+    echo -n "Changing cloned repo url to https://<token>@github.com/$repo ..."
+    git remote set-url origin "https://$token@github.com/$repo" && echo " Done"
+
+    # Push cloned repo to github
+    echo "Pushing cloned repo to github:"
+    git push -u origin main 2>&1 | prepend "» "
+
+    # Remove token from repo url in .git/config
+    echo -ne "Removing <token> from repo url..."
+    git remote set-url origin "https://github.com/$repo" && echo -e " Done\n"
+
+    # Do full backup
+    backup "${1:-custom}"
+
+    # Return
+    return 0
+  fi
+
   # Setup GH_TOKEN
   [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 

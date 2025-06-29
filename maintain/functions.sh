@@ -1477,7 +1477,7 @@ restore_source() {
 
   # Apply DevOps patch so that critical files a still at the most recent state
   echo -n "Forcing DevOps-setup files to be still at the latest version..."
-  git checkout master -- . ":(exclude)$dir"
+  git checkout main -- . ":(exclude)$dir"
   echo " Done"
 
   # Add note
@@ -1613,8 +1613,8 @@ cancel_restore_source() {
       git stash --quiet && git stash drop --quiet;
   fi
 
-  # Restore source code at master-branch
-  git checkout -q master
+  # Restore source code at main-branch
+  git checkout -q main
 
   # Print done
   echo -e " Done"
@@ -1745,7 +1745,7 @@ commit_restore() {
 
   # Checkout whole working dir was the latest version
   echo -n "» Switching source code to the latest version..."
-  git checkout master > /dev/null 2>&1
+  git checkout main > /dev/null 2>&1
   echo " Done"
 
   # However, checkout custom dir at the restored version
@@ -1762,7 +1762,7 @@ commit_restore() {
   git notes remove "$hash" 2> /dev/null
   echo " Done"
 
-  # Push changes to remote repo, and pull back for git log to show last commit in origin/master as well
+  # Push changes to remote repo, and pull back for git log to show last commit in origin/main as well
   echo ""
   git remote set-url origin https://$GH_TOKEN_CUSTOM@github.com/$(get_current_repo)
   git push

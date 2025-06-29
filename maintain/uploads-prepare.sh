@@ -16,7 +16,7 @@ uploads="$dir/uploads.zip"
 [ -d "$dir" ] || mkdir -p "$dir"
 
 # Get glob pattern for zip file(s)
-base="${uploads%.zip}".z*
+base="${uploads%.zip}.z*"
 
 # Remove all .z01, .z02, etc chunks for this archive including .zip file
 rm -f $base

@@ -21,8 +21,13 @@ base="${uploads%.zip}.z*"
 # Remove all .z01, .z02, etc chunks for this archive including .zip file
 rm -f $base
 
-# Create dir to be zipped, if not created so far
-[[ ! -d "$source" ]] && mkdir -p "$source"
+# If source dir not created so far - create, make it writable for www-data user and executable
+# to allow du-command to be runnable from within apache-container on behalf of www-data user
+if [[ ! -d "$source" ]]; then
+  mkdir -p "$source"
+  chown -R "www-data:www-data" "$source"
+  chmod +x "$source/../" "$source"
+fi
 
 # Get total files and folders to be added to zip
 qty=$(find $source -mindepth 1 | wc -l)

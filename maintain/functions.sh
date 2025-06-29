@@ -828,7 +828,7 @@ download_possibly_chunked_file() {
     else
       local msg="Downloading $file for selected version into data/ dir..." && echo $msg
       gh_download "$repo" "$release" "$file" "$dir"
-      if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then clear_last_lines 2; fi
+      if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then clear_last_lines 1; fi
       echo "$msg Done"
     fi
 

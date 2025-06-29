@@ -15,6 +15,9 @@ if command -v docker >/dev/null 2>&1; then
 # Else it means we're in the wrapper-container, so proceed with the restore
 else
 
+  # Refresh token
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
   # Set up restore scenario based on 1st arg
   if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" || "${1:-}" = "cancel" || "${1:-}" = "commit" ]]; then
     scenario="${1:-}"

@@ -71,6 +71,9 @@ else
     return 0
   fi
 
+  # Refresh token
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
   # Setup GH_TOKEN
   [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 

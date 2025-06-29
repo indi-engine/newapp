@@ -145,7 +145,7 @@ read_choice_env() {
     IFS=',' read -r -a choices <<< "$2"
 
     # Print tip
-    echo -e $1
+    echo -e "${gray}${1}${d}"
 
     # Print variable name with currently selected value
     echo "$ENV_NAME=${choices[$selected]}"

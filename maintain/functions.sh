@@ -1921,6 +1921,10 @@ mysql_entrypoint() {
 
       # Use system.sql
       import+=("system.sql.gz")
+
+    # Else remove system.sql.gz from current dir to prevent it from being imported, if need
+    elif [ -f "system.sql.gz" ]; then
+      rm "system.sql.gz"
     fi
 
     # Feed system token to GitHub CLI

@@ -21,15 +21,15 @@ base="${uploads%.zip}.z*"
 # Remove all .z01, .z02, etc chunks for this archive including .zip file
 rm -f $base
 
+# Create dir to be zipped, if not created so far
+[[ ! -d "$source" ]] && mkdir -p "$source"
+
 # Get total files and folders to be added to zip
 qty=$(find $source -mindepth 1 | wc -l)
 msg="Zipping $source into $uploads..."
 
 # Save current dir
 dir="$(pwd)";
-
-# Create dir to be zipped, if not created so far
-[[ ! -d "$source" ]] && mkdir -p "$source"
 
 # Goto dir to be zipped
 cd "$source"

@@ -7,6 +7,7 @@ user=$MYSQL_USER
 pass=$MYSQL_PASSWORD
 name=$MYSQL_DATABASE
 dump="$dir/$MYSQL_DUMP"
+pref="${2:-}"
 
 # Clear last X lines
 clear_last_lines() {
@@ -24,7 +25,7 @@ sql=$(echo "$dump" | sed 's/\.gz$//')
 export MYSQL_PWD=$pass
 
 # Estimate export as number of records to be dumped
-msg="Calculating total rows..."; echo $msg
+msg="${pref}Calculating total rows..."; echo $msg
 total=0; tables=0
 args="-h $host -u $user -N -e"
 for table in $(mysql $args 'SHOW TABLES FROM `'$name'`;'); do
@@ -37,7 +38,7 @@ done
 
 # Export dump with printing progress
 [ -d "$dir" ] || mkdir -p "$dir"
-msg="Exporting $(basename "$sql") into $dir/ dir...";
+msg="${pref}Exporting $(basename "$sql") into $dir/ dir...";
 mysqldump --single-transaction -h $host -u $user -y $name | \
   tee $sql | \
   grep --line-buffered '^INSERT INTO' | \
@@ -66,7 +67,7 @@ base=$gz*
 rm -f $base*
 
 # Gzip dump with splitting into chunks
-echo -n "Gzipping $(basename "$sql")..."
+echo -n "${pref}Gzipping $(basename "$sql")..."
 gzip -f $sql -c | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
 echo -n " Done"
 

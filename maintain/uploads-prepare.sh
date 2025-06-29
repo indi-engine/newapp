@@ -6,6 +6,9 @@ cd $DOC
 # Directory where to create the zip
 dir=${1:-data}
 
+# Prefix to every printed message
+pref="${2:-}"
+
 # Source dir to be zipped
 source="custom/data/upload"
 
@@ -31,10 +34,10 @@ fi
 
 # Get total files and folders to be added to zip
 qty=$(find $source -mindepth 1 | wc -l)
-msg="Zipping $source into $uploads..."
+msg="${pref}Zipping $source into $uploads..."
 
 # Save current dir
-dir="$(pwd)";
+dir="$(pwd)"
 
 # Goto dir to be zipped
 cd "$source"
@@ -55,7 +58,7 @@ else
   if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then
 
     # Zip with progress tracking
-    zip $args | awk -v qty="$qty" -v msg="$msg" '/ adding: / {idx++; printf "\r%s %d of %d\033[K", msg, idx, qty; fflush();}'
+    zip $args | awk -v qty="$qty" -v msg="$msg" '/ adding: / {idx++; printf "\r%s %d of %d\033[K     ", msg, idx, qty; fflush();}'
     clear_last_lines 1
     echo -en "\n$msg Done"
 
@@ -69,7 +72,7 @@ fi
 cd "$dir"
 
 # Get and print zip size
-size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b"
+size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b     "
 
 # Find all chunks
 chunks=$(ls -1 $base 2> /dev/null | sort -V)

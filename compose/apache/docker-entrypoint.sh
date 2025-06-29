@@ -6,13 +6,6 @@ if [[ ! -d "vendor" && -d "../vendor" ]]; then echo "Moving ../vendor back here.
 # Copy config.ini file from example one, if not exist
 ini="application/config.ini"; if [[ ! -f "$ini" ]]; then cp "$ini.example" "$ini"; fi
 
-# Command prefix to run something on behalf on www-data user
-run='/sbin/runuser '$user' -s /bin/bash -c'
-
-# Start php background processes
-$run 'php indi -d realtime/closetab'
-$run 'php indi realtime/maxwell/enable'
-
 # Apache pid-file
 pid_file="/var/run/apache2/apache2.pid"
 
@@ -130,6 +123,13 @@ chmod +x $DOC
 # Add executable right for $DOC/data and $DOC/data/upload dirs for du-command to be executable on behalf www-data user
 if [ -d "$DOC/data" ]; then chmod +x "$DOC/data"; fi
 if [ -d "$DOC/data/upload" ]; then chmod +x "$DOC/data/upload"; fi
+
+# Command prefix to run something on behalf on www-data user
+run='/sbin/runuser '$user' -s /bin/bash -c'
+
+# Start php background processes
+$run 'php indi -d realtime/closetab'
+$run 'php indi realtime/maxwell/enable'
 
 # Run original entrypoint script provided by base image
 echo "Apache started" && source /usr/local/bin/docker-php-entrypoint "apache2-foreground"

@@ -108,7 +108,7 @@ get_self_host() {
   if [[ ! -z $LETS_ENCRYPT_DOMAIN ]]; then
     host=${LETS_ENCRYPT_DOMAIN%% *}
   elif [[ $APP_ENV == "staging" ]]; then
-    host=$(curl http://ipecho.net/plain)
+    host=$(curl -sS --fail-with-body http://ipecho.net/plain)
   else
     host="localhost"
   fi

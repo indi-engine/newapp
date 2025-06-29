@@ -1816,6 +1816,10 @@ mysql_entrypoint() {
     # Downloaded/copied dumps counter, to be used in filename prefix to preserve import order
     prefix=0
 
+    # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
+    # that are recognized by mysql entrypoint as importable/executable ones
+    rm -f ./*.sh ./*.sql ./*.sql.bz2 ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
+
     # Foreach dump
     for dump in "${dumpA[@]}"; do
 
@@ -1921,10 +1925,6 @@ mysql_entrypoint() {
 
       # Use system.sql
       import+=("system.sql.gz")
-
-    # Else remove system.sql.gz from current dir to prevent it from being imported, if need
-    elif [ -f "system.sql.gz" ]; then
-      rm "system.sql.gz"
     fi
 
     # Feed system token to GitHub CLI

@@ -1284,34 +1284,50 @@ get_parent_repo() {
   # Shortcut to json query
   local jq=".parent.full_name, .template_repository.full_name"
   local uri="/repos/${repo}"
+  local url
   local info
+  local forked_from
+  local templated_from
+  local parent_repo
 
-  # Get current repo info
+  # If GH_TOKEN_CUSTOM is given
   if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
-    info=$(gh api "$uri" --jq "$jq")
+
+    # Setup GH_TOKEN if not given
+    [[ -z ${GH_TOKEN:-} ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+
+    # Get current repo info
+    set +e
+    url="$uri"
+    info=$(gh api "$url" 2>&1); exit_code=$?
+    set -e
+
+  # Else
   else
 
-    # Get repo info
+    # Get current repo info
     set +e
     url="https://api.github.com$uri"
     info=$(curl -sS --fail-with-body "$url" 2>&1); exit_code=$?
     set -e
-
-    # If curl failed - return error, else clear last 2 lines
-    if [[ exit_code -ne 0 ]]; then
-      echo "null"
-      echo "$url" >&2
-      echo "$info" >&2
-      return 1
-    else
-      # Get global parent_repo variable and print it
-      info=$(echo "$info" | jq -r "$jq")
-      local forked_from=$(echo "$info" | head -n 1)
-      local templated_from=$(echo "$info" | sed -n '2p')
-      parent_repo=${forked_from:-$templated_from}
-      echo $parent_repo
-    fi
   fi
+
+  # If request failed - return error, else clear last 2 lines
+  if [[ exit_code -ne 0 ]]; then
+    echo "null"
+    echo "$url" >&2
+    echo "$info" >&2
+    return 1
+  else
+    # Get global parent_repo variable and print it
+    info=$(echo "$info" | jq -r "$jq")
+  fi
+
+  # Get parent repo
+  forked_from=$(echo "$info" | head -n 1)
+  templated_from=$(echo "$info" | sed -n '2p')
+  parent_repo=${forked_from:-$templated_from}
+  echo $parent_repo
 }
 
 # Unzip given file into a given destination

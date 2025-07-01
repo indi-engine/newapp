@@ -18,11 +18,18 @@ else
   # Load functions
   source maintain/functions.sh
 
+  # Pick GH_TOKEN_CUSTOM from .env
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
+  # Set up is_cloned flag and has_token flags
+  if [[ "$(get_current_repo)" = "indi-engine/custom" ]]; then is_cloned=true; else is_cloned=false; fi
+  if [[ "$GH_TOKEN_CUSTOM" = "" ]]; then has_token=false; else has_token=true; fi
+
   # If current repo is 'indi-engine/custom' - it means it's a clone of Indi Engine blank repo,
   # so to be able to create a backup - we have to ask user to create own repo with access token
-  if [[ "$(get_current_repo)" = "indi-engine/custom" ]]; then
+  if [[ $is_cloned = true ]]; then
 
-    # If repo name is not given by $REPO variable from outside - prompt for it
+    # If repo name is NOT given by $REPO variable from outside - prompt for it
     if [[ "${REPO:-}" = "" ]]; then
       href="${g}https://github.com/new${d}${gray}";
       read_text "# Please create a repository at $href and input it's name:" "OWNER/REPO" true
@@ -31,13 +38,18 @@ else
     else
       repo="$REPO"
     fi
+  fi
+
+  # If access token is not yet specified
+  if [[ $has_token = false ]]; then
 
     # If access token is not given by $TOKEN variable from outside - prompt for it
     if [[ "${TOKEN:-}" = "" ]]; then
+      repo=${repo:-$(get_current_repo)}
       href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
-      line1="# Please goto $href,"
-      line2="# create there and then input here a fine-grained personal access token"
-      line3="# granted with read-write access to the contents of that specific repository:"
+      line1="# Please goto $href, create"
+      line2="# there and input below a fine-grained personal access token with read-write"
+      line3="# access to the Contents of ${g}${repo}${gray} repository:"
       read_text "$line1\n$line2\n$line3" "GH_TOKEN_CUSTOM" true
       token="$INPUT_VALUE"
       echo
@@ -48,9 +60,10 @@ else
     # Set value for GH_TOKEN_CUSTOM in .env
     echo -n "Updating .env with GH_TOKEN_CUSTOM..."
     sed -Ei 's~^(GH_TOKEN_CUSTOM=).*?$~\1'"$token"'~' .env && echo " Done"
+  fi
 
-    # Export token and into current shell session
-    export GH_TOKEN_CUSTOM="$token"; export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+  # Push cloned repo to user's github
+  if [[ $is_cloned = true ]]; then
 
     # Change repo url in .git/config
     echo -n "Changing cloned repo url to https://<token>@github.com/$repo ..."
@@ -63,91 +76,101 @@ else
     # Remove token from repo url in .git/config
     echo -ne "Removing <token> from repo url..."
     git remote set-url origin "https://github.com/$repo" && echo -e " Done\n"
+  fi
+
+  # If repo was cloned or token was missing - do full initial backup
+  if [[ $is_cloned = true || $has_token = false ]]; then
+
+    # Pick GH_TOKEN_CUSTOM from .env again, because at this point it might have been updated there
+    export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
+    # Export token and into current shell session
+    export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 
     # Do full backup
     backup "${1:-custom}"
 
-    # Return
-    return 0
-  fi
-
-  # Refresh token
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
-
-  # Setup GH_TOKEN
-  [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
-
-  # If we're in detached HEAD state - it means we did an unconfirmed restore
-  # so make sure new backups won't be created until restore is confirmed or cancelled
-  if is_uncommitted_restore; then
-    echo "Your MUST commit or cancel the restore you've done before."
-    echo "Do this using 'source restore commit' or 'source restore cancel' commands."
-    echo "Creation of ANY new backups is prevented until then."
-    echo ""
-
-  # Else if we're NOT in detached HEAD state - do the backup
+  # Else
   else
 
-    # Set up backup scenario based on 1st arg
-    if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" ]]; then
-      scenario="${1:-}"
+    # Refresh token
+    export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
+    # Setup GH_TOKEN
+    [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+
+    # If we're in detached HEAD state - it means we did an unconfirmed restore
+    # so make sure new backups won't be created until restore is confirmed or cancelled
+    if is_uncommitted_restore; then
+      echo "Your MUST commit or cancel the restore you've done before."
+      echo "Do this using 'source restore commit' or 'source restore cancel' commands."
+      echo "Creation of ANY new backups is prevented until then."
+      echo ""
+
+    # Else if we're NOT in detached HEAD state - do the backup
     else
-      scenario="full"
-    fi
 
-    # Set up most_recent flag
-    if [[ "$scenario" != "full" && "${2:-}" = "--recent" ]]; then
-      most_recent=1
-    else
-      most_recent=0
-    fi
-
-    # If first argument is 'dump' or 'uploads'
-    if [[ "$scenario" != "full" ]]; then
-
-      # Print that we're going to update dump (or uploads) inside already existing backup
-      if [[ $most_recent = 0 ]]; then
-        echo -e "\nBACKUP ONLY: $scenario\n"
+      # Set up backup scenario based on 1st arg
+      if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" ]]; then
+        scenario="${1:-}"
+      else
+        scenario="full"
       fi
 
-      # Ask user to select which backup should be patched with new dump or uploads
-      release_choices "to be patched" $most_recent
-
-      # If there was a manual choice for backup version to be patched
-      if [[ $most_recent = 0 ]]; then
-
-        # Print that version
-        echo -e "SELECTED VERSION: $(get_release_title $selected)\n"
-
-      # Else
+      # Set up most_recent flag
+      if [[ "$scenario" != "full" && "${2:-}" = "--recent" ]]; then
+        most_recent=1
       else
+        most_recent=0
+      fi
 
-        # If most recent version's environment does match the current instance's environment
-        if [[ "${selected:0:1}" == "${APP_ENV:0:1}" ]]; then
+      # If first argument is 'dump' or 'uploads'
+      if [[ "$scenario" != "full" ]]; then
 
-          # Print version to be patched
-          echo -e "VERSION TO PATCH: ${g}$(get_release_title $selected)${d}\n"
+        # Print that we're going to update dump (or uploads) inside already existing backup
+        if [[ $most_recent = 0 ]]; then
+          echo -e "\nBACKUP ONLY: $scenario\n"
+        fi
+
+        # Ask user to select which backup should be patched with new dump or uploads
+        release_choices "to be patched" $most_recent
+
+        # If there was a manual choice for backup version to be patched
+        if [[ $most_recent = 0 ]]; then
+
+          # Print that version
+          echo -e "SELECTED VERSION: $(get_release_title $selected)\n"
 
         # Else
         else
 
-          # Print a message there is nothing can be patched
-          echo -e "VERSION TO PATCH: ${r}no $APP_ENV backups created so far,${d}"
-          echo -e "                  ${g}so creating new custom $APP_ENV backup ${d}\n"
+          # If most recent version's environment does match the current instance's environment
+          if [[ "${selected:0:1}" == "${APP_ENV:0:1}" ]]; then
 
-          # Pivot backup scenario to full new custom backup
-          scenario="full"
+            # Print version to be patched
+            echo -e "VERSION TO PATCH: ${g}$(get_release_title $selected)${d}\n"
+
+          # Else
+          else
+
+            # Print a message there is nothing can be patched
+            echo -e "VERSION TO PATCH: ${r}no $APP_ENV backups created so far,${d}"
+            echo -e "                  ${g}so creating new custom $APP_ENV backup ${d}\n"
+
+            # Pivot backup scenario to full new custom backup
+            scenario="full"
+          fi
         fi
+
+        # Do backup as per scenario
+          if [[ "$scenario" = "dump"    ]]; then backup_dump "$selected";
+        elif [[ "$scenario" = "uploads" ]]; then backup_uploads "$selected";
+        elif [[ "$scenario" = "full"    ]]; then backup "custom"; fi
+
+      # Else do full custom backup
+      else
+        backup "${1:-custom}"
       fi
-
-      # Do backup as per scenario
-        if [[ "$scenario" = "dump"    ]]; then backup_dump "$selected";
-      elif [[ "$scenario" = "uploads" ]]; then backup_uploads "$selected";
-      elif [[ "$scenario" = "full"    ]]; then backup "custom"; fi
-
-    # Else do full custom backup
-    else
-      backup "${1:-custom}"
     fi
   fi
 fi

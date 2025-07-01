@@ -237,7 +237,7 @@ def restore_choices():
     parent_repo = get_parent_repo()
 
     # If detected
-    if (parent_repo != "null"):
+    if (parent_repo not in ["null", "indi-engine/custom"]):
 
         # Append 'parent'-key into choices object
         choices['parent'] = {'name': parent_repo, 'list': []}
@@ -284,7 +284,18 @@ def restore():
     # Run bash script and stream stdout/stderr
     return bash_stream(command, data)
 
-@app.route('/repo/name', methods=['GET'])
-def print_current_repo():
-    return jsonify({'success': True, 'name': get_current_repo()}), 200
+@app.route('/backup/status', methods=['GET'])
+def backup_status():
+
+    # Setup has_token flag
+    has_token = False
+    with open('.env') as f:
+        for line in f:
+            if line.startswith('GH_TOKEN_CUSTOM='):
+                value = line.strip().split('=', 1)[1]
+                has_token = bool(value)
+                break
+
+    # Return backup status as current repo name and has_token flag
+    return jsonify({'success': True, 'repo': get_current_repo(), 'has_token': has_token}), 200
 

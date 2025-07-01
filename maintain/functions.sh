@@ -1676,7 +1676,7 @@ prepare_backup_tag() {
   if (( is_rotated_backup )); then
 
     # Print a newline
-    echo ""
+    echo -e "\nRotating backups:"
 
     # Iterate over each expected backup starting from the oldest one and up to the most recent one
     for ((backup_idx=$((rotated_qty-1)); backup_idx>=0; backup_idx--)); do
@@ -1689,7 +1689,7 @@ prepare_backup_tag() {
       if [[ $backup_idx -eq $((rotated_qty - 1)) ]]; then
 
         # Print where we are
-        echo -n "${p}Oldest: $tag - "
+        echo -n "${p}» Oldest: $tag - "
 
         # Delete backup (if exists)
         delete_release "$tag"
@@ -1700,9 +1700,9 @@ prepare_backup_tag() {
 
         # Print where we are
         if [[ $backup_idx -ne 0 ]]; then
-          echo -n "${p}Newer: $tag - "
+          echo -n "${p}» Newer : $tag - "
         else
-          echo -n "${p}Newest: $tag - "
+          echo -n "${p}» Newest: $tag - "
         fi
 
         # Move release (if exists) from current tag to older tag
@@ -2194,6 +2194,9 @@ wrapper_entrypoint() {
   # Start opendkim and postfix to be able to send DKIM-signed emails via sendmail
   if [[ -f "/etc/opendkim/trusted.hosts" ]]; then service opendkim start; fi
   service postfix start
+
+  # Refresh token
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
 
   # Export GH_TOKEN from $GH_TOKEN_CUSTOM
   [[ ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"

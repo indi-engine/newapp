@@ -32,6 +32,14 @@ def queue_exists(channel, name):
     except ChannelClosedByBroker:
         return False, channel.connection.channel()
 
+# Get value of GH_TOKEN_CUSTOM variable from .env file
+def get_token():
+    with open('.env') as f:
+        for line in f:
+            if line.startswith('GH_TOKEN_CUSTOM='):
+                return line.strip().split('=', 1)[1]
+    return ''
+
 # Send websocket message to open xterm in Indi Engine UI
 def ws(to, data, mq, mysql):
 
@@ -219,11 +227,16 @@ def restore_choices():
     # Prepare choices object
     choices = {'current': {'name': get_current_repo(), 'list': []}}
 
+    # Get GH_TOKEN_CUSTOM from .env
+    token = get_token()
+
+    # Prepare curl command
+    command = ['curl']
+    if bool(token): command += ['-H', f'Authorization: Bearer {token}']
+    command += ['-sS', '--fail-with-body', url := 'https://api.github.com/repos/' + choices['current']['name'] + '/releases']
+
     # Get restore choices list for current repo
-    list = subprocess.run(
-        ['curl', '-sS', '--fail-with-body', url := 'https://api.github.com/repos/' + choices['current']['name'] + '/releases'],
-        capture_output=True, text=True
-    )
+    list = subprocess.run(command, capture_output=True, text=True)
 
     # If something went wrong - flush failure
     if list.returncode != 0:
@@ -242,11 +255,13 @@ def restore_choices():
         # Append 'parent'-key into choices object
         choices['parent'] = {'name': parent_repo, 'list': []}
 
-        # Get restore choices list for parent repo
-        list = subprocess.run(
-            ['curl', '-sS', 'https://api.github.com/repos/' + choices['parent']['name'] + '/releases'],
-            capture_output=True, text=True
-        )
+        # Prepare curl command
+        command = ['curl']
+        if bool(token): command += ['-H', f'Authorization: Bearer {token}']
+        command += ['-sS', '--fail-with-body', url := 'https://api.github.com/repos/' + choices['parent']['name'] + '/releases']
+
+        # Get restore choices list for current repo
+        list = subprocess.run(command, capture_output=True, text=True)
 
         # If something went wrong - flush failure
         if list.returncode != 0: return jsonify({'success': False, 'msg': list.stderr}), 500
@@ -287,15 +302,6 @@ def restore():
 @app.route('/backup/status', methods=['GET'])
 def backup_status():
 
-    # Setup has_token flag
-    has_token = False
-    with open('.env') as f:
-        for line in f:
-            if line.startswith('GH_TOKEN_CUSTOM='):
-                value = line.strip().split('=', 1)[1]
-                has_token = bool(value)
-                break
-
     # Return backup status as current repo name and has_token flag
-    return jsonify({'success': True, 'repo': get_current_repo(), 'has_token': has_token}), 200
+    return jsonify({'success': True, 'repo': get_current_repo(), 'has_token': bool(get_token())}), 200
 

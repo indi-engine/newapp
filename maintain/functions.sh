@@ -1565,7 +1565,7 @@ restore_source() {
   echo " Done"
 
   # Add note
-  git notes add -m "$title · ${hash:0:7}"
+  git notes add -f -m "$title · ${hash:0:7}"
 
   # Apply composer packages state
   echo "Setting up composer packages state:"

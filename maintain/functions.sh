@@ -148,7 +148,7 @@ read_choice_env() {
     echo -e "${gray}${1}${d}"
 
     # Print variable name with currently selected value
-    echo "$ENV_NAME=${choices[$selected]}"
+    echo "$ENV_NAME=${choices[0]}"
 
     # Print instruction on how to use keyboard keys
     echo "" && echo "» Use the up and down arrow keys to navigate and press Enter to select."
@@ -1181,21 +1181,48 @@ gh_download() {
   local dir=${4:-data}
 
   # Shortcuts
-  local url="https://github.com/$repo/releases/download/$release/$file"
   local out="$dir/$file"
+  local url
+  local hdr
 
-  # Append auth token
+  # If $GH_TOKEN_CUSTOM is given it might mean the repo is private, and this will mean the asset won't be downloadable
+  # via ordinary public uri, so we have use retrieve another url from release info and then use that url for downloading
+  # the asset.
+  #
+  # Note: $GH_TOKEN_CUSTOM might be given also for public repo, but we anyway can use GitHub CLI and we do that way
+  # because otherwise we have to check for whether repo is private which would add unnecessary network overhead
   if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
-    local hdr="Authorization: Bearer ${GH_TOKEN_CUSTOM}"
+
+    # Get assets info for a given release
+    view=$(gh release view "$release" -R "$repo" --json assets)
+
+    # Get needed asset apiUrl usable for wget request
+    url="$(echo "$view" | jq -r '.assets[] | select(.name == "'"$file"'") | .apiUrl')"
+
+    # If asset not found - print error and return error code 1
+    if [[ "$url" = "" ]]; then
+      echo "Asset $file not found in $repo:$release" >&2
+      return 1
+    fi
+
+    # Set auth header
+    hdr="Authorization: Bearer ${GH_TOKEN_CUSTOM}"
+
+  # Else
   else
-    local hdr=""
+
+    # Set shortcut for public url
+    url="https://github.com/$repo/releases/download/$release/$file"
+
+    # Auth header not needed
+    hdr=""
   fi
 
   # Disable exit on error
   set +e
 
   # Run wget with progress bar only
-  wget --progress=bar --header="$hdr" --show-progress -q -O "$out" "$url"
+  wget --progress=bar --header="$hdr" --header="Accept: application/octet-stream" --show-progress -q -O "$out" "$url"
 
   # If wget failed
   if [[ $? -ne 0 ]]; then
@@ -2278,7 +2305,7 @@ wrapper_entrypoint() {
   make_very_first_release_if_need
 
   # Run HTTP api server
-  FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80 --reload
+  FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
 
   # If we reached this line, it means mysql was shut down
   echo "Flask server has been shut down"

@@ -1760,7 +1760,7 @@ prepare_backup_tag() {
   if (( is_rotated_backup )); then
 
     # Print a newline
-    echo -e "\nRotating backups:"
+    echo -e "\n${p}Rotating backups:"
 
     # Iterate over each expected backup starting from the oldest one and up to the most recent one
     for ((backup_idx=$((rotated_qty-1)); backup_idx>=0; backup_idx--)); do

@@ -48,7 +48,7 @@ else
       repo=${repo:-$(get_current_repo)}
       href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
       line1="# Please goto $href, create"
-      line2="# there and input below a fine-grained personal access token with read-write"
+      line2="# there and input here a fine-grained personal access token with read-write"
       line3="# access to the Contents of ${g}${repo}${gray} repository:"
       read_text "$line1\n$line2\n$line3" "GH_TOKEN_CUSTOM" true
       token="$INPUT_VALUE"

@@ -6,6 +6,9 @@ clear
 # Get current dir name as it's used as prefix for all container names
 dir=$(basename "$PWD")
 
+# Make sure execution stops on any error
+set -eu -o pipefail
+
 # Load functions
 source maintain/functions.sh
 

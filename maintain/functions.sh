@@ -1043,16 +1043,16 @@ longest_choice_length() {
 prepare_env() {
 
   # Input and output files
-  DIST=${1:-".env.dist"}
-  PROD=".env.prod"
+  local DIST=${1:-".env.dist"}
+  local PROD=".env.prod"
 
   # Clear the output file
   > "$PROD"
 
   # Reset description and required flag
-  TIP=""
-  REQ=false
-  enum_rex='\[enum=([a-zA-Z0-9_]+(,[a-zA-Z0-9_]+)*)\]'
+  local TIP=""
+  local REQ=false
+  local enum_rex='\[enum=([a-zA-Z0-9_]+(,[a-zA-Z0-9_]+)*)\]'
 
   # Read the file into an array, preserving lines with spaces
   mapfile -t lines < "$DIST"
@@ -1078,6 +1078,11 @@ prepare_env() {
       # Split by '=' into name and default value
       local ENV_NAME=$(echo "$line" | cut -d '=' -f 1)
       local DEFAULT_VALUE=$(echo "$line" | cut -d '=' -f 2-)
+
+      # Check if a function exists for adjusting TIP and REQ for the ENV_NAME prompt, and if yes - call it
+      if declare -f "env_$ENV_NAME" > /dev/null; then
+        env_$ENV_NAME
+      fi
 
       # If default value is empty
       if [[ -z $DEFAULT_VALUE ]]; then
@@ -1112,6 +1117,58 @@ prepare_env() {
 
   # Rename .env.prod to .env
   mv $PROD .env
+}
+
+# Spoof TIP and make GH_TOKEN_CUSTOM required if current repo is private
+env_GH_TOKEN_CUSTOM() {
+
+  # Don't put this directly into 'if' to make sure everything will stop on return 1, if happen
+  is_private=$(repo_is_private)
+
+  # If repo is private - spoof TIP and make GH_TOKEN_CUSTOM variable to be required
+  if [[ "$is_private" = true ]]; then
+    repo="${g}$(get_current_repo)${gray}"
+    href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
+    TIP="\n# [Required] Please goto $href,"
+    TIP+="\n# create there and input here a fine-grained personal access token with"
+    TIP+="\n# read-write access to the Contents of this $repo repository:"
+    REQ=true
+  fi
+}
+
+# Check whether given repo is private
+repo_is_private() {
+
+  # Argument #1: repo for which curl request should be executed
+  local repo="${1:-$(get_current_repo)}"
+
+  # Shortcut to json query
+  local uri="/repos/${repo}"
+  local url
+
+  # Get repo info
+  set +e
+  url="https://api.github.com$uri"
+  info=$(curl -sS --fail-with-body "$url" 2>&1); exit_code=$?
+  set -e
+
+  # If request failed
+  if [[ exit_code -ne 0 ]]; then
+
+    # If request failed because of 404 error - it means repo is private
+    if echo "$info" | grep -q "error: 404"; then
+      echo true
+
+    # Else if request failed due to some other reason - print error text and return error code 1
+    else
+      echo "$info" >&2
+      return 1
+    fi
+
+  # Else it means repo is public
+  else
+    echo false
+  fi
 }
 
 # Download file

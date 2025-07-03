@@ -32,11 +32,11 @@ def queue_exists(channel, name):
     except ChannelClosedByBroker:
         return False, channel.connection.channel()
 
-# Get value of GH_TOKEN_CUSTOM variable from .env file
-def get_token():
+# Get value of given variable from .env file
+def get_dot_env(name):
     with open('.env') as f:
         for line in f:
-            if line.startswith('GH_TOKEN_CUSTOM='):
+            if line.startswith(name + '='):
                 return line.strip().split('=', 1)[1]
     return ''
 
@@ -228,7 +228,7 @@ def restore_choices():
     choices = {'current': {'name': get_current_repo(), 'list': []}}
 
     # Get GH_TOKEN_CUSTOM from .env
-    token = get_token()
+    token = get_dot_env('GH_TOKEN_CUSTOM')
 
     # Prepare curl command
     command = ['curl']
@@ -303,5 +303,10 @@ def restore():
 def backup_status():
 
     # Return backup status as current repo name and has_token flag
-    return jsonify({'success': True, 'repo': get_current_repo(), 'has_token': bool(get_token())}), 200
+    return jsonify({
+        'success': True,
+        'repo': get_current_repo(),
+        'has_token': bool(get_dot_env('GH_TOKEN_CUSTOM')),
+        'GH_ASSET_MAX_SIZE': get_dot_env('GH_ASSET_MAX_SIZE')
+    }), 200
 

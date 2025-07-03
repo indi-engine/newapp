@@ -13,7 +13,10 @@ gray='\033[38;5;240m' #lightgray
 getup() {
 
   # Setup the docker compose project
-  docker compose up -d
+  set +e; docker compose up -d; exit_code=$?;
+
+  # If failed - return error
+  if [[ $exit_code -ne 0 ]]; then return 1; else set -e; fi
 
   # Pick LETS_ENCRYPT_DOMAIN and EMAIL_SENDER_DOMAIN from .env file, if possible
   LETS_ENCRYPT_DOMAIN=$(grep "^LETS_ENCRYPT_DOMAIN=" .env | cut -d '=' -f 2-)
@@ -275,8 +278,8 @@ load_releases() {
   # IMPORTANT: will be overwritten by any further calls of load_releases() function
   declare -gA releases=()
 
-  # If $GH_TOKEN_CUSTOM variable is given - work via via GitHub CLI
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
+  # If $GH_TOKEN variable is set - work via via GitHub CLI
+  if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     # Get current repo releases list via GitHub CLI
     list=$(gh release ls --json name,tagName -R "$repo" --jq '.[] | "\(.tagName)=\(.name)"')
@@ -334,6 +337,11 @@ load_releases() {
     # and right now it's a very first time when the whole 'docker compose'-based Indi Engine
     # instance is getting up and running for the current repo, so try to load releases of parent repo
     if [[ $parent_repo != "null" ]]; then
+
+      # If GH_TOKEN_PARENT is given - use it for loading releases of parent repo
+      if [[ ! -z "${GH_TOKEN_PARENT:-}" ]]; then export GH_TOKEN="${GH_TOKEN_PARENT:-}"; fi
+
+      # Load releases for parent repo
       load_releases "$parent_repo" "init"
     fi
   fi
@@ -631,7 +639,7 @@ load_remote_chunk_list() {
   local pattern="$3"
 
   # Load asset names
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
+  if [[ ! -z "${GH_TOKEN:-}" ]]; then
     local list=$(gh release view "$release" -R "$repo" --json assets --jq '.assets[].name | select(test("'$pattern'"))')
   else
     local list=$(curl -s "https://api.github.com/repos/$repo/releases/tags/$release" | jq -r '.assets[].name | select(test("'$pattern'"))')
@@ -826,7 +834,7 @@ download_possibly_chunked_file() {
 
     # Else download the single file, overwriting the existing one, if any
     else
-      local msg="Downloading $file for selected version into data/ dir..." && echo $msg
+      local msg="Downloading $file for selected version into data/ dir..." && echo "$msg"
       gh_download "$repo" "$release" "$file" "$dir"
       if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then clear_last_lines 1; fi
       echo "$msg Done"
@@ -904,7 +912,7 @@ import_dump() {
     local msg="Starting MySQL server with import from data/ dir..." && echo "$msg"
     local elapsed=0
     local done="/var/lib/mysql/init.done"
-    local initTimeout=180 # todo: pick from docker-compose.yml:services.mysql.healthcheck.start_period
+    local initTimeout=600 # todo: pick from docker-compose.yml:services.mysql.healthcheck.start_period
     local waitTimeout=2
     while :; do
       clear_last_lines 1
@@ -1185,13 +1193,13 @@ gh_download() {
   local url
   local hdr
 
-  # If $GH_TOKEN_CUSTOM is given it might mean the repo is private, and this will mean the asset won't be downloadable
-  # via ordinary public uri, so we have use retrieve another url from release info and then use that url for downloading
+  # If $GH_TOKEN is given it might mean the repo is private, and in that case the asset won't be downloadable
+  # via ordinary public uri, so we have to retrieve another url from release info and then use that url for downloading
   # the asset.
   #
-  # Note: $GH_TOKEN_CUSTOM might be given also for public repo, but we anyway can use GitHub CLI and we do that way
+  # Note: $GH_TOKEN might be given also for public repo, but we anyway can use GitHub CLI and we do that way
   # because otherwise we have to check for whether repo is private which would add unnecessary network overhead
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
+  if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     # Get assets info for a given release
     view=$(gh release view "$release" -R "$repo" --json assets)
@@ -1206,7 +1214,7 @@ gh_download() {
     fi
 
     # Set auth header
-    hdr="Authorization: Bearer ${GH_TOKEN_CUSTOM}"
+    hdr="Authorization: Bearer ${GH_TOKEN}"
 
   # Else
   else
@@ -1309,6 +1317,9 @@ init_uploads_if_need() {
         echo "Asset '$file' will be downloaded from '$init_repo:$init_release'"
         download_possibly_chunked_file "$init_repo" "$init_release" "$file"
       fi
+
+      # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
+      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
     fi
 
     # If asset file does exist locally (due to it was just downloaded or it was already existing locally)
@@ -1374,11 +1385,8 @@ get_parent_repo() {
   local templated_from
   local parent_repo
 
-  # If GH_TOKEN_CUSTOM is given
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
-
-    # Setup GH_TOKEN if not given
-    [[ -z ${GH_TOKEN:-} ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
+  # If GH_TOKEN is given
+  if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     # Get current repo info
     set +e
@@ -1587,7 +1595,7 @@ release_choices() {
   declare -Ag releases=()
 
   # If GitHub CLI will be used
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
+  if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     local lerr="var/log/release_list.stderr"
     local list=$(script -q -c "gh release -R $repo list 2> $lerr" /dev/null)
@@ -1637,7 +1645,7 @@ release_choices() {
 
   # If no releases exist in github for $repo - print error and return
   if [[ "${#releases[@]}" -eq 0 ]]; then
-    echo "No backup versions available on github for this repo"
+    echo "No backup versions available on github for ${g}${repo}${d} repo"
     set +e
     return 1
   fi
@@ -1950,7 +1958,7 @@ mysql_entrypoint() {
         # e.g does NOT exist in custom/ directory in mysql-container due to bind volume mapping
         if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
 
-          # If GH_TOKEN_CUSTOM variable is set - install GitHub CLI
+          # If GH_TOKEN_CUSTOM variable is set - use it as GH_TOKEN
           if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
             export GH_TOKEN="$GH_TOKEN_CUSTOM"
           fi
@@ -1969,6 +1977,9 @@ mysql_entrypoint() {
             echo "Asset '$dump' will be downloaded from '$init_repo:$init_release'"
             download_possibly_chunked_file "$init_repo" "$init_release" "$dump" "custom"
           fi
+
+          # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
+          export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
         fi
 
         # Refresh local chunks array, as they might have been downloaded from github

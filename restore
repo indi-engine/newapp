@@ -15,8 +15,9 @@ if command -v docker >/dev/null 2>&1; then
 # Else it means we're in the wrapper-container, so proceed with the restore
 else
 
-  # Refresh token
+  # Refresh tokens
   export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_PARENT="$(grep "^GH_TOKEN_PARENT=" .env | cut -d '=' -f 2-)"
 
   # Set up restore scenario based on 1st arg
   if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" || "${1:-}" = "cancel" || "${1:-}" = "commit" ]]; then
@@ -28,23 +29,38 @@ else
   # Set current_repo variable to be globally accessible
   current_repo="$(get_current_repo)"
 
-  # If --parent flag is given - try to detect parent repo, and if failed - stop with error
+  # If --parent flag is given
   if has_flag "--parent" "$@"; then
-    parent_repo="$(get_parent_repo "$current_repo")";
-    if [[ "$parent_repo" = "null" ]]; then
-      echo "Unable to detect parent repo for $(get_current_repo)" >&2
+
+    # If restore scenario is 'dump' or 'uploads'
+    if [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
+
+      # Set token as it's needed in get_parent_repo
+      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+
+      # Try to detect parent repo
+      parent_repo="$(get_parent_repo "$current_repo")"
+
+      # If failed - stop with error, else use parent repo's token, if given
+      if [[ "$parent_repo" = "null" ]]; then
+        echo "Unable to detect parent repo for $(get_current_repo)" >&2
+        return 1
+      else
+        export GH_TOKEN="${GH_TOKEN_PARENT:-}"
+      fi
+    else
+      echo "Restore from parent repo is supported only for 'dump' or 'uploads' scenarios" >&2
       return 1
     fi
-  # Else indicate parent repo won't be involved
+
+  # Else indicate parent repo won't be involved and use current repo's token
   else
     parent_repo="false"
+    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
   fi
 
   # Make sure execution stops on any error
   set -eu -o pipefail
-
-  # Setup GH_TOKEN
-  [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 
   # If first arg is 'cancel' or 'commit'
   if [[ "$scenario" = "cancel" || "$scenario" = "commit" ]]; then
@@ -91,7 +107,11 @@ else
       tag="${1:-}"
     elif [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
       if [[ "$parent_repo" = "false" || "$parent_repo" != "${2:-}" ]]; then
-        tag="${2:-}"
+        if [[ "${2:-}" = "--parent" ]]; then
+          tag=""
+        else
+          tag="${2:-}"
+        fi
       else
         tag=""
       fi
@@ -103,7 +123,7 @@ else
     if [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
       if [[ -z "$tag" ]]; then
         echo -en "\nRESTORE ONLY: ${g}${1:-}${d}"
-        if [[ "$parent_repo" != "false" ]]; then echo -e ", FROM: ${g}$parent_repo${d}"; fi
+        if [[ "$parent_repo" != "false" ]]; then echo -e ", FROM: ${g}$parent_repo${d}"; else echo; fi
         echo
       fi
 

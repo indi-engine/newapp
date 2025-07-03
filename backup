@@ -81,26 +81,20 @@ else
     git remote set-url origin "https://github.com/$repo" && echo -e " Done\n"
   fi
 
+  # Refresh token
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
+  # Export token and into current shell session
+  export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+
   # If repo was cloned or token was missing - do full initial backup
   if [[ $is_cloned = true || $has_token = false ]]; then
-
-    # Pick GH_TOKEN_CUSTOM from .env again, because at this point it might have been updated there
-    export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
-
-    # Export token and into current shell session
-    export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 
     # Do full backup
     backup "${1:-custom}"
 
   # Else
   else
-
-    # Refresh token
-    export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
-
-    # Setup GH_TOKEN
-    [[ -z ${GH_TOKEN:-} && ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN=${GH_TOKEN_CUSTOM:-}
 
     # If we're in detached HEAD state - it means we did an unconfirmed restore
     # so make sure new backups won't be created until restore is confirmed or cancelled

@@ -255,6 +255,9 @@ def restore_choices():
         # Append 'parent'-key into choices object
         choices['parent'] = {'name': parent_repo, 'list': []}
 
+        # Get GH_TOKEN_PARENT from .env
+        token = get_dot_env('GH_TOKEN_PARENT')
+
         # Prepare curl command
         command = ['curl']
         if bool(token): command += ['-H', f'Authorization: Bearer {token}']

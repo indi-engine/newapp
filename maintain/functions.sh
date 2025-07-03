@@ -760,7 +760,7 @@ upload_asset() {
   # Run curl with progress bar only
   # Enable exit on error back
   set +e
-  curl -fL -X POST -H "$hdr1" -H "$hdr2" --data-binary "@$asset" -o /dev/null -# "$url"; exit_code=$?;
+  curl -fL -X PUT -H "$hdr1" -H "$hdr2" --upload-file "$asset" -o /dev/null -# "$url"; exit_code=$?;
   set -e
 
   # If curl failed - return error, else clear last 2 lines

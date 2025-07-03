@@ -39,6 +39,9 @@ msg="${pref}Zipping $source into $uploads..."
 # Save current dir
 dir="$(pwd)"
 
+# Pick GH_ASSET_MAX_SIZE from .env
+export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
+
 # Goto dir to be zipped
 cd "$source"
 
@@ -72,13 +75,13 @@ fi
 cd "$dir"
 
 # Get and print zip size
-size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b     "
+size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b"
 
 # Find all chunks
 chunks=$(ls -1 $base 2> /dev/null | sort -V)
 
 # Print chunks qty if more than 1
-qty=$(echo "$chunks" | wc -l); if (( $qty > 1 )); then echo -n " ($qty chunks)"; fi
+qty=$(echo "$chunks" | wc -l); if (( $qty > 1 )); then echo -n " ($qty chunks)"; else echo -n "     "; fi
 
 # Print newline
 echo ""

@@ -780,20 +780,111 @@ upload_asset() {
 
 # Restore database state from the dump.sql.gz of a given release tag
 # If release tag is not given - existing data/dump.sql.gz file will be used
+# shellcheck disable=SC2120
 restore_dump() {
 
   # Arguments
   local release="${1:-}"
   local repo="${2:-$(get_current_repo)}"
 
-  # Name of the backup file
-  local file="dump.sql.gz"
+  # Expected dumps qty
+  expected=$(echo "$MYSQL_DUMP" | wc -w)
 
-  # Download possibly chunked dump.sql.gz using glob pattern dump.sql.gz*
-  download_possibly_chunked_file "$repo" "$release" "$file"
+  # Missing dumps counter (might be incremented in download_possibly_chunked_file call)
+  missing=0
 
-  # Empty mysql data-dir and restart mysql to re-init using downloaded dump
-  import_dump
+  # Download each (possibly chunked) dump file
+  for file in $MYSQL_DUMP; do
+    download_possibly_chunked_file "$repo" "$release" "$file" "" true
+  done
+
+  # If some (but not all) dumps are missing - print error
+  if [[ $expected -gt $missing && $missing -gt 0 ]]; then
+    echo "Some of SQL dump file(s) not found, assuming some error occurred" >&2
+    return 1
+  fi
+
+  # Stop maxwell and/or closetab php processes if any running
+  # Shut down mysql server, clean it's data/ dir and start back
+  stop_maxwell_and_closetab_if_need
+  reset_mysql
+
+  # Pick system token
+  export GH_TOKEN_SYSTEM="$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"
+
+  # If all expected dumps are missing
+  if [[ "$expected" = "$missing" ]]; then
+
+    # Print info
+    echo "None of expected SQL dump file(s) are found, assuming blank Indi Engine instance setup"
+
+    # Temporary switch to system token to download and import system dump
+    export GH_TOKEN="$GH_TOKEN_SYSTEM"
+    download_possibly_chunked_file "indi-engine/system" "default" "system.sql.gz"
+    import_possibly_chunked_dump "system.sql.gz"
+    export GH_TOKEN="$GH_TOKEN_CUSTOM"
+
+  # Else import each (possibly chunked) dump file
+  else
+    for file in $MYSQL_DUMP; do
+      import_possibly_chunked_dump "$file"
+    done
+  fi
+
+  # Prepare maxwell
+  export MYSQL_PWD=$MYSQL_PASSWORD
+  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'%';"
+  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'%';"
+  unset MYSQL_PWD
+
+  # If maxwell and/or closetab php processes were running - enable back
+  start_maxwell_and_closetab_if_need
+}
+
+# Import dump with a given filename, or count
+import_possibly_chunked_dump() {
+
+  # Arguments
+  dump="$1"
+
+  # Shortcuts
+  local path="data/$dump"
+  local msg="Importing $dump"
+  local run="mysql -h mysql -u root custom"
+
+  # Prevent warning
+  export MYSQL_PWD=$MYSQL_PASSWORD
+
+  # If dump file exists in data/ directory - import
+  if [[ -f "$path" ]]; then
+
+    # If dump is gzipped - pipe to gunzip
+    if [[ "${dump##*.}" = "gz" ]]; then
+      pv --name "$msg" -pert "$path" | gunzip | $run
+    else
+      pv --name "$msg" -pert "$path" | $run
+    fi
+
+  # Else
+  else
+
+    # Get local chunks array, if any
+    shopt -s nullglob; chunks=("$path"[0-9][0-9]); shopt -u nullglob
+
+    # If chunks detected - import
+    if [[ ${#chunks[@]} -gt 0 ]]; then
+
+      # If dump is gzipped - pipe to gunzip
+      if [[ "${dump##*.}" = "gz" ]]; then
+        pv --name "$msg" -pert "${path}"[0-9][0-9] | gunzip | $run;
+      else
+        pv --name "$msg" -pert "${path}"[0-9][0-9] | $run;
+      fi
+    fi
+  fi
+
+  # Unset back
+  unset MYSQL_PWD
 }
 
 # Download possibly chunked file from github, based on glob pattern
@@ -804,6 +895,7 @@ download_possibly_chunked_file() {
   local release="$2"
   local file="$3"
   local dir="${4:-data}"
+  local count_missing=${5:-false}
 
   # Prepare glob pattern to find chunks, if any
   if [[ "$file" =~ \.zip$ ]]; then
@@ -851,34 +943,36 @@ download_possibly_chunked_file() {
       fi
     done
   fi
+
+  # Get file path and chunks paths, if any
+  local="$dir/$file"; shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
+
+  # If neither file exists nor chunks - increment missing files counter
+  if [[ ! -f "$local" && ${#chunks[@]} -eq 0 && $count_missing = true ]]; then
+      missing=$((missing + 1))
+  fi
 }
 
-# Shutdown mysql, empty data-dir and wait for mysql to re-init using pre-downloaded dump
-import_dump() {
+# Stop maxwell and/or closetab php processes if any running
+stop_maxwell_and_closetab_if_need() {
 
-  # Get maxwell status
-  if curl http://apache/realtime/status/ 2>&1 | grep -q maxwell; then
-    maxwell="enabled"
-  else
-    maxwell="disabled"
-  fi
+  # Get maxwell and closetab status
+  maxwell=false;  if curl http://apache/realtime/status/ 2>&1 | grep -q maxwell;  then maxwell=true; fi
+  closetab=false; if curl http://apache/realtime/status/ 2>&1 | grep -q closetab; then closetab=true; fi
 
-  # Get closetab status
-  if curl http://apache/realtime/status/ 2>&1 | grep -q closetab; then
-    closetab="enabled"
-  else
-    closetab="disabled"
-  fi
+  # If disable each, if needed
+  if [[ $maxwell = true ]];  then curl http://apache/realtime/maxwell/disable/ > /dev/null 2>&1; fi
+  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/        > /dev/null 2>&1; fi
+}
 
-  # If maxwell is enabled - disable it
-  if [[ "$maxwell" = "enabled" ]]; then
-    curl http://apache/realtime/maxwell/disable/ > /dev/null 2>&1
-  fi
+# If maxwell and/or closetab php processes were running - enable back
+start_maxwell_and_closetab_if_need() {
+  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/ > /dev/null 2>&1; fi
+  if [[ $maxwell = true ]];  then curl http://apache/realtime/maxwell/enable/ > /dev/null 2>&1; fi
+}
 
-  # If closetab is enabled - toggle it to disable
-  if [[ "$closetab" = "enabled" ]]; then
-    curl http://apache/realtime/closetab/ > /dev/null 2>&1
-  fi
+# Shut down mysql server, clean it's data/ dir and start back
+reset_mysql() {
 
   # Shut down mysql
   export MYSQL_PWD=$MYSQL_PASSWORD
@@ -909,10 +1003,10 @@ import_dump() {
     echo -n "Removing all data from MySQL server..." && rm -rf /var/lib/mysql/* && echo -e " Done"
 
     # Wait until re-init is really completed
-    local msg="Starting MySQL server with import from data/ dir..." && echo "$msg"
+    local msg="Starting up MySQL server back..." && echo "$msg"
     local elapsed=0
     local done="/var/lib/mysql/init.done"
-    local initTimeout=600 # todo: pick from docker-compose.yml:services.mysql.healthcheck.start_period
+    local initTimeout=60
     local waitTimeout=2
     while :; do
       clear_last_lines 1
@@ -920,9 +1014,9 @@ import_dump() {
       sleep 1
       elapsed=$((elapsed + 1))
 
-      # If init maxium time reached - break
+      # If init maximum time reached - break
       if [ $elapsed -ge $initTimeout ]; then
-        echo "MySQL init timeout reached, something went wrong :("
+        echo "MySQL empty init timeout reached, something went wrong :("
         exit 1
       fi
 
@@ -933,16 +1027,6 @@ import_dump() {
     done
     clear_last_lines 1
     echo "$msg Done"
-
-    # If closetab was enabled - toggle it to enable back
-    if [[ "$closetab" = "enabled" ]]; then
-      curl http://apache/realtime/closetab/ > /dev/null 2>&1
-    fi
-
-    # If maxwell was enabled - enabled it back
-    if [[ "$maxwell" = "enabled" ]]; then
-      curl http://apache/realtime/maxwell/enable/ > /dev/null 2>&1
-    fi
 
   # Else if shutdown is stuck somewhere - print error message and exit
   else
@@ -1897,170 +1981,12 @@ mysql_entrypoint() {
   # If init is not done
   if [[ ! -f "$done" ]]; then
 
-    # Install certain tools
-    apt-get update && apt-get install -y wget curl jq
-
-    # Install GitHub CLI
-    ghcli_install
-
-    # Print which dump is going to be imported
-    echo "MYSQL_DUMP is '$MYSQL_DUMP'";
-
     # Change dir
     cd /docker-entrypoint-initdb.d
-
-    # Array of other sql files to be imported
-    declare -a import=("maxwell.sql")
-
-    # Split MYSQL_DUMP on whitespace into an array
-    IFS=' ' read -ra dumpA <<< "$MYSQL_DUMP"
-
-    # Empty dumps counter
-    empty=0
-
-    # Missing dumps counter
-    missing=0
-
-    # Downloaded/copied dumps counter, to be used in filename prefix to preserve import order
-    prefix=0
 
     # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
     # that are recognized by mysql entrypoint as importable/executable ones
     rm -f ./*.sh ./*.sql ./*.sql.bz2 ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
-
-    # Foreach dump
-    for dump in "${dumpA[@]}"; do
-
-      # If dump is an URL
-      if [[ $dump == http* ]]; then
-
-        # Extract the filename from the URL and add counter-prefix
-        name="$prefix-$(basename "$dump")"
-
-        # Download it right here
-        echo "Fetching remote MySQL dump from '$dump' into local '$name' ..." && wget --no-check-certificate -O "$name" "$dump"
-
-        # Increment saved dumps counter
-        prefix=$((prefix + 1))
-
-      # Else assume it's a local path pointing to some file inside
-      # /docker-entrypoint-initdb.d/custom/ directory mapped as a volume
-      # from data/ directory on the docker host machine
-      else
-
-        # Dump file path
-        local="custom/$dump"
-
-        # Get local chunks array, if any
-        shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
-
-        # If that local dump file does NOT really exists in data/ directory on host machine
-        # e.g does NOT exist in custom/ directory in mysql-container due to bind volume mapping
-        if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
-
-          # If GH_TOKEN_CUSTOM variable is set - use it as GH_TOKEN
-          if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
-            export GH_TOKEN="$GH_TOKEN_CUSTOM"
-          fi
-
-          # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
-          # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
-          # download asset from, and it will refer to either current repo, or parent repo for cases when current repo
-          # has no releases so far, which might be true if it's a very first time of the instance getting up and running
-          # for the current repo
-          if (( ${#releaseQty[@]} == 0 )); then
-            load_releases "$(get_current_repo ".gitconfig")" "init"
-          fi
-
-          # Download it from github into data/ dir
-          if [[ ! -z "${init_repo:-}" ]]; then
-            echo "Asset '$dump' will be downloaded from '$init_repo:$init_release'"
-            download_possibly_chunked_file "$init_repo" "$init_release" "$dump" "custom"
-          fi
-
-          # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
-          export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
-        fi
-
-        # Refresh local chunks array, as they might have been downloaded from github
-        shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
-
-        # If that local dump file really exists in data/ directory on host machine
-        # e.g exists  in custom/ directory in mysql-container due to bind volume mapping
-        if [[ -f "$local" || ${#chunks[@]} -gt 0 ]]; then
-
-          # If chunks detected
-          if [[ ${#chunks[@]} -gt 0 ]]; then
-
-            # Copy each chunk to the level up for it to be imported, as files from subdirectories are ignored while import
-            for chunk in "${chunks[@]}"; do
-              cp "$chunk" "$prefix-${chunk##*/}" && echo "File '/docker-entrypoint-initdb.d/$chunk' copied to the level up"
-            done
-
-            # Increment saved dumps counter
-            prefix=$((prefix + 1))
-
-          # If that local dump file is not empty
-          elif [ -s "$local" ]; then
-
-            # Copy that file here for it to be imported, as files from subdirectories are ignored while import
-            cp "$local" "$prefix-$dump" && echo "File '/docker-entrypoint-initdb.d/$local' copied to the level up"
-
-            # Increment saved dumps counter
-            prefix=$((prefix + 1))
-
-          # Else
-          else
-
-            # Print warning
-            echo "[Warning] Local SQL dump file '$dump' is empty"
-
-            # Increment empty dumps counter
-            empty=$((empty + 1))
-          fi
-
-        # Else if that local dump file does not really exist
-        else
-
-          # Increment missing dumps counter
-          missing=$((missing + 1))
-        fi
-      fi
-    done
-
-    # If no dump(s) were given by MYSQL_DUMP-variable or all are empty/missing
-    if [ $(( ${#dumpA[@]} - empty - missing )) -eq 0 ]; then
-
-      # Print info
-      echo "None of SQL dump file(s) not found, assuming blank Indi Engine instance setup"
-
-      # Use system.sql
-      import+=("system.sql.gz")
-    fi
-
-    # Feed system token to GitHub CLI
-    export GH_TOKEN="$GH_TOKEN_SYSTEM"
-
-    # Foreach file to be imported in addition to file(s) in MYSQL_DUMP
-    for filename in "${import[@]}"; do
-
-      # Relative path of the downloaded file
-      local="custom/$filename"
-
-      # If file does not exist - download it
-      if [ ! -f "$local" ]; then
-        gh release download -R "indi-engine/system" "default" -p "${filename}" -D custom
-      fi
-
-      # Copy that file here for it to be imported, as files from subdirectories are ignored while import
-      cp "$local" "$filename" && echo "File '/docker-entrypoint-initdb.d/$local' copied to the level up"
-    done
-
-    # Feed custom token to GitHub CLI, back
-    export GH_TOKEN="$GH_TOKEN_CUSTOM"
-
-    # Spoof mysql user name inside maxwell.sql, if need
-    [[ $MYSQL_USER != "custom" ]] && sed -i "s~custom~$MYSQL_USER~" maxwell.sql
 
     # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
     # those two binaries with apache-container to be able to export/import sql-files
@@ -2074,16 +2000,6 @@ mysql_entrypoint() {
 
     # If 'init.done' file creation code was not yet added to native entrypoint script
     if ! grep -q "init.done" $native; then
-
-      # Append block of bash code that will process chunked gz-files
-      sed -Ei "/\*\.sql\.gz\).+?;;/r /dev/stdin" $native <<'EOF'
-			*.sql.gz[0-9][0-9])
-				if [[ "$f" =~ [^0-9]([0-9][0-9])$ && "${BASH_REMATCH[1]}" != "01" ]]; then continue; fi
-				base="${f%??}"
-				mysql_note "$0: running multi-part chunks starting from $f as $base"
-				cat "${base}"[0-9][0-9] | gunzip | docker_process_sql
-				;;
-EOF
 
       # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
       sed -i 's~Ready for start up."~&\n\t\t\ttouch /var/lib/mysql/init.done~' $native

@@ -66,6 +66,9 @@ base=$gz*
 # Remove existing gz file with chunks, if any
 rm -f $base*
 
+# Pick GH_ASSET_MAX_SIZE from .env
+export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
+
 # Gzip dump with splitting into chunks
 echo -n "${pref}Gzipping $(basename "$sql")..."
 gzip -f $sql -c | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz

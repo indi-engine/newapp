@@ -63,16 +63,9 @@ services:
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
-      MYSQL_DUMP: ${MYSQL_DUMP}
-      GH_TOKEN_CUSTOM: ${GH_TOKEN_CUSTOM}
-      GH_TOKEN_PARENT: ${GH_TOKEN_PARENT}
-      GH_TOKEN_SYSTEM: ${GH_TOKEN_SYSTEM}
-      APP_ENV: ${APP_ENV}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
-      - ./data/:/docker-entrypoint-initdb.d/custom/
-      - ./.git/config:/docker-entrypoint-initdb.d/.gitconfig:ro
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/volumed
       - ./var/log/compose/mysql:/var/log/mysql
@@ -104,6 +97,7 @@ services:
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
       GH_TOKEN_CUSTOM: ${GH_TOKEN_CUSTOM:-}
+      GH_TOKEN_SYSTEM: ${GH_TOKEN_SYSTEM:-}
       GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}

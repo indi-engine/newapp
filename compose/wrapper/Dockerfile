@@ -1,7 +1,7 @@
 FROM php:8.3-cli-bookworm
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy mc curl wget lsb-release cron bsdextrautils zip unzip jq python3-flask python3-pika python3-pexpect python3-pymysql p7zip-full
+RUN apt-get update && apt-get install -fy mc curl wget lsb-release cron bsdextrautils zip unzip jq python3-flask python3-pika python3-pexpect python3-pymysql p7zip-full pv
 
 ## </Misc> ##
 

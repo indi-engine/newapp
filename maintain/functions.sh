@@ -15,8 +15,14 @@ getup() {
   # Setup the docker compose project
   set +e; docker compose up -d; exit_code=$?;
 
+  # Windows: Git Bash specific fix
+  export GIT_PS1_SHOWCONFLICTSTATE=0
+
   # If failed - return error
   if [[ $exit_code -ne 0 ]]; then return 1; else set -e; fi
+
+  # Import files mentioned in MYSQL_DUMP with preliminary download, if need
+  mysql_import
 
   # Pick LETS_ENCRYPT_DOMAIN and EMAIL_SENDER_DOMAIN from .env file, if possible
   LETS_ENCRYPT_DOMAIN=$(grep "^LETS_ENCRYPT_DOMAIN=" .env | cut -d '=' -f 2-)
@@ -73,6 +79,88 @@ getup() {
 
   # Print newline and URL to proceed
   echo "Open your browser: $(get_self_href)"
+}
+
+# shellcheck disable=SC2120
+mysql_import() {
+
+  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  if command -v docker >/dev/null 2>&1; then
+    docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; mysql_import"
+    return 0
+  fi
+
+  # Print newline
+  echo
+
+  # Make sure execution stops on any error
+  set -eu -o pipefail
+
+  # Path to a file to be created once import is done
+  local done=/var/lib/mysql/import.done;
+
+  # If import is done - do nothing
+  if [[ -f "$done" ]]; then return 0; fi
+
+  # Collect missing dump files
+  missing=""
+  for dump in $MYSQL_DUMP; do
+    local="data/$dump"
+    shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
+    if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
+      if [[ "$missing" = "" ]]; then
+        missing="$dump"
+      else
+        missing="$missing $dump"
+      fi
+    fi
+  done
+
+  # If no expected dump files are missing
+  if [[ "$missing" = "" ]]; then
+
+    # Import the dump files that we have
+    for file in $MYSQL_DUMP; do
+      import_possibly_chunked_dump "$file"
+    done
+
+    # Run maxwell-specific sql
+    prepare_maxwell
+
+  # Else if at least one dump file is missing
+  else
+
+    # If GH_TOKEN_CUSTOM variable is set - use it as GH_TOKEN
+    if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then export GH_TOKEN="$GH_TOKEN_CUSTOM"; fi
+
+    # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
+    # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
+    # download asset from, and it will refer to either current repo, or parent repo for cases when current repo
+    # has no releases so far, which might be true if it's a very first time of the instance getting up and running
+    # for the current repo
+    if (( ${#releaseQty[@]} == 0 )); then
+      load_releases "$(get_current_repo)" "init"
+    fi
+
+    # Restore dump
+    if [[ ! -z "${init_repo:-}" ]]; then
+      restore_dump "$init_release" "$init_repo" "init"
+    fi
+
+    # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
+    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+  fi
+
+  # Create a file indicating that import is done
+  touch "$done"
+}
+
+# Run maxwell-specific sql
+prepare_maxwell() {
+  export MYSQL_PWD=$MYSQL_PASSWORD
+  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'%';"
+  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'%';"
+  unset MYSQL_PWD
 }
 
 # Get URL of current instance
@@ -786,6 +874,7 @@ restore_dump() {
   # Arguments
   local release="${1:-}"
   local repo="${2:-$(get_current_repo)}"
+  local step="${3:-}"
 
   # Expected dumps qty
   expected=$(echo "$MYSQL_DUMP" | wc -w)
@@ -806,8 +895,10 @@ restore_dump() {
 
   # Stop maxwell and/or closetab php processes if any running
   # Shut down mysql server, clean it's data/ dir and start back
-  stop_maxwell_and_closetab_if_need
-  reset_mysql
+  if [[ $step != "init" ]]; then
+    stop_maxwell_and_closetab_if_need
+    reset_mysql
+  fi
 
   # Pick system token
   export GH_TOKEN_SYSTEM="$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"
@@ -816,7 +907,7 @@ restore_dump() {
   if [[ "$expected" = "$missing" ]]; then
 
     # Print info
-    echo "None of expected SQL dump file(s) are found, assuming blank Indi Engine instance setup"
+    echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
 
     # Temporary switch to system token to download and import system dump
     export GH_TOKEN="$GH_TOKEN_SYSTEM"
@@ -831,14 +922,13 @@ restore_dump() {
     done
   fi
 
-  # Prepare maxwell
-  export MYSQL_PWD=$MYSQL_PASSWORD
-  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'%';"
-  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'%';"
-  unset MYSQL_PWD
+  # Run maxwell-specific sql
+  prepare_maxwell
 
   # If maxwell and/or closetab php processes were running - enable back
-  start_maxwell_and_closetab_if_need
+  if [[ $step != "init" ]]; then
+    start_maxwell_and_closetab_if_need
+  fi
 }
 
 # Import dump with a given filename, or count
@@ -850,7 +940,7 @@ import_possibly_chunked_dump() {
   # Shortcuts
   local path="data/$dump"
   local msg="Importing $dump"
-  local run="mysql -h mysql -u root custom"
+  local run="mysql -h mysql -u root $MYSQL_DATABASE"
 
   # Prevent warning
   export MYSQL_PWD=$MYSQL_PASSWORD
@@ -2031,7 +2121,7 @@ mysql_entrypoint() {
     # We assume it was done for restore
     echo "MySQL data-directory has been emptied, so initiating the restore..."
 
-    # Re-init, assuming sql dump file(s) are present in /docker-entrypoint-initdb.d/custom/
+    # Re-init
     mysql_entrypoint "$@"
   fi
 }
@@ -2136,6 +2226,12 @@ wrapper_entrypoint() {
   # Setup git commit author identity
   if [[ ! -z "$GIT_COMMIT_NAME"   && -z $(git config user.name)  ]]; then git config user.name  "$GIT_COMMIT_NAME" ; fi
   if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $(git config user.email) ]]; then git config user.email "$GIT_COMMIT_EMAIL"; fi
+
+  # Add github.com to known hosts, if missing
+  if ! grep -q "github.com" ~/.ssh/known_hosts; then ssh-keyscan github.com >> ~/.ssh/known_hosts; fi
+
+  # Setup github token for composer
+  composer --global config github-oauth.github.com "$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"
 
   # Setup git filemode
   git config --global core.filemode false

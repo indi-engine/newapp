@@ -15,9 +15,6 @@ getup() {
   # Setup the docker compose project
   set +e; docker compose up -d; exit_code=$?;
 
-  # Windows: Git Bash specific fix
-  export GIT_PS1_SHOWCONFLICTSTATE=0
-
   # If failed - return error
   if [[ $exit_code -ne 0 ]]; then return 1; else set -e; fi
 
@@ -1322,6 +1319,42 @@ env_GH_TOKEN_CUSTOM() {
   fi
 }
 
+# Spoof TIP and make GH_TOKEN_PARENT required if parent repo exists and is private
+env_GH_TOKEN_PARENT() {
+
+  # Get current repo name and visibility
+  local current_repo="$(get_current_repo)"
+  local current_is_private="$(repo_is_private "$current_repo")"
+
+  # If current repo is private - set GH_TOKEN as otherwise we won't be able to detect parent repo
+  if [[ "$current_is_private" = true ]]; then
+    export GH_TOKEN="$(grep "^GH_TOKEN_CUSTOM=" .env.prod | cut -d '=' -f 2-)"
+  fi
+
+  # Get parent repo, if any exists for current repo
+  local parent="$(get_parent_repo "$current_repo" true)"
+  local parent_repo="${parent%:*}"
+  local child_type="${parent#*:}"
+
+  # If parent repo exists and is not indi-engine/custom
+  if [[ $parent_repo != null && $parent_repo != "indi-engine/custom" ]]; then
+
+    # Check if parent repo is private
+    parent_is_private=$(repo_is_private "$parent_repo")
+
+    # If yes - spoof TIP and make GH_TOKEN_SYSTEM variable to be required
+    if [[ "$parent_is_private" = true ]]; then
+      TIP="\n# [Required] This repo is ${child_type} from parent ${g}$parent_repo${gray} repo,"
+      TIP+="\n# which is private, so this means you were added to the list of collaborators"
+      TIP+="\n# by the owner of that parent repo on GitHub. Now please ask owner to create for"
+      TIP+="\n# you a fine-grained personal access token with read-only access to the Contents"
+      TIP+="\n# of that repo, as otherwise you won't be able to update your instance with"
+      TIP+="\n# their fresh database/uploads - vital if your repo has no own backup so far"
+      REQ=true
+    fi
+  fi
+}
+
 # Check whether given repo is private
 repo_is_private() {
 
@@ -1571,51 +1604,60 @@ get_parent_repo() {
 
   # Argument #1: repo for which parent should be detected
   local repo="${1}"
+  local detect_child_type="${2:-}"
 
   # Shortcut to json query
-  local jq=".parent.full_name, .template_repository.full_name"
-  local uri="/repos/${repo}"
   local url
   local info
-  local forked_from
-  local templated_from
   local parent_repo
+  local hdr
 
-  # If GH_TOKEN is given
+  # Set auth header
   if [[ ! -z "${GH_TOKEN:-}" ]]; then
-
-    # Get current repo info
-    set +e
-    url="$uri"
-    info=$(gh api "$url" 2>&1); exit_code=$?
-    set -e
-
-  # Else
+    hdr="Authorization: Bearer ${GH_TOKEN}"
   else
-
-    # Get current repo info
-    set +e
-    url="https://api.github.com$uri"
-    info=$(curl -sS --fail-with-body "$url" 2>&1); exit_code=$?
-    set -e
+    hdr=""
   fi
 
-  # If request failed - return error, else clear last 2 lines
+  # Get current repo info
+  set +e
+  url="https://api.github.com/repos/${repo}"
+  info=$(curl -sS -H "$hdr" --fail-with-body "$url" 2>&1); exit_code=$?
+  set -e
+
+  # If request failed - print 'null' and return error
   if [[ exit_code -ne 0 ]]; then
     echo "null"
     echo "$url" >&2
     echo "$info" >&2
     return 1
-  else
-    # Get global parent_repo variable and print it
-    info=$(echo "$info" | jq -r "$jq")
-  fi
 
-  # Get parent repo
-  forked_from=$(echo "$info" | head -n 1)
-  templated_from=$(echo "$info" | sed -n '2p')
-  parent_repo=${forked_from:-$templated_from}
-  echo $parent_repo
+  # Else
+  else
+
+    # Find parent repo info via regular expressions
+    info="$(echo "$info" | tr -d '\n' | grep -Pzo '"(?:parent|template_repository)": \{[^{}]+?"full_name": "(.+?)"' | tr -d '\0')"
+
+    # If nothing found - print 'null'
+    if [[ $info = "" ]]; then echo "null";
+
+    # Else
+    else
+
+      # Print parent repo to stdout
+      echo -n "$info" | sed -E 's~.*"full_name": "([^"]*)".*~\1~'
+
+      # If $detect_child_type arg is given as true - do it
+      if [[ "$detect_child_type" = true ]]; then
+        if echo "$info" | grep -q 'template_repository'; then
+          echo -n ":generated"
+        else
+          echo -n ":forked" # Assuming if not template_repository, it's a direct fork
+        fi
+      fi
+      echo
+    fi
+  fi
 }
 
 # Unzip given file into a given destination

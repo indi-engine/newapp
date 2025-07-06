@@ -12,6 +12,9 @@ set -eu -o pipefail
 # Load functions
 source maintain/functions.sh
 
+# Windows: Git Bash specific fix
+GIT_PS1_SHOWCONFLICTSTATE=
+
 # Set the trap: Call on_exit function when the script exits
 trap on_exit EXIT
 

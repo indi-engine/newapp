@@ -130,8 +130,8 @@ mysql_import() {
   # Else if at least one dump file is missing
   else
 
-    # If GH_TOKEN_CUSTOM variable is set - use it as GH_TOKEN
-    if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then export GH_TOKEN="$GH_TOKEN_CUSTOM"; fi
+    # Use GH_TOKEN_CUSTOM as GH_TOKEN
+    export GH_TOKEN="$GH_TOKEN_CUSTOM"
 
     # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
     # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
@@ -142,17 +142,30 @@ mysql_import() {
       load_releases "$(get_current_repo)" "init"
     fi
 
-    # Restore dump
+    # If release was detected to init from - do it
     if [[ ! -z "${init_repo:-}" ]]; then
       restore_dump "$init_release" "$init_repo" "init"
+
+    # Else temporary switch to system token to download and import system dump
+    else
+      echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
+      export GH_TOKEN="$GH_TOKEN_SYSTEM"
+      download_possibly_chunked_file "indi-engine/system" "default" "system.sql.gz"
+      import_possibly_chunked_dump "system.sql.gz"
+
+      # Run maxwell-specific sql
+      prepare_maxwell
     fi
 
-    # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
+    # Restore GH_TOKEN back, as it might have been spoofed with
+    # GH_TOKEN_PARENT by (load_releases .. "init") call above
+    # or with
+    # GH_TOKEN_SYSTEM in case of blank Indi Engine instance setup
     export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
   fi
 
   # Create a file indicating that import is done
-  touch "$done"
+  #touch "$done"
 }
 
 # Run maxwell-specific sql
@@ -876,21 +889,11 @@ restore_dump() {
   local repo="${2:-$(get_current_repo)}"
   local step="${3:-}"
 
-  # Expected dumps qty
-  expected=$(echo "$MYSQL_DUMP" | wc -w)
-
-  # Missing dumps counter (might be incremented in download_possibly_chunked_file call)
-  missing=0
-
-  # Download each (possibly chunked) dump file
-  for file in $MYSQL_DUMP; do
-    download_possibly_chunked_file "$repo" "$release" "$file" "" true
-  done
-
-  # If some (but not all) dumps are missing - print error
-  if [[ $expected -gt $missing && $missing -gt 0 ]]; then
-    echo "Some of SQL dump file(s) not found, assuming some error occurred" >&2
-    return 1
+  # If $release arg is given - download each (possibly chunked) dump file
+  if [[ "$release" != "" ]]; then
+    for file in $MYSQL_DUMP; do
+      download_possibly_chunked_file "$repo" "$release" "$file"
+    done
   fi
 
   # Stop maxwell and/or closetab php processes if any running
@@ -900,27 +903,10 @@ restore_dump() {
     reset_mysql
   fi
 
-  # Pick system token
-  export GH_TOKEN_SYSTEM="$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"
-
-  # If all expected dumps are missing
-  if [[ "$expected" = "$missing" ]]; then
-
-    # Print info
-    echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
-
-    # Temporary switch to system token to download and import system dump
-    export GH_TOKEN="$GH_TOKEN_SYSTEM"
-    download_possibly_chunked_file "indi-engine/system" "default" "system.sql.gz"
-    import_possibly_chunked_dump "system.sql.gz"
-    export GH_TOKEN="$GH_TOKEN_CUSTOM"
-
-  # Else import each (possibly chunked) dump file
-  else
-    for file in $MYSQL_DUMP; do
-      import_possibly_chunked_dump "$file"
-    done
-  fi
+  # Import each (possibly chunked) dump
+  for file in $MYSQL_DUMP; do
+    import_possibly_chunked_dump "$file"
+  done
 
   # Run maxwell-specific sql
   prepare_maxwell
@@ -2228,7 +2214,8 @@ wrapper_entrypoint() {
   if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $(git config user.email) ]]; then git config user.email "$GIT_COMMIT_EMAIL"; fi
 
   # Add github.com to known hosts, if missing
-  if ! grep -q "github.com" ~/.ssh/known_hosts; then ssh-keyscan github.com >> ~/.ssh/known_hosts; fi
+  if [[ ! -d ~/.ssh ]]; then mkdir ~/.ssh; fi; known=~/.ssh/known_hosts;    
+  if [[ ! -f $known ]] || ! grep -q "github.com" $known; then ssh-keyscan github.com >> $known; fi
 
   # Setup github token for composer
   composer --global config github-oauth.github.com "$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"

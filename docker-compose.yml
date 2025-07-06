@@ -11,7 +11,7 @@ services:
       - "443:443"
     depends_on:
       wrapper:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     #restart: always
@@ -112,6 +112,12 @@ services:
       mysql:
         condition: service_healthy
         restart: true
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/80' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
     volumes:
       - ./:${DOC}/
       - opendkim:/etc/opendkim

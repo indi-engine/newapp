@@ -1,6 +1,6 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql
+import subprocess, pika, json, pexpect, re, pymysql, os
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app
@@ -313,3 +313,7 @@ def backup_status():
         'GH_ASSET_MAX_SIZE': get_dot_env('GH_ASSET_MAX_SIZE')
     }), 200
 
+# Get mysql import status
+@app.route('/import/done', methods=['GET'])
+def import_done():
+    return '', 200 if os.path.exists('/var/lib/mysql/import.done') else 404

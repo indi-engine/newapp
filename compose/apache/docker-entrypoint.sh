@@ -127,6 +127,16 @@ if [ -d "$DOC/data/upload" ]; then chmod +x "$DOC/data/upload"; fi
 # Command prefix to run something on behalf on www-data user
 run='/sbin/runuser '$user' -s /bin/bash -c'
 
+# Wait while mysql import is ready
+wait="Waiting for mysql import..."; test="curl -fs http://wrapper/import/done"
+if ! $test; then
+  while ! curl -fs http://wrapper/import/done; do
+    [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
+    sleep 10
+  done
+  echo
+fi
+
 # Start php background processes
 $run 'php indi -d realtime/closetab'
 $run 'php indi realtime/maxwell/enable'

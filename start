@@ -12,6 +12,9 @@ set -eu -o pipefail
 # Load functions
 source maintain/functions.sh
 
+# Set the trap: Call on_exit function when the script exits
+trap on_exit EXIT
+
 # If .env file does not exist - create it with prompting some values where
 # needed, and get the whole project up and running for the very first time
 if [[ ! -f ".env" ]]; then
@@ -22,9 +25,7 @@ if [[ ! -f ".env" ]]; then
 # the whole project have been previously got up and running, so now we get it
 # up and running again with preliminary (re)creation of missing containers, if need
 elif docker volume ls --format '{{.Name}}' | grep -q "^${dir//./}_"; then
-
-  # Prevent Putty window from being closed on failure if any happens during getting up
-  set +e; docker compose up -d
+  getup
 
 # Else if .env and .env.hard files - exist, but volumes - not exist, it means
 # it's a hard copy that has NOT been previously got up and running, so we do all

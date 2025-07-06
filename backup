@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Clear the terminal log
-clear
+# Clear the terminal log if first arg is not false
+if [[ "${1:-}" = init ]]; then shift; else clear; fi
 
 # If docker is installed - it means backup-command is being run on host
 if command -v docker >/dev/null 2>&1; then

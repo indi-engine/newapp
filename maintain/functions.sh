@@ -52,13 +52,13 @@ getup() {
   fi
 
   # If .env.hard file does not yet exist - create it as a copy of .env.dist but with a pre-filled value for GH_TOKEN_CUSTOM
-  if [[ ! -f ".env.hard" ]]; then
-    cp ".env.dist" ".env.hard"
-    GH_TOKEN_CUSTOM=$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)
-    if [[ ! -z $GH_TOKEN_CUSTOM ]]; then
-      sed -i "s~GH_TOKEN_CUSTOM=~&${GH_TOKEN_CUSTOM:-}~" ".env.hard"
-    fi
-  fi
+  #if [[ ! -f ".env.hard" ]]; then
+  #  cp ".env.dist" ".env.hard"
+  #  GH_TOKEN_CUSTOM=$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)
+  #  if [[ ! -z $GH_TOKEN_CUSTOM ]]; then
+  #    sed -i "s~GH_TOKEN_CUSTOM=~&${GH_TOKEN_CUSTOM:-}~" ".env.hard"
+  #  fi
+  #fi
 
   # If SSL cert is expected to be created
   if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
@@ -74,11 +74,17 @@ getup() {
     echo ""
   fi
 
-  # Print a newline
-  echo ""
-
   # Print newline and URL to proceed
-  echo "Open your browser: $(get_self_href)"
+  echo -e "Your app is here: ${g}$(get_self_href)${d}"
+
+  # Make sure 'custom/data/upload' dir is created and filled, if does not exist
+  init_uploads_if_need
+
+  # If $GH_TOKEN_CUSTOM is set but there are no releases yet in the current repo due to it's
+  # a forked or generated repo and it's a very first time of the instance getting
+  # up and running for the current repo - backup current state into a very first own release,
+  # so that any further deployments won't rely on parent repo releases anymore
+  make_very_first_release_if_need
 }
 
 # shellcheck disable=SC2120
@@ -144,6 +150,15 @@ mysql_import() {
 
     # If release was detected to init from - do it
     if [[ ! -z "${init_repo:-}" ]]; then
+      choice_title=$(get_release_title $init_release)
+      echo -e "SELECTED VERSION: ${g}${choice_title}${d}"
+      echo -e "         Release: ${g}$init_repo:$init_release${d}"
+      if [[ "$init_repo" = "$(get_current_repo)" ]]; then
+        echo -e "            Repo: ${g}current${d} / ${gray}parent${d}"
+      else
+        echo -e "            Repo: ${gray}current${d} / ${g}parent${d}"
+      fi
+      echo
       restore_dump "$init_release" "$init_repo" "init"
 
     # Else temporary switch to system token to download and import system dump
@@ -164,8 +179,11 @@ mysql_import() {
     export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
   fi
 
+  # Print newline
+  echo
+
   # Create a file indicating that import is done
-  #touch "$done"
+  touch "$done"
 }
 
 # Run maxwell-specific sql
@@ -994,15 +1012,15 @@ download_possibly_chunked_file() {
     if (( remote_chunks_qty > 1 )); then
 
       # Download one by one
-      echo "Downloading $file for selected version into data/ dir ($remote_chunks_qty chunks):"
+      echo "Downloading $file from $repo:$release into data/ dir ($remote_chunks_qty chunks):"
       for remote_chunk in $remote_chunks; do
         gh_download "$repo" "$release" "$remote_chunk" "$dir"
-        echo "» Downloading $remote_chunk from '$repo:$release'... Done"
+        echo "» Downloading $remote_chunk... Done"
       done
 
     # Else download the single file, overwriting the existing one, if any
     else
-      local msg="Downloading $file for selected version into data/ dir..." && echo "$msg"
+      local msg="Downloading $file from $repo:$release into data/ dir..." && echo "$msg"
       gh_download "$repo" "$release" "$file" "$dir"
       if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then clear_last_lines 1; fi
       echo "$msg Done"
@@ -1453,11 +1471,20 @@ ghcli_install() {
 # Make sure 'custom/data/upload' dir is created and filled, if does not exist
 init_uploads_if_need() {
 
+  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  if command -v docker >/dev/null 2>&1; then
+    docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; init_uploads_if_need"
+    return 0
+  fi
+
   # Destination dir for Indi Engine uploads
   dest="custom/data/upload"
 
   # If that dir does not exist
   if [[ ! -d "$dest" ]]; then
+
+    # Print newline
+    echo
 
     # Define file name of the asset, that is needed for creation of the above mentioned dir
     file="uploads.zip"
@@ -1474,7 +1501,6 @@ init_uploads_if_need() {
 
       # Download it from github into data/ dir
       if [[ ! -z "${init_repo:-}" ]]; then
-        echo "Asset '$file' will be downloaded from '$init_repo:$init_release'"
         download_possibly_chunked_file "$init_repo" "$init_release" "$file"
       fi
 
@@ -1500,9 +1526,7 @@ init_uploads_if_need() {
   # dir, so it won't be writable to 'www-data'-user on behalf of which Indi Engine is working,
   # so below code is there to solve that problem
   else
-    echo -n "Making $dest dir writable for Indi Engine..."
     chown -R "www-data:www-data" "$dest"
-    echo -e " Done\n"
 
     # Make executable to allow du-command to be runnable from within apache-container on behalf of www-data user
     chmod +x "$dest/../" "$dest"
@@ -1515,6 +1539,12 @@ init_uploads_if_need() {
 # so that any further deployments won't rely on parent repo releases anymore
 make_very_first_release_if_need() {
 
+  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  if command -v docker >/dev/null 2>&1; then
+    docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; make_very_first_release_if_need"
+    return 0
+  fi
+
   # Get current repo
   current_repo="$(get_current_repo)"
 
@@ -1525,8 +1555,14 @@ make_very_first_release_if_need() {
   # If current repo has no own releases so far - create very first one
   if (( releaseQty["$current_repo"] == 0 )) && [[ -n $GH_TOKEN_CUSTOM ]]; then
 
+    # Print header
+    echo "» --------------------------------------------- «"
+    echo "» -- Creating very first own backup, if need -- «"
+    echo "» --------------------------------------------- «"
+    echo
+
     # Do backup
-    source backup
+    source backup init
   fi
 }
 
@@ -1618,6 +1654,7 @@ unzip_file() {
 
   # If $owner arg is given - apply ownership for the destination dir
   if [[ -n $owner ]]; then
+    if [[ ! -d "$dest" ]]; then mkdir -p "$dest"; fi
     echo -n "Making that dir writable for Indi Engine..."
     chown -R "$owner" "$dest"
     echo -e " Done"
@@ -1639,7 +1676,7 @@ get_release_title() {
 
   # Get release title
   local title=$(echo -e "${releases[$tag]}" | sed -e 's/\x1b\[[0-9;]*m//g')
-  title=$(echo -e "${releases[$selected]}" | cat -v | sed -E 's~\^(\[[^m]+?m|M)~~g' | sed -E 's~M-BM-7~-~g')
+  title=$(echo -e "${releases[$tag]}" | cat -v | sed -E 's~\^(\[[^m]+?m|M)~~g' | sed -E 's~M-BM-7~-~g')
   length=${release_choice_title_length:-37}
   title=$(echo "${title:0:$length}")
   title="${title%"${title##*[![:space:]]}"}"
@@ -2305,15 +2342,6 @@ wrapper_entrypoint() {
     gh repo set-default "$(get_current_repo)"
   fi
 
-  # Make sure 'custom/data/upload' dir is created and filled, if does not exist
-  init_uploads_if_need
-
-  # If $GH_TOKEN_CUSTOM is set but there are no releases yet in the current repo due to it's
-  # a forked or generated repo and it's a very first time of the instance getting
-  # up and running for the current repo - backup current state into a very first own release,
-  # so that any further deployments won't rely on parent repo releases anymore
-  make_very_first_release_if_need
-
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
 
@@ -2322,4 +2350,24 @@ wrapper_entrypoint() {
 
   # Re-start flask
   #wrapper_entrypoint "$@"
+}
+
+# Function to execute on exit
+function on_exit() {
+
+  # Get the exit code of the last command/script
+  local exit_code=$?
+
+  # If it's a error exit code and current execution was not triggered from Flask
+  if [ "$exit_code" -ne 0 ] && [ -z "${FLASK_APP:-}" ]; then
+
+    # Wait for user to press any key
+    echo "-----"
+    echo "ERROR: Script terminated with exit code $exit_code."
+    echo "Press any key..."
+    read -n 1 -r
+
+    # Keep interactive window
+    exec bash
+  fi
 }

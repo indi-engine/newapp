@@ -1552,6 +1552,7 @@ init_uploads_if_need() {
 
       # Extract asset with recreating the destination dir and make that dir writable by Indi Engine
       unzip_file "data/$file" "$dest" "www-data:www-data"
+      echo
 
     # Else create empty dir
     else
@@ -1598,9 +1599,9 @@ make_very_first_release_if_need() {
   if (( releaseQty["$current_repo"] == 0 )) && [[ -n $GH_TOKEN_CUSTOM ]]; then
 
     # Print header
-    echo "» --------------------------------------------- «"
-    echo "» -- Creating very first own backup, if need -- «"
-    echo "» --------------------------------------------- «"
+    echo "» ------------------------------------------------------------- «"
+    echo "» -- Running backup script (to create very first own backup) -- «"
+    echo "» ------------------------------------------------------------- «"
     echo
 
     # Do backup

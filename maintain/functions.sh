@@ -454,6 +454,9 @@ load_releases() {
     # instance is getting up and running for the current repo, so try to load releases of parent repo
     if [[ $parent_repo != "null" ]]; then
 
+      # Set up GH_TOKEN_PARENT to be further accessible
+      export GH_TOKEN_PARENT="$(grep "^GH_TOKEN_PARENT=" .env | cut -d '=' -f 2-)"
+
       # If GH_TOKEN_PARENT is given - use it for loading releases of parent repo
       if [[ ! -z "${GH_TOKEN_PARENT:-}" ]]; then export GH_TOKEN="${GH_TOKEN_PARENT:-}"; fi
 

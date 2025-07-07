@@ -47,13 +47,13 @@ else
       # If failed - stop with error, else use parent repo's token, if given
       if [[ "$parent_repo" = "null" ]]; then
         echo "Unable to detect parent repo for $(get_current_repo)" >&2
-        return 1
+        exit 1
       else
         export GH_TOKEN="${GH_TOKEN_PARENT:-}"
       fi
     else
       echo "Restore from parent repo is supported only for 'dump' or 'uploads' scenarios" >&2
-      return 1
+      exit 1
     fi
 
   # Else indicate parent repo won't be involved and use current repo's token
@@ -75,7 +75,7 @@ else
       if [[ "$parent_repo" != "false" ]]; then
         echo "You can't involve parent repo while you're in an 'uncommitted restore' state"
         set +e
-        return 1
+        exit 1
       fi
 
       # If first arg is 'cancel' - cancel restore for source code, database and uploads, i.e. revert all to the state
@@ -99,7 +99,7 @@ else
       echo "so there is nothing to be committed or cancelled"
       echo ""
       set +e
-      return 1
+      exit 1
     fi
 
   # Else if first arg is NOT 'cancel' or 'commit'
@@ -134,7 +134,7 @@ else
     elif [[ "$parent_repo" != "false" ]]; then
       echo "You can't involve parent repo for full restore"
       set +e
-      return 1
+      exit 1
     fi
 
     # Declare global associative $releases array
@@ -194,14 +194,14 @@ else
 
       # Load backups list and ask user to select one unless $tag is not empty
       release_choices "to be restored" "$tag" "$from_repo"
-      if [[ $? -eq 1 ]]; then set +e; echo ""; return 1; fi
+      if [[ $? -eq 1 ]]; then set +e; echo ""; exit 1; fi
     fi
 
     # If nothing was selected - return
     if [[ -z "${selected:-}" ]]; then
       echo "No version selected for restore"
       set +e
-      return 1
+      exit 1
     fi
 
     # Get selected

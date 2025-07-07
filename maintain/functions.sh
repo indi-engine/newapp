@@ -1314,7 +1314,7 @@ env_GH_TOKEN_CUSTOM() {
     href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
     TIP="\n# [Required] Please goto $href,"
     TIP+="\n# create there and input here a fine-grained personal access token with"
-    TIP+="\n# read-write access to the Contents of this $repo repository:"
+    TIP+="\n# read-write access to the Contents of this $repo repo:"
     REQ=true
   fi
 }
@@ -1550,23 +1550,23 @@ init_uploads_if_need() {
       # Extract asset with recreating the destination dir and make that dir writable by Indi Engine
       unzip_file "data/$file" "$dest" "www-data:www-data"
 
-      # Make executable to allow du-command to be runnable from within apache-container on behalf of www-data user
-      chmod +x "$dest/../" "$dest"
+    # Else create empty dir
+    else
+      mkdir -p "$dest"
     fi
+  fi
 
-  # Else just make uploads dir writable for Indi Engine which might be at least needed
+  # Make uploads dir writable for Indi Engine which might be at least needed
   # if current project have been deployed from a hard copy coming from a disk storage
   # system (e.g. USB Flash Drive) that might not preserve ownership for the stored
   # files and directories, which can lead to that all files and folders copied from
   # such a hard copy into a server will have 'root' as owner, including custom/data/upload
-  # dir, so it won't be writable to 'www-data'-user on behalf of which Indi Engine is working,
+  # dir, so it won't be writable to 'www-data'-user on behalf of which Indi Engine's apache-container is working,
   # so below code is there to solve that problem
-  else
-    chown -R "www-data:www-data" "$dest"
+  chown -R "www-data:www-data" "$dest"
 
-    # Make executable to allow du-command to be runnable from within apache-container on behalf of www-data user
-    chmod +x "$dest/../" "$dest"
-  fi
+  # Make executable to allow du-command to be runnable from within apache-container on behalf of www-data user
+  chmod +x "$dest/../" "$dest"
 }
 
 # If $GH_TOKEN_CUSTOM is set but there are no releases yet in the current repo due to it's
@@ -1674,7 +1674,7 @@ unzip_file() {
   local dest=$2
   local owner=${3:-}
 
-  # Remove existing destination dir, if any
+  # Remove contents of existing destination dir, if any
   [[ -d $dest ]] && rm -rf "$dest"/*
 
   # Count total quantity of files in the archive

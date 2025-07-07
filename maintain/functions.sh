@@ -1525,6 +1525,9 @@ init_uploads_if_need() {
     # If asset file does not exist locally
     if [[ ! -f "data/$file" ]]; then
 
+      # Use GH_TOKEN_CUSTOM as GH_TOKEN
+      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+
       # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
       # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
       # download asset from, and it will refer to either current repo, or parent repo for cases when current repo
@@ -1580,6 +1583,9 @@ make_very_first_release_if_need() {
 
   # Get current repo
   current_repo="$(get_current_repo)"
+
+  # Use GH_TOKEN_CUSTOM as GH_TOKEN
+  export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
 
   # If global releaseQty array is empty, it means load_releases() function was NOT
   # called yet, so call it now as we need to know whether current repo has releases

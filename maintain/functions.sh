@@ -1636,7 +1636,7 @@ get_parent_repo() {
   else
 
     # Find parent repo info via regular expressions
-    info="$(echo "$info" | tr -d '\n' | grep -Pzo '"(?:parent|template_repository)": \{[^{}]+?"full_name": "(.+?)"' | tr -d '\0')"
+    info="$(echo "$info" | tr -d '\n' | (grep -Pzo '"(?:parent|template_repository)": \{[^{}]+?"full_name": "(.+?)"' || true) | tr -d '\0')"
 
     # If nothing found - print 'null'
     if [[ $info = "" ]]; then echo "null";

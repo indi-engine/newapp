@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Clear the terminal log 
+# Clear the terminal log
 clear
 
 # Get current dir name as it's used as prefix for all container names

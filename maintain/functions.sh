@@ -1748,7 +1748,9 @@ is_uncommitted_restore() {
 
 # Prepend each printed line with string given by 1st arg
 prepend() {
-  while read -r line; do echo "${1:-}${line}"; done
+  while IFS= read -r line; do
+    printf "${gray}%s%s\n${d}" "${1:-}" "$line"
+  done
 }
 
 # Get hash of a commit where HEAD is right now
@@ -2422,4 +2424,147 @@ function on_exit() {
     # Keep interactive window
     exec bash
   fi
+}
+
+# Function to execute a shell command with optional folder context, silent mode, and failure tolerance
+exec_command() {
+
+  # Arguments
+  local command="$1"
+  local folder="${2:-}"
+  local no_exit_on_failure_if_msg_contains="${3:-}"
+  local silent="${4:-false}"
+
+  # Aux variables
+  local wasdir exit_code
+
+  # Change to target folder if provided
+  if [[ -n "$folder" ]]; then
+      wasdir="$(pwd)"
+      cd "$folder" || return 1
+  fi
+
+  # Execute command, capture output and exit code
+  set +e
+  stdout="$($command 2>&1)"
+  exit_code=$?
+  set -e
+
+  # Restore previous directory
+  if [[ -n "$folder" ]]; then
+      cd "$wasdir" || return 1
+  fi
+
+  # If success, return output
+  if [[ $exit_code -eq 0 ]]; then
+      return 0
+  fi
+
+  # If failure but output contains specified string, return 1 silently
+  if [[ -n "$no_exit_on_failure_if_msg_contains" ]] && grep -q "$no_exit_on_failure_if_msg_contains" <<< "$stdout"; then
+      return 1
+  fi
+
+  # Else show output and return failure
+  echo "$stdout"
+  return 1
+}
+
+# Check if given repo is outdated
+is_repo_outdated() {
+
+  # Arguments
+  local repo="$1"
+
+  # Variables
+  local url=
+  local dir=
+  local branch=
+
+  # Prepare url to check last commit
+  if [[ "$repo" = "custom" ]]; then
+    url="https://github.com/$(get_current_repo)"
+    branch=main
+    git_askpass "custom"
+  else
+    url="https://github.com/indi-engine/$repo"
+    branch=master
+    dir="$VDR/$repo"
+    git_askpass "system"
+  fi
+
+  # Get last commit on remote
+  stdout="$(git ls-remote -h -t "$url" $branch 2>&1)"
+  stdout="$(echo "$stdout" | xargs)"
+  commit="${stdout%% *}"
+  #commit=43bae0b260b913f7686ff284116f08f7ce69d0cb
+
+  # Check if that commit exists locally
+  set +e; stdout="$(git -C "$dir" branch --contains "$commit" 2>&1)"; exit_code=$?;
+
+  # If exists, it means repo is NOT outdated, so return exit code 1
+  if [[ $exit_code -eq 0 ]]; then
+    stdout="$commit"
+    return 1
+  elif [[ "$stdout" =~ "no such commit" ]]; then
+    return 0
+  else
+    echo -e "\n$stdout"
+    exit $exit_code
+  fi
+}
+
+# Check whether composer.lock is outdated for a given indi-engine repo and commit hash
+is_lock_outdated() {
+
+  # Arguments
+  local repo="$1"
+  local commit="$2"
+
+  # Auxiliary variable
+  local reference
+
+  # Extract the 'reference' for the matching package from composer.lock
+  reference=$(jq -r --arg repo "indi-engine/$repo" '
+      .packages[] | select(.name == $repo) | .source.reference
+  ' custom/composer.lock)
+
+  # If reference not found, package doesn't exist — consider outdated
+  if [[ -z "$reference" || "$reference" == "null" ]]; then
+      return 0  # outdated
+  fi
+
+  # If the commit doesn't match the reference — it's outdated
+  if [[ "$reference" != "$commit" ]]; then
+      return 0  # outdated
+  fi
+
+  # Return 1 to indicate that lock file is NOT outdated
+  return 1
+}
+
+# Make sure a certain token will be used for any sunsequent git-command calls
+git_askpass() {
+
+  # Arguments
+  local token="${1:-}"
+
+  # Set GH_TOKEN based on $token-arg
+  if [[ "$token" = "custom" ]]; then
+    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+  elif [[ "$token" = "system" ]]; then
+    export GH_TOKEN="${GH_TOKEN_SYSTEM:-}"
+  elif [[ "$token" = "parent" ]]; then
+    export GH_TOKEN="${GH_TOKEN_PARENT:-}"
+  else
+    export GH_TOKEN=""
+  fi
+
+  # Get current dir
+
+  # Setup GIT_ASKPASS
+  local dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  local pass="$dir/git-askpass.sh"
+  export GIT_ASKPASS="$pass"
+  chmod +x "$pass"
 }

@@ -1,0 +1,137 @@
+#!/bin/bash
+
+# Make sure execution stops on any error
+set -eu -o pipefail
+
+# Clear the terminal log
+clear
+
+# If docker is installed - it means restore-command is being run on host
+if command -v docker >/dev/null 2>&1; then
+
+  # Add -i if we're in interactive shell
+  [[ $- == *i* ]] && bash_flags=(-i) || bash_flags=()
+
+  # Execute restore-command within the container environment passing all arguments, if any
+  docker compose exec -it -e TERM="$TERM" wrapper bash "${bash_flags[@]}" "$(basename "${BASH_SOURCE[0]}")" $@
+
+# Else it means we're in the wrapper-container, so proceed with the restore
+else
+
+  # Global msg
+  declare -g stdout
+
+  # Vendor dir
+  VDR="custom/vendor/indi-engine"
+
+  # Load functions
+  source maintain/functions.sh
+
+  # Load custom token
+  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+
+  # Set the trap: Call on_exit function when the script exits
+  trap on_exit EXIT
+
+  # Use GH_TOKEN_CUSTOM as git password
+  git_askpass "custom"
+
+  # Get 'git status' for system repo
+  exec_command "git -C $VDR/system status"
+
+  # If system package has uncommitted changes - ask user if we should proceed
+  if [[ ! "$stdout" =~ "nothing to commit" ]]; then
+    echo -e "${gray}$stdout${d}"
+    echo "----"
+    echo "You have uncommitted changes. Do you want to proceed?"
+    echo "Press Ctrl+C to cancel, or Enter to proceed"
+    read -n 1
+  fi
+
+  # Check if custom repo is outdated
+  msg="Checking if current repo is outdated..."; echo -n "$msg"
+  set +e; is_repo_outdated "custom"; exit_code=$?; set -e
+
+  # If yes
+  if [[ $exit_code -eq 0 ]]; then
+
+    # Indicate yes
+    echo " Yes"
+
+    # Pull changes from remote
+    echo "Pulling latest changes from github:"
+    git pull 2>&1 | prepend "» "
+
+    # Install possibly updated composer packages
+    echo "Installing possibly updated composer packages:"
+    composer -d custom install 2>&1 | grep -v " fund" | prepend "» "
+
+  # Else indicate no
+  else
+    echo " No"
+  fi
+
+  # Declare associative array to track which of indi-engine/* repos are outdated
+  declare -A is_outdated=()
+
+  # Use GH_TOKEN_SYSTEM as git password as now we'll check if any Indi Engine packages are outdated
+  echo "Checking if any of local indi-engine/* packages are outdated:"
+  git_askpass "system"
+
+  # Check indi-engine/* repos
+  for repo in system client; do
+
+    msg=" - ${g}indi-engine/$repo${d} ..."; echo -en "$msg"
+    set +e; is_repo_outdated "$repo"; exit_code=$?; set -e
+
+    # If yes - indicate that
+    if [[ $exit_code -eq 0 ]]; then
+      is_outdated["$repo"]=true
+      echo " Yes"
+
+    # Else to next check
+    else
+
+      # Get last pushed commit as $stdout that was set by above is_repo_outdated "$repo" call
+      last_pushed_commit="$stdout"
+
+      # Check if repo commit hash mentioned in lock file is outdated
+      if is_lock_outdated "$repo" "$last_pushed_commit"; then
+        is_outdated["$repo"]=true
+        echo " Yes"
+      else
+        echo " No"
+      fi
+    fi
+  done
+
+  # Use GH_TOKEN_CUSTOM as git password, back
+  git_askpass "custom"
+
+  # If one/both of indi-engine packages is/are outdated, or their mentions
+  # inside composer.lock are outdated, or composer.lock file is changed but not committed
+  if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/composer.lock)" ]]; then
+
+    # Update indi-engine/* packages
+    echo "Updating outdated ones:"
+    composer -d custom update --no-ansi "indi-engine/*" 2>&1 | grep -v " fund" | prepend "» "
+
+    # Commit composer.lock
+    echo "Committing composer.lock:"
+    git add custom/composer.lock 2>&1 | prepend "» "
+    msg=".git/COMMIT_EDITMSG"; if [[ ! -f "$msg" ]]; then touch $msg; fi;
+    git commit -F "$msg" 2>&1 | prepend "» "
+
+    # If GH_TOKEN_CUSTOM is given
+    if [[ ! "${GH_TOKEN_CUSTOM:-}" = "" ]]; then
+
+      # Push changes to remote repo
+      echo "Pushing to github:"
+      git push 2>&1 | prepend "» "
+
+    # Else
+    else
+      echo "NOTE: Updates are committed but not pushed to github as no GH_TOKEN_CUSTOM given"
+    fi
+  fi
+fi

@@ -134,4 +134,75 @@ else
       echo "NOTE: Updates are committed but not pushed to github as no GH_TOKEN_CUSTOM given"
     fi
   fi
+
+  # Get current repo
+  current_repo="$(get_current_repo)"
+
+  # If current repo is NOT a user's own repo yet
+  if [[ "$current_repo" = "indi-engine/custom" ]]; then
+
+    # Fetch latest changes
+    git fetch origin
+
+    # Get a list of changed files BEFORE applying the update
+    changed_files=$(git diff --name-only HEAD origin/main -- . ":(exclude)custom/")
+
+    # Apply the update
+    git merge origin/main
+
+  # Else
+  else
+
+    # Ensure devops remote exists
+    git remote | grep -q "^devops$" || git remote add devops https://github.com/indi-engine/custom
+
+    # Fetch latest from devops remote
+    git fetch devops
+
+    # Get a list of changed files BEFORE applying the update
+    changed_files=$(git diff --name-only HEAD devops/main -- . ":(exclude)custom/")
+
+    # Apply the update
+    git checkout devops/main -- . ":(exclude)custom/"
+  fi
+
+  # Default restart scenario: do nothing
+  restart=5
+
+  # Determine what was affected
+  while IFS= read -r file; do
+    case "$file" in
+      compose/wrapper/Dockerfile.base|compose/apache/Dockerfile.base)     [[ $restart -gt 1 ]] && restart=1 ;;
+      .dockerignore|compose/wrapper/Dockerfile|compose/apache/Dockerfile) [[ $restart -gt 2 ]] && restart=2 ;;
+      docker-compose.yml|.env.dist)                                       [[ $restart -gt 3 ]] && restart=3 ;;
+      compose/*)                                                          [[ $restart -gt 4 ]] && restart=4 ;;
+    esac
+  done <<< "$changed_files"
+
+  # Print changes files and restart scenario
+  echo "Changed files:"
+  echo "$changed_files"
+
+  # If a restart scenario is not 'do nothing' - write restart scenario to
+  # a temporary file to be further picked by watcher-process running no host
+  if [[ "$restart" != 5 ]]; then
+    echo "$restart" > var/tmp/restart
+  fi
+
+  # Print status
+  case "$restart" in
+    1) echo "Update: base images, own images, and container refresh is needed" ;;
+    2) echo "Update: own images and container refresh is needed" ;;
+    3) echo "Update: container recreation is needed" ;;
+    4) echo "Update: container restart is needed" ;;
+    5) echo "Update: no container changes are needed" ;;
+  esac
+
+  #case "$restart" in
+  #  1) docker compose pull; docker compose up --build --force-recreate -d ;;
+  #  2) docker compose up --build --force-recreate -d ;;
+  #  3) docker compose up --force-recreate -d ;;
+  #  4) docker compose restart ;;
+  #  5) echo "No container changes needed." ;;
+  #esac
 fi

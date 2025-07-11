@@ -169,21 +169,40 @@ else
   # Default restart scenario: do nothing
   restart=5
 
-  # Determine what was affected
+  # Foreach updated file
   while IFS= read -r file; do
+
+    # Check if it affects restart scenario
     case "$file" in
       compose/wrapper/Dockerfile.base|compose/apache/Dockerfile.base)     [[ $restart -gt 1 ]] && restart=1 ;;
       .dockerignore|compose/wrapper/Dockerfile|compose/apache/Dockerfile) [[ $restart -gt 2 ]] && restart=2 ;;
       docker-compose.yml|.env.dist)                                       [[ $restart -gt 3 ]] && restart=3 ;;
       compose/*)                                                          [[ $restart -gt 4 ]] && restart=4 ;;
     esac
+
+    # Add to commit
+    [[ -e "$file" ]] && git add "$file"
   done <<< "$changed_files"
 
   # Print changes files and restart scenario
-  echo "Changed files:"
-  echo "$changed_files"
+  if [[ "$changed_files" = "" ]]; then
+    echo "No DevOps files are changed"
+  else
+    echo "Changed files:"
+    echo "$changed_files"
+  fi
 
-  # If a restart scenario is not 'do nothing' - write restart scenario to
+  # If there is something added to commit for user's own repo
+  if [[ "$current_repo" != "indi-engine/custom" ]] && ! git diff --cached --quiet; then
+
+    # Do commit
+    git commit -m "Update DevOps files from indi-engine/custom"
+
+    # Push to github
+    echo "Pushing to github:"; git push 2>&1 | prepend "» "
+  fi
+
+  # If restart scenario is not 'do nothing' - write restart scenario to
   # a temporary file to be further picked by watcher-process running no host
   if [[ "$restart" != 5 ]]; then
     echo "$restart" > var/tmp/restart
@@ -191,11 +210,11 @@ else
 
   # Print status
   case "$restart" in
-    1) echo "Update: base images, own images, and container refresh is needed" ;;
-    2) echo "Update: own images and container refresh is needed" ;;
-    3) echo "Update: container recreation is needed" ;;
-    4) echo "Update: container restart is needed" ;;
-    5) echo "Update: no container changes are needed" ;;
+    1) echo "Base images, own images, and container refresh is needed" ;;
+    2) echo "Own images and container refresh is needed" ;;
+    3) echo "Container recreation is needed" ;;
+    4) echo "Container restart is needed" ;;
+    5) echo "No container changes are needed" ;;
   esac
 
   #case "$restart" in

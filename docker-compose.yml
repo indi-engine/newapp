@@ -46,7 +46,6 @@ services:
     image: mysql:8.0.36-debian
     #restart: always
     command:
-      --default-authentication-plugin=mysql_native_password
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_unicode_ci

@@ -9,6 +9,9 @@ clear
 # Load functions
 source maintain/functions.sh
 
+# Set the trap: Call on_exit function when the script exits
+trap on_exit EXIT
+
 # If docker is installed - it means restore-command is being run on host
 if command -v docker >/dev/null 2>&1; then
 
@@ -32,9 +35,6 @@ else
 
   # Load custom token
   export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
-
-  # Set the trap: Call on_exit function when the script exits
-  trap on_exit EXIT
 
   # Use GH_TOKEN_CUSTOM as git password
   git_askpass "custom"

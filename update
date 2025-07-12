@@ -25,8 +25,8 @@ if command -v docker >/dev/null 2>&1; then
     restart=$(<"$artifact")
 
     # Pull base images and/or rebuild own ones, if need
-    if [[ "$restart" == 1 ]]; then docker compose pull;  echo 2 > "$artifact"; restart=2; fi
-    if [[ "$restart" == 2 ]]; then docker compose build; echo 3 > "$artifact"; restart=3; fi
+    if [[ "$restart" == 1 ]]; then docker compose build --pull;  echo 2 > "$artifact"; restart=2; fi
+    if [[ "$restart" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; restart=3; fi
 
     # Act further according to current restart level
     case "$restart" in

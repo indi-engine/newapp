@@ -357,8 +357,8 @@ setup_auxiliary_variables() {
 # Get current repo
 get_current_repo() {
 
-  # Get repo name from git config file
-  repo=$(sed -nE 's~\s*url\s*=\s*https?://([a-zA-Z0-9_\-]+@)?github\.com/([a-zA-Z0-9_\-]+/[a-zA-Z0-9_.\-]+)(\.git)?$~\2~p' "${1:-.git/config}")
+  # Get repo name
+  repo=$(git remote get-url origin | sed -nE 's~https?://([a-zA-Z0-9_\-]+@)?github\.com/([a-zA-Z0-9_\-]+/[a-zA-Z0-9_.\-]+)(\.git)?$~\2~p')
 
   # Trim trailing '.git' from repo name as this is unsupported but GitHub CLI
   echo ${repo%.git}

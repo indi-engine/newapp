@@ -157,7 +157,8 @@ else
     git remote | grep -q "^devops$" || git remote add devops https://github.com/indi-engine/custom
 
     # Fetch latest from devops remote
-    git fetch devops
+    echo "Syncing DevOps files if needed:"
+    git fetch devops | prepend  "» "
 
     # Get a list of changed files BEFORE applying the update
     changed_files=$(git diff --name-only HEAD devops/main -- . ":(exclude)custom/")
@@ -189,7 +190,7 @@ else
     echo "No DevOps files are changed"
   else
     echo "Changed files:"
-    echo "$changed_files"
+    echo "$changed_files" | prepend  " - "
   fi
 
   # If there is something added to commit for user's own repo

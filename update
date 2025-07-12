@@ -197,11 +197,11 @@ else
   if [[ "$current_repo" != "indi-engine/custom" ]] && ! git diff --cached --quiet; then
 
     # Do commit
-    echo "Committing to local repo:"
+    echo "Adding to local repo:"
     git commit -m "Updated DevOps-setup files from indi-engine/custom" 2>&1 | prepend "» "
 
     # Push to github
-    echo "Pushing to remote repo on github:"; git push 2>&1 | prepend "» "
+    echo "Pushing to github:"; git push 2>&1 | prepend "» "
   fi
 
   # If restart scenario is not 'do nothing' - write restart scenario to

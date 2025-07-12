@@ -157,7 +157,7 @@ else
     git remote | grep -q "^devops$" || git remote add devops https://github.com/indi-engine/custom
 
     # Fetch latest from devops remote
-    echo "Syncing DevOps files if needed:"
+    echo "Fetching latest DevOps-setup files:"
     git fetch devops | prepend  "» "
 
     # Get a list of changed files BEFORE applying the update

@@ -1,7 +1,83 @@
 #!/bin/bash
 
-# Remove containers
-docker compose down
+# Make sure execution stops on any error
+set -euo pipefail
 
-# Recreate containers
-docker compose up -d
+# Load functions
+source maintain/functions.sh
+
+# Set the trap: Call on_exit function when the script exits
+trap on_exit EXIT
+
+# If 1st arg is 'watcher'
+if [[ "${1:-}" == "watcher" ]]; then
+
+  # Paths
+  PIDFILE="var/tmp/restart-watcher.pid"
+  LOGFILE="var/log/restart-watcher.log"
+
+  # Check if restart watcher is running
+  restart_watcher_running() {
+    [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2> /dev/null
+  }
+
+  # If 2nd arg is 'run'
+  if [[ "${2:-}" == "run" ]]; then
+
+    # If watcher is running - print that, else start running in background
+    if restart_watcher_running; then
+      echo "Restart watcher is already running with PID $(cat "$PIDFILE")"
+    else
+
+      # If 3rd arg is 'background'
+      if [[ "${3:-}" == "background" ]]; then
+
+        # Write current PID into file
+        echo "$$" > "$PIDFILE"
+
+        # Start loop
+        while true; do restart_if_need; sleep 10; done
+
+      # Else
+      else
+        # Print status
+        echo "[watcher] Starting in background..."
+
+        # Start in background
+        nohup ./restart $@ background >> "$LOGFILE" 2>&1 &
+      fi
+    fi
+
+  # Else if 2nd arg is 'stop'
+  elif [[ "${2:-}" == "stop" ]]; then
+
+    # If watcher is running - kill, else print it's not running
+    if restart_watcher_running; then
+      kill -9 "$(cat "$PIDFILE")"
+    else
+      echo "Restart watcher is NOT running, nothing to be stopped"
+    fi
+
+  # Else print status
+  else
+
+    # If watcher is running - print PID, else print it's not running
+    if restart_watcher_running; then
+      echo "Restart watcher is running with PID $(cat "$PIDFILE")"
+    else
+      echo "Restart watcher is NOT running"
+    fi
+  fi
+
+# Else if first arg is from 1 to 4
+elif [[ "${1:-}" =~ (1|2|3|4) ]]; then
+
+  # Restart with the given scenario
+  restart_if_need "${1:-}"
+
+# Else
+else
+
+  # Restart with containers recreation
+  restart_if_need "3"
+fi

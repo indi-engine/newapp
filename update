@@ -15,28 +15,8 @@ if command -v docker >/dev/null 2>&1; then
   # Execute restore-command within the container environment passing all arguments, if any
   docker compose exec -it -e TERM="$TERM" wrapper bash "${bash_flags[@]}" "$(basename "${BASH_SOURCE[0]}")" $@
 
-  # Update artifact file where restart scenario is stored
-  artifact=var/restart
-
-  # If update artifact file exists
-  if [[ -f "$artifact" ]]; then
-
-    # Read restart scenario
-    restart=$(<"$artifact")
-
-    # Pull base images and/or rebuild own ones, if need
-    if [[ "$restart" == 1 ]]; then docker compose build --pull;  echo 2 > "$artifact"; restart=2; fi
-    if [[ "$restart" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; restart=3; fi
-
-    # Act further according to current restart level
-    case "$restart" in
-      3) docker compose up --force-recreate -d ;;
-      4) docker compose restart ;;
-    esac
-
-    # Remove artifact file
-    rm -f "$artifact"
-  fi
+  # Do restart, if needed according to scenario written to var/restart
+  restart_if_need
 
 # Else it means we're in the wrapper-container, so proceed with the restore
 else

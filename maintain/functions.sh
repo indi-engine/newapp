@@ -81,7 +81,13 @@ getup() {
   # a forked or generated repo and it's a very first time of the instance getting
   # up and running for the current repo - backup current state into a very first own release,
   # so that any further deployments won't rely on parent repo releases anymore
-  make_very_first_release_if_need
+  if [[ "$(get_current_repo)" != "indi-engine/custom" ]]; then
+    make_very_first_release_if_need
+  fi
+
+  # Periodically check if var/restart file appeared, and when yes - initiate a certain scenario of a restart for the
+  # current docker compose project, depending on what DevOps-related files were updated during any further 'source update' call
+  source restart watcher run
 }
 
 # shellcheck disable=SC2120
@@ -357,11 +363,14 @@ setup_auxiliary_variables() {
 # Get current repo
 get_current_repo() {
 
-  # Get repo name
-  repo=$(git remote get-url origin | sed -nE 's~https?://([a-zA-Z0-9_\-]+@)?github\.com/([a-zA-Z0-9_\-]+/[a-zA-Z0-9_.\-]+)(\.git)?$~\2~p')
+  # Get line containing [remote "origin"]...github.com/<repo>
+  origin=$(cat .git/config | tr -d '\n' | grep -Pzo '\[remote "origin"].+?url\s*=\s*https?://([a-zA-Z0-9_\-]+@)?github\.com/([a-zA-Z0-9_\-]+/[a-zA-Z0-9_.\-]+)(\.git)?\w' | tr -d '\0')
 
-  # Trim trailing '.git' from repo name as this is unsupported but GitHub CLI
-  echo ${repo%.git}
+  # Get repo name
+  repo="${origin##*github.com/}"
+
+  # Trim trailing '.git' from repo name as this is unsupported by GitHub CLI
+  echo "${repo%.git}"
 }
 
 # Setup values for is_rotated_backup and rotated_qty variables
@@ -2567,4 +2576,44 @@ git_askpass() {
   local pass="$dir/git-askpass.sh"
   export GIT_ASKPASS="$pass"
   chmod +x "$pass"
+}
+
+# Do restart, if needed according to scenario, if written to var/restart
+# IMPORTANT: This function is intended to be called on host only
+restart_if_need() {
+
+  # Get restart scenario as 1st arg
+  scenario="${1:-}"
+
+  # ./update artifact file where restart scenario might be stored
+  artifact=var/restart
+
+  # If restart scenario is from 1 to 4
+  if [[ "$scenario" =~ (1|2|3|4) ]]; then
+
+    # Pull base images and/or rebuild own ones, if need
+    if [[ "$scenario" == 1 ]]; then docker compose build --pull;  echo 3 > "$artifact"; scenario=3; fi
+    if [[ "$scenario" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; scenario=3; fi
+
+    # Act further according to current restart level
+    case "$scenario" in
+      3) docker compose up --force-recreate -d ;;
+      4) docker compose restart ;;
+    esac
+
+  # Else assume we may have update artifact containing restart scenario
+  elif [[ "$scenario" == "" ]]; then
+
+    # If update artifact file exists
+    if [[ -f "$artifact" ]]; then
+
+      # Restart according to scenario
+      restart_if_need "$(<"$artifact")"
+
+      # Remove artifact file
+      rm -f "$artifact"
+    fi
+  else
+    echo "Unknown restart scenario: $scenario"
+  fi
 }

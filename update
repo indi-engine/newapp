@@ -6,6 +6,9 @@ set -eu -o pipefail
 # Clear the terminal log
 clear
 
+# Load functions
+source maintain/functions.sh
+
 # If docker is installed - it means restore-command is being run on host
 if command -v docker >/dev/null 2>&1; then
 
@@ -26,9 +29,6 @@ else
 
   # Vendor dir
   VDR="custom/vendor/indi-engine"
-
-  # Load functions
-  source maintain/functions.sh
 
   # Load custom token
   export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"

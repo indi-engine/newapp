@@ -158,7 +158,7 @@ else
 
     # Fetch latest from devops remote
     echo "Fetching latest DevOps-setup files:"
-    git fetch devops | prepend  "» "
+    git fetch devops 2>&1 | prepend  "» "
 
     # Get a list of changed files BEFORE applying the update
     changed_files=$(git diff --name-only HEAD devops/main -- . ":(exclude)custom/")

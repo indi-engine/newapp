@@ -196,7 +196,7 @@ else
   if [[ "$current_repo" != "indi-engine/custom" ]] && ! git diff --cached --quiet; then
 
     # Do commit
-    git commit -m "Update DevOps files from indi-engine/custom"
+    git commit -m "Updated DevOps files from indi-engine/custom"
 
     # Push to github
     echo "Pushing to github:"; git push 2>&1 | prepend "» "

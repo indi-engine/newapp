@@ -11,7 +11,7 @@ RUN composer install
 RUN sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/client/.git/config && \
   sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/system/.git/config && \
   mv vendor ../vendor
-## </Composer>  ##
+## </Composer> ##
 
 # Use custom entrypoint
 ENTRYPOINT ["bash", "custom-entrypoint.sh"]

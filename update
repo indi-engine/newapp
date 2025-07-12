@@ -16,7 +16,7 @@ if command -v docker >/dev/null 2>&1; then
   docker compose exec -it -e TERM="$TERM" wrapper bash "${bash_flags[@]}" "$(basename "${BASH_SOURCE[0]}")" $@
 
   # Update artifact file where restart scenario is stored
-  artifact=var/tmp/restart
+  artifact=var/restart
 
   # If update artifact file exists
   if [[ -f "$artifact" ]]; then
@@ -230,7 +230,7 @@ else
   # If restart scenario is not 'do nothing' - write restart scenario to
   # a temporary file to be further picked by watcher-process running no host
   if [[ "$restart" != 5 ]]; then
-    echo "$restart" > var/tmp/restart
+    echo "$restart" > var/restart
   fi
 
   # Print status

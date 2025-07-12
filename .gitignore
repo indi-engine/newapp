@@ -27,5 +27,8 @@ custom/**/*.tgz
 # Temporary files
 var/tmp/*
 
+# Restart scenario
+var/restart
+
 # Any stderr files
 *.stderr

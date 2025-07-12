@@ -187,7 +187,7 @@ else
 
   # Print changes files and restart scenario
   if [[ "$changed_files" = "" ]]; then
-    echo "No DevOps files are changed"
+    echo "No DevOps-setup files are changed"
   else
     echo "Changed files:"
     echo "$changed_files" | prepend  " - "

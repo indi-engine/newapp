@@ -207,6 +207,9 @@ else
     echo "Pushing to github:"; git push 2>&1 | prepend "» "
   fi
 
+  # Run database migrations, if any new ones detected for system and/or custom fractions
+  migrate_if_need
+
   # If restart scenario is not 'do nothing' - write restart scenario to
   # a temporary file to be further picked by watcher-process running no host
   if [[ "$restart" != 5 ]]; then

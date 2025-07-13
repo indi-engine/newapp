@@ -2617,3 +2617,129 @@ restart_if_need() {
     echo "Unknown restart scenario: $scenario"
   fi
 }
+
+# Get hash of the commit up to which the db migrations are executed
+get_migration_commit() {
+
+  # Arguments
+  local fraction="${1:-}"
+
+  # Add mysql password to env
+  export MYSQL_PWD=$MYSQL_PASSWORD
+
+  # Get commit
+  mysql -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
+
+  # Remove mysql password from env
+  unset MYSQL_PWD
+}
+
+# Run database migrations, if any new ones detected for system and/or custom fractions
+migrate_if_need() {
+
+  # Foreach fraction
+  for fraction in system custom; do
+
+    # Setup a file to detect changes in and fraction folder where it's located
+    if [[ "$fraction" == "system" ]]; then
+      folder="$VDR/system"
+      detect="library/Indi/Controller/Migrate.php"
+    else
+      folder="custom"
+      detect="application/controllers/admin/MigrateController.php"
+    fi
+
+    # Get hash of the last commit up to which migrations were run
+    commit=$(get_migration_commit "$fraction")
+
+    # If none - use HEAD commit
+    if [[ $commit == "" ]]; then commit="$(git rev-parse HEAD)"; fi
+
+    # Try to get the list of changed files
+    set +e; files=$(git -C "$folder" diff --name-only "$commit" 2>&1); exit_code=$?; set -e
+
+    # If the above 'git diff ...' command failed
+    if [[ "$files" == *"fatal: bad object"* ]] && [[ exit_code -ne 0 ]]; then
+
+      # If it failed because of $commit does not exist in custom repo
+      if [[ $fraction == "custom" ]]; then
+
+        # Get the very first commit
+        commit=$(git rev-list --max-parents=0 HEAD)
+
+        # Get files changed since the very first commit, if any
+        files=$(git -C "$folder" diff --name-only "$commit" 2>&1)
+
+      # Else exit with error code 1
+      else
+        echo "$stdout" >&2
+        exit $exit_code
+      fi
+    fi
+
+    # If no any files were changed - print that
+    if [[ "$files" == "" ]]; then
+      echo "$fraction: no files were changed"
+
+    # Else
+    else
+
+      # If migration controller php file was changed for $fraction
+      if grep -qxF "$detect" <<< "$files"; then
+
+        # Get diff
+        diff="$(git -C "$folder" diff "$commit" -- "$detect")"
+
+        # Setup regex to detect added migration actions
+        rex='^\+\s+public function ([a-zA-Z_0-9]+)Action'
+
+        # Detect migration actions
+        actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1~" | tac)
+
+        # If no new migrations detected - print that
+        if [[ "$actions" == "" ]]; then
+          echo "$fraction: no migrations were added"
+
+        # Else run new migrations
+        else
+          echo "$fraction: running migrations:"
+          for action in $actions; do
+            echo -e " - ${g}php indi migrate/${action}${d}"
+          done
+        fi
+
+      # Else print status
+      else
+        echo "$fraction: no changes in migrations"
+      fi
+
+      # Path to a php-file responsible for turning On localization for certain fields
+      l10n_meta="application/lang/ui.php"
+
+      # If that file was changed for $fraction
+      if grep -qxF "application/lang/ui.php" <<< "$files"; then
+        echo "$fraction: importing $l10n_meta"
+      else
+        echo "$fraction: no l10n meta was changed"
+      fi
+
+      # Collect [lang => file] pairs for changed files responsible for actual translations for certain language
+      declare -A l10n_data=(); rex="^application/lang/ui/(.*?).php$"
+      for file in $files; do
+        if [[ "$file" =~ $rex ]]; then
+          l10n_data["$(echo $file | sed -E "s~$rex~\1~")"]="$file"
+        fi
+      done
+
+      # If no localization data files were changed for $fraction
+      if [[ "${#l10n_data[@]}" -eq 0 ]]; then
+        echo "$fraction: no l10n data was changed"
+      else
+        echo "$fraction: importing l10n data files:"
+        for lang in "${!l10n_data[@]}"; do
+          echo -e " - ${g}php indi lang/import?$lang${d}  [${l10n_data[$lang]}]"
+        done
+      fi
+    fi
+  done
+}

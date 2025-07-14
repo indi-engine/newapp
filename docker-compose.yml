@@ -125,6 +125,7 @@ services:
       - ./compose/opendkim.conf:/etc/opendkim.conf
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/mysql_client_binaries
+      - ./var/log/custom:/var/log/custom
 
 volumes:
   mysql_server_data:

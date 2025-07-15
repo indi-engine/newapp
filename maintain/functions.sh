@@ -1757,8 +1757,31 @@ is_uncommitted_restore() {
 
 # Prepend each printed line with string given by 1st arg
 prepend() {
+
+  # Arguments
+  local prefix="${1:-}"
+  local count="${2:-}"
+
+  # Lines counter
+  local qty=0
+
+  # File to write counter value
+  local qtyfile=$DOC/var/prepended
+
+  # If $count-arg is true - count the lines by writing to a file
+  # as this is the only way to recall the resulting value of $qty
+  if [[ "$count" == true ]]; then echo "$qty" > "$qtyfile"; fi
+
+  # Foreach line
   while IFS= read -r line; do
-    printf "${gray}%s%s\n${d}" "${1:-}" "$line"
+
+    # Print using gray color and with given $prefix
+    printf "${gray}%s%s\n${d}" "$prefix" "$line"
+
+    # Increment local $counter variable and write it's value into a file to be further accessible
+    if [[ "$count" == true ]]; then
+      qty=$((qty + 1)); echo "$qty" > "$qtyfile"
+    fi
   done
 }
 
@@ -2703,8 +2726,38 @@ migrate_if_need() {
         # Else run new migrations
         else
           echo "$fraction: running migrations:"
+
+          # Foreach migration action
           for action in $actions; do
-            echo -e " - ${g}php indi migrate/${action}${d}"
+
+            # Prepare and print msg
+            local msg=" - ${g}php indi migrate/${action}${d} ..."; echo -e "$msg"
+
+            # Change dir to webroot
+            cd "custom"
+
+            # Run migration action
+            #set +e; php indi migrate/$action | prepend "     " true; exit_code=$?; set -e
+            exit_code=0
+            # Change dir back
+            cd "../"
+
+            # If migration failed
+            if [[ $exit_code -ne 0 ]]; then
+
+              # Return failure exit code
+              return $exit_code
+
+            # Else is no lines were printed by migration action
+            elif [[ $(prepended) -eq 0 ]]; then
+
+              # Rewrite msg now with trailing 'Done'
+              clear_last_lines 1; echo -e "$msg Done"
+
+            # Else print Done (with indent) as the next line after the lines printed by migration action
+            else
+              echo "   Done"
+            fi
           done
         fi
 
@@ -2718,7 +2771,29 @@ migrate_if_need() {
 
       # If that file was changed for $fraction
       if grep -qxF "application/lang/ui.php" <<< "$files"; then
+
+        # Print status
         echo "$fraction: importing $l10n_meta"
+
+        # Prepare and print command to be executed, change dir to webroot, run locale file re-import action and change dir back
+        local msg=" - ${g}php indi lang/import/meta?$fraction$d ..."; echo -e "$msg"
+        cd "custom"; set +e
+        php indi "lang/import/meta?$fraction" | prepend "     " true; exit_code=$?;
+        set -e; cd "../"
+
+        # If locale meta import failed - return failure exit code
+        if [[ $exit_code -ne 0 ]]; then
+          return $exit_code
+
+        # Else is no lines were printed by migration action - rewrite msg now with trailing 'Done'
+        elif [[ $(prepended) -eq 0 ]]; then
+          clear_last_lines 1; echo -e "$msg Done"
+
+        # Else print Done (with indent) as the next line
+        # after the lines printed by locale file re-import action
+        else
+          echo "   Done"
+        fi
       else
         echo "$fraction: no l10n meta was changed"
       fi
@@ -2736,10 +2811,36 @@ migrate_if_need() {
         echo "$fraction: no l10n data was changed"
       else
         echo "$fraction: importing l10n data files:"
+
+        # Foreach changed locale file
         for lang in "${!l10n_data[@]}"; do
-          echo -e " - ${g}php indi lang/import?$lang${d}  [${l10n_data[$lang]}]"
+
+          # Prepare and print msg, change dir to webroot, run locale file re-import action and change dir back
+          local msg=" - ${g}php indi lang/import/data?$fraction:$lang$d ..."; echo -e "$msg"
+          cd "custom"; set +e;
+          php indi "lang/import/data?$fraction:$lang" | prepend "     " true; exit_code=$?;
+          set -e; cd "../"
+
+          # If locale import failed - return failure exit code
+          if [[ $exit_code -ne 0 ]]; then
+            return $exit_code
+
+          # Else if succeeded and no lines were printed by migration action - rewrite msg now with trailing 'Done'
+          elif [[ $(prepended) -eq 0 ]]; then
+            clear_last_lines 1; echo -e "$msg Done"
+
+          # Else if succeeded but some output was printed - print Done (with indent) as the next line
+          else
+            echo "   Done"
+          fi
         done
       fi
     fi
   done
+}
+
+# Print quantity of lines prepended by the last piping of some command's output into prepend() function
+prepended() {
+  cat "$DOC/var/prepended"
+  rm "$DOC/var/prepended"
 }

@@ -2657,6 +2657,23 @@ get_migration_commit() {
   unset MYSQL_PWD
 }
 
+# Set hash of the commit up to which the db migrations are executed
+set_migration_commit() {
+
+  # Arguments
+  local fraction=$1
+  local commit=$2
+
+  # Add mysql password to env
+  export MYSQL_PWD=$MYSQL_PASSWORD
+
+  # Get commit
+  mysql -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
+
+  # Remove mysql password from env
+  unset MYSQL_PWD
+}
+
 # Run database migrations, if any new ones detected for system and/or custom fractions
 migrate_if_need() {
 
@@ -2676,7 +2693,7 @@ migrate_if_need() {
     commit=$(get_migration_commit "$fraction")
 
     # If none - use HEAD commit
-    if [[ $commit == "" ]]; then commit="$(git rev-parse HEAD)"; fi
+    if [[ $commit == "" ]]; then commit="$(git -C "$folder" rev-parse HEAD)"; fi
 
     # Try to get the list of changed files
     set +e; files=$(git -C "$folder" diff --name-only "$commit" 2>&1); exit_code=$?; set -e
@@ -2688,14 +2705,14 @@ migrate_if_need() {
       if [[ $fraction == "custom" ]]; then
 
         # Get the very first commit
-        commit=$(git rev-list --max-parents=0 HEAD)
+        commit=$(git -C "$folder" rev-list --max-parents=0 HEAD)
 
         # Get files changed since the very first commit, if any
         files=$(git -C "$folder" diff --name-only "$commit" 2>&1)
 
       # Else exit with error code 1
       else
-        echo "$stdout" >&2
+        echo "$files" >&2
         exit $exit_code
       fi
     fi
@@ -2830,6 +2847,10 @@ migrate_if_need() {
         done
       fi
     fi
+
+    # Spoof existing migration commit with the most recent one
+    # to be able to distinguish between old and new migrations
+    set_migration_commit "$fraction" "$(git -C "$folder" rev-parse HEAD)"
   done
 }
 

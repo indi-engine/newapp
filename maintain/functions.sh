@@ -2730,16 +2730,10 @@ migrate_if_need() {
           # Foreach migration action
           for action in $actions; do
 
-            # Prepare and print msg
+            # Prepare and print msg, change dir to webroot, run migration action and change dir back
             local msg=" - ${g}php indi migrate/${action}${d} ..."; echo -e "$msg"
-
-            # Change dir to webroot
             cd "custom"
-
-            # Run migration action
-            #set +e; php indi migrate/$action | prepend "     " true; exit_code=$?; set -e
-            exit_code=0
-            # Change dir back
+            set +e; php indi migrate/$action | prepend "     " true; exit_code=$?; set -e
             cd "../"
 
             # If migration failed
@@ -2773,7 +2767,7 @@ migrate_if_need() {
       if grep -qxF "application/lang/ui.php" <<< "$files"; then
 
         # Print status
-        echo "$fraction: importing $l10n_meta"
+        echo "$fraction: importing l10n meta file"
 
         # Prepare and print command to be executed, change dir to webroot, run locale file re-import action and change dir back
         local msg=" - ${g}php indi lang/import/meta?$fraction$d ..."; echo -e "$msg"

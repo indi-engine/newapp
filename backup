@@ -104,6 +104,16 @@ else
       echo "Creation of ANY new backups is prevented until then."
       echo ""
 
+    # Else if we're in 'failed migration' state indicated by data/before directory presence
+    elif [[ -d data/before ]]; then
+
+      echo "Database migration has failed during last update attempt, so you MUST either"
+      echo "run 'source restore dump before' command to get back to the original database"
+      echo "state (i.e. before migration), or execute 'source update' command again to retry"
+      echo "the migration if failure reason is already investigated and fixed."
+      echo "Creation of ANY new backups is prevented until then."
+      echo ""
+
     # Else if we're NOT in detached HEAD state - do the backup
     else
 

@@ -6,6 +6,9 @@ clear
 # Load functions
 source maintain/functions.sh
 
+# Set the trap: Call on_exit function when the script exits
+trap on_exit EXIT
+
 # If docker is installed - it means restore-command is being run on host
 if command -v docker >/dev/null 2>&1; then
 
@@ -128,6 +131,10 @@ else
         echo -en "\nRESTORE ONLY: ${g}${1:-}${d}"
         if [[ "$parent_repo" != "false" ]]; then echo -e ", FROM: ${g}$parent_repo${d}"; else echo; fi
         echo
+      elif [[ -d "data/$tag" ]]; then
+        echo -e "\nRESTORE ONLY: ${g}${1:-}${d}, FROM: ${g}data/$tag${d} local directory\n"
+        restore_dump_from_local "data/before"
+        exit
       fi
 
     # Else prevent full restore from parent repo, if needed

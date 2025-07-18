@@ -207,13 +207,30 @@ else
     echo "Pushing to github:"; git push 2>&1 | prepend "» "
   fi
 
+  # If restart scenario is NOT 'do nothing'
+  if [[ "$restart" != 5 ]]; then
+
+    # IF restart was already planned but is still not done due to migration failure AND if current update assume
+    # 'harder' restart scenario is needed comparing with one previously planned based on previous update
+    # THEN update previously planned restart scenario with 'harder' one
+    if [[ -f var/restart.plan ]]; then
+      if [[ "$restart" -lt "$(cat var/restart.plan)" ]]; then
+        echo "$restart" > var/restart.plan
+      fi
+
+    # Write restart scenario to a temporary file
+    else
+      echo "$restart" > var/restart.plan
+    fi
+  fi
+
   # Run database migrations, if any new ones detected for system and/or custom fractions
   migrate_if_need
 
-  # If restart scenario is not 'do nothing' - write restart scenario to
-  # a temporary file to be further picked by watcher-process running no host
-  if [[ "$restart" != 5 ]]; then
-    echo "$restart" > var/restart
+  # If we reached this line, if means migrations were run ok, so we recall if restart is needed and if yes - rename
+  # temporary var/restart.plan to var/restart - to be further picked by watcher-process running on host
+  if [[ -f var/restart.plan ]]; then
+    mv var/restart.plan var/restart
   fi
 
   # Print status

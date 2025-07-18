@@ -923,24 +923,51 @@ restore_dump() {
     done
   fi
 
+  # Restore downloaded possibly chunked dump
+  restore_dump_from_local_backup "data" "" "$step"
+}
+
+# Restore database from local possibly chunked dump, located in a given directory
+restore_dump_from_local() {
+
+  # Arguments
+  local dir="${1:-data}"
+  local prepend="${2:-}"
+  local step="${3:-}"
+
+  # Global variables needed by (stop|start)_maxwell_and_closetab_if_need functions
+  declare -g closetab=false
+  declare -g maxwell=false
+
+  # Shortcuts
+  fn1='stop_maxwell_and_closetab_if_need'
+  fn2='reset_mysql'
+  fn3='prepare_maxwell'
+  fn4='start_maxwell_and_closetab_if_need'
+
   # Stop maxwell and/or closetab php processes if any running
   # Shut down mysql server, clean it's data/ dir and start back
   if [[ $step != "init" ]]; then
-    stop_maxwell_and_closetab_if_need
-    reset_mysql
+    if [[ $prepend != "" ]]; then
+      $fn1 2>&1 | prepend "$prepend"; $fn2 2>&1 | prepend "$prepend"
+    else
+      $fn1; $fn2
+    fi
   fi
 
   # Import each (possibly chunked) dump
+  [[ "$prepend" != "" ]] && echo -ne "${gray}"
   for file in $MYSQL_DUMP; do
-    import_possibly_chunked_dump "$file"
+    import_possibly_chunked_dump "$file" "$dir" "$prepend"
   done
+  [[ "$prepend" != "" ]] && echo -ne "${d}"
 
   # Run maxwell-specific sql
-  prepare_maxwell
+  if [[ "$prepend" != "" ]]; then $fn3 2>&1 | prepend "» "; else $fn3; fi
 
   # If maxwell and/or closetab php processes were running - enable back
   if [[ $step != "init" ]]; then
-    start_maxwell_and_closetab_if_need
+    if [[ "$prepend" != "" ]]; then $fn4 2>&1 | prepend "» "; else $fn4; fi
   fi
 }
 
@@ -949,10 +976,12 @@ import_possibly_chunked_dump() {
 
   # Arguments
   dump="$1"
+  dir="${2:-data}"
+  prepend="${3:-}"
 
   # Shortcuts
-  local path="data/$dump"
-  local msg="Importing $dump"
+  local path="$dir/$dump"
+  local msg="${prepend}Importing $dump"
   local run="mysql -h mysql -u root $MYSQL_DATABASE"
 
   # Prevent warning
@@ -2677,8 +2706,14 @@ set_migration_commit() {
 # Run database migrations, if any new ones detected for system and/or custom fractions
 migrate_if_need() {
 
+  # Migration actions will be collected here
+  declare -A migrate=()
+
   # Foreach fraction
   for fraction in system custom; do
+
+    # Print status
+    echo "Checking $fraction fraction:"
 
     # Setup a file to detect changes in and fraction folder where it's located
     if [[ "$fraction" == "system" ]]; then
@@ -2719,7 +2754,7 @@ migrate_if_need() {
 
     # If no any files were changed - print that
     if [[ "$files" == "" ]]; then
-      echo "$fraction: no files were changed"
+      echo "no files were changed" | prepend "» "
 
     # Else
     else
@@ -2738,75 +2773,27 @@ migrate_if_need() {
 
         # If no new migrations detected - print that
         if [[ "$actions" == "" ]]; then
-          echo "$fraction: no migrations were added"
+          echo "no migrations were added" | prepend "» "
 
-        # Else run new migrations
+        # Else add to the pending migration list and print status
         else
-          echo "$fraction: running migrations:"
-
-          # Foreach migration action
-          for action in $actions; do
-
-            # Prepare and print msg, change dir to webroot, run migration action and change dir back
-            local msg=" - ${g}php indi migrate/${action}${d} ..."; echo -e "$msg"
-            cd "custom"
-            set +e; php indi migrate/$action | prepend "     " true; exit_code=$?; set -e
-            cd "../"
-
-            # If migration failed
-            if [[ $exit_code -ne 0 ]]; then
-
-              # Return failure exit code
-              return $exit_code
-
-            # Else is no lines were printed by migration action
-            elif [[ $(prepended) -eq 0 ]]; then
-
-              # Rewrite msg now with trailing 'Done'
-              clear_last_lines 1; echo -e "$msg Done"
-
-            # Else print Done (with indent) as the next line after the lines printed by migration action
-            else
-              echo "   Done"
-            fi
-          done
+          for action in $actions; do migrate["$fraction"]+="migrate/$action "; done
+          echo "$(echo "$actions" | wc -l) new migration(s) detected" | prepend "» "
         fi
 
       # Else print status
       else
-        echo "$fraction: no changes in migrations"
+        echo "no migrations were added" | prepend "» "
       fi
 
-      # Path to a php-file responsible for turning On localization for certain fields
-      l10n_meta="application/lang/ui.php"
+      # If php-file responsible for turning On localization for certain fields - was NOT changed for $fraction
+      if ! grep -qxF "application/lang/ui.php" <<< "$files"; then
+        echo "no locale meta was changed" | prepend "» "
 
-      # If that file was changed for $fraction
-      if grep -qxF "application/lang/ui.php" <<< "$files"; then
-
-        # Print status
-        echo "$fraction: importing l10n meta file"
-
-        # Prepare and print command to be executed, change dir to webroot, run locale file re-import action and change dir back
-        local msg=" - ${g}php indi lang/import/meta?$fraction$d ..."; echo -e "$msg"
-        cd "custom"; set +e
-        php indi "lang/import/meta?$fraction" | prepend "     " true; exit_code=$?;
-        set -e; cd "../"
-
-        # If locale meta import failed - return failure exit code
-        if [[ $exit_code -ne 0 ]]; then
-          return $exit_code
-
-        # Else is no lines were printed by migration action - rewrite msg now with trailing 'Done'
-        elif [[ $(prepended) -eq 0 ]]; then
-          clear_last_lines 1; echo -e "$msg Done"
-
-        # Else print Done (with indent) as the next line
-        # after the lines printed by locale file re-import action
-        else
-          echo "   Done"
-        fi
+      # Else add to the pending migration list and print status
       else
-        echo "$fraction: no l10n meta was changed"
+        migrate["$fraction"]+="lang/import/meta?$fraction "
+        echo "locale meta change detected" | prepend "» "
       fi
 
       # Collect [lang => file] pairs for changed files responsible for actual translations for certain language
@@ -2817,41 +2804,103 @@ migrate_if_need() {
         fi
       done
 
-      # If no localization data files were changed for $fraction
+      # If NO localization data files were changed for $fraction
       if [[ "${#l10n_data[@]}" -eq 0 ]]; then
-        echo "$fraction: no l10n data was changed"
-      else
-        echo "$fraction: importing l10n data files:"
+        echo "no locale data was changed" | prepend "» "
 
+      # Else add to the pending migration list and print status
+      else
         # Foreach changed locale file
         for lang in "${!l10n_data[@]}"; do
-
-          # Prepare and print msg, change dir to webroot, run locale file re-import action and change dir back
-          local msg=" - ${g}php indi lang/import/data?$fraction:$lang$d ..."; echo -e "$msg"
-          cd "custom"; set +e;
-          php indi "lang/import/data?$fraction:$lang" | prepend "     " true; exit_code=$?;
-          set -e; cd "../"
-
-          # If locale import failed - return failure exit code
-          if [[ $exit_code -ne 0 ]]; then
-            return $exit_code
-
-          # Else if succeeded and no lines were printed by migration action - rewrite msg now with trailing 'Done'
-          elif [[ $(prepended) -eq 0 ]]; then
-            clear_last_lines 1; echo -e "$msg Done"
-
-          # Else if succeeded but some output was printed - print Done (with indent) as the next line
-          else
-            echo "   Done"
-          fi
+          migrate["$fraction"]+="lang/import/data?$fraction:$lang "
         done
+        echo "locale data changes for ${#l10n_data[@]} language(s) detected" | prepend "» "
       fi
+    fi
+  done
+
+  # If at least one system and/or custom migration detected
+  if [[ ${#migrate[@]} -gt 0 ]]; then
+
+    # Remove local database dump, if any, to prevent duplicate disk space usage
+    rm -f data/dump.sql.gz*
+
+    # Create pre-migrate database backup, if not yet created
+    if [[ ! -d data/before ]]; then
+      echo -e "Backing up the current database state locally before running migrations:"
+      echo -ne "${gray}"
+      source maintain/dump-prepare.sh "data/before" "» "
+      echo -ne "${d}"
+
+    # Else restore database from pre-migrate backup:
+    # 1.Stop maxwell and/or closetab php processes if any running
+    # 2.Shut down mysql server, clean it's data/ dir and start back
+    # 3.Import each (possibly chunked) dump
+    # 4.Run maxwell-specific sql
+    # 5.If maxwell and/or closetab php processes were running - enable back
+    else
+      echo -e "Restoring database from pre-migrate backup:"
+      restore_dump_from_local "data/before" "» "
+    fi
+
+    # Foreach fraction as a key within $migrate array
+    for fraction in "${!migrate[@]}"; do
+
+      # Print status
+      echo "Running migrations for $fraction fraction:"
+
+      # Foreach migration action
+      for action in ${migrate["$fraction"]}; do
+
+        # Prepare and print msg, change dir to webroot, run migration action and change dir back
+        local msg=" - ${g}php indi ${action}${d} ..."; echo -e "$msg"
+        cd "custom"
+        set +e; php indi $action 2>&1 | prepend "     " true; exit_code=$?; set -e
+        cd "../"
+
+        # If migration failed
+        if [[ $exit_code -ne 0 ]]; then
+
+          # Return failure exit code
+          echo "Database migration step has failed during update. In this situation you can"
+          echo "either run 'source restore dump before' command to get back to the pre-migration"
+          echo "(i.e. original) database state, or try to re-run the migration step again with"
+          echo "'source update' command - make sense if failure is investigated and fixed."
+          return $exit_code
+
+        # Else is no lines were printed by migration action
+        elif [[ $(prepended) -eq 0 ]]; then
+
+          # Rewrite msg now with trailing 'Done'
+          clear_last_lines 1; echo -e "$msg Done"
+
+        # Else print Done (with indent) as the next line after the lines printed by migration action
+        else
+          echo "   Done"
+        fi
+      done
+    done
+  fi
+
+  # Foreach fraction
+  for fraction in system custom; do
+
+    # Setup fraction repo folder
+    if [[ "$fraction" == "system" ]]; then
+      folder="$VDR/system"
+    else
+      folder="custom"
     fi
 
     # Spoof existing migration commit with the most recent one
     # to be able to distinguish between old and new migrations
     set_migration_commit "$fraction" "$(git -C "$folder" rev-parse HEAD)"
   done
+
+  # If at least one system and/or custom migration detected - remove data/before folder
+  if [[ ${#migrate[@]} -gt 0 ]]; then
+    rm -rf data/before
+  fi
 }
 
 # Print quantity of lines prepended by the last piping of some command's output into prepend() function

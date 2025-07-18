@@ -114,8 +114,8 @@ if ! grep -q "SetEnv DOC " /etc/apache2/apache2.conf; then
   echo "SetEnv DOC $DOC" >> /etc/apache2/apache2.conf
 fi
 
-# Make logs dir is writable for apache user except .gitignore
-# Also, make writable ini file and temporary files
+# Make logs and temp dir writable for apache user except .gitignore
+# Also, make app ini file writable as well
 chown -R "$user:$user" "/var/log/custom"; chown "root:root" "/var/log/custom/.gitignore"
 chown "$user:$user" "$DOC/application/config.ini" "/var/www/tmp"
 

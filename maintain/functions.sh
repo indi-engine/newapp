@@ -2752,70 +2752,62 @@ migrate_if_need() {
       fi
     fi
 
-    # If no any files were changed - print that
-    if [[ "$files" == "" ]]; then
-      echo "no files were changed" | prepend "» "
+    # If migration controller php file was changed for $fraction
+    if grep -qxF "$detect" <<< "$files"; then
 
-    # Else
-    else
+      # Get diff
+      diff="$(git -C "$folder" diff "$commit" -- "$detect")"
 
-      # If migration controller php file was changed for $fraction
-      if grep -qxF "$detect" <<< "$files"; then
+      # Setup regex to detect added migration actions
+      rex='^\+\s+public function ([a-zA-Z_0-9]+)Action'
 
-        # Get diff
-        diff="$(git -C "$folder" diff "$commit" -- "$detect")"
+      # Detect migration actions
+      actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1~" | tac)
 
-        # Setup regex to detect added migration actions
-        rex='^\+\s+public function ([a-zA-Z_0-9]+)Action'
-
-        # Detect migration actions
-        actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1~" | tac)
-
-        # If no new migrations detected - print that
-        if [[ "$actions" == "" ]]; then
-          echo "no migrations were added" | prepend "» "
-
-        # Else add to the pending migration list and print status
-        else
-          for action in $actions; do migrate["$fraction"]+="migrate/$action "; done
-          echo "$(echo "$actions" | wc -l) new migration(s) detected" | prepend "» "
-        fi
-
-      # Else print status
-      else
+      # If no new migrations detected - print that
+      if [[ "$actions" == "" ]]; then
         echo "no migrations were added" | prepend "» "
-      fi
-
-      # If php-file responsible for turning On localization for certain fields - was NOT changed for $fraction
-      if ! grep -qxF "application/lang/ui.php" <<< "$files"; then
-        echo "no locale meta was changed" | prepend "» "
 
       # Else add to the pending migration list and print status
       else
-        migrate["$fraction"]+="lang/import/meta?$fraction "
-        echo "locale meta change detected" | prepend "» "
+        for action in $actions; do migrate["$fraction"]+="migrate/$action "; done
+        echo "$(echo "$actions" | wc -l) new migration(s) detected" | prepend "» "
       fi
 
-      # Collect [lang => file] pairs for changed files responsible for actual translations for certain language
-      declare -A l10n_data=(); rex="^application/lang/ui/(.*?).php$"
-      for file in $files; do
-        if [[ "$file" =~ $rex ]]; then
-          l10n_data["$(echo $file | sed -E "s~$rex~\1~")"]="$file"
-        fi
+    # Else print status
+    else
+      echo "no migrations were added" | prepend "» "
+    fi
+
+    # If php-file responsible for turning On localization for certain fields - was NOT changed for $fraction
+    if ! grep -qxF "application/lang/ui.php" <<< "$files"; then
+      echo "no locale meta was changed" | prepend "» "
+
+    # Else add to the pending migration list and print status
+    else
+      migrate["$fraction"]+="lang/import/meta?$fraction "
+      echo "locale meta change detected" | prepend "» "
+    fi
+
+    # Collect [lang => file] pairs for changed files responsible for actual translations for certain language
+    declare -A l10n_data=(); rex="^application/lang/ui/(.*?).php$"
+    for file in $files; do
+      if [[ "$file" =~ $rex ]]; then
+        l10n_data["$(echo $file | sed -E "s~$rex~\1~")"]="$file"
+      fi
+    done
+
+    # If NO localization data files were changed for $fraction
+    if [[ "${#l10n_data[@]}" -eq 0 ]]; then
+      echo "no locale data was changed" | prepend "» "
+
+    # Else add to the pending migration list and print status
+    else
+      # Foreach changed locale file
+      for lang in "${!l10n_data[@]}"; do
+        migrate["$fraction"]+="lang/import/data?$fraction:$lang "
       done
-
-      # If NO localization data files were changed for $fraction
-      if [[ "${#l10n_data[@]}" -eq 0 ]]; then
-        echo "no locale data was changed" | prepend "» "
-
-      # Else add to the pending migration list and print status
-      else
-        # Foreach changed locale file
-        for lang in "${!l10n_data[@]}"; do
-          migrate["$fraction"]+="lang/import/data?$fraction:$lang "
-        done
-        echo "locale data changes for ${#l10n_data[@]} language(s) detected" | prepend "» "
-      fi
+      echo "locale data changes for ${#l10n_data[@]} language(s) detected" | prepend "» "
     fi
   done
 

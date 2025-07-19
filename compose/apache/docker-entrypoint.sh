@@ -139,6 +139,16 @@ if ! $test; then
   echo
 fi
 
+# Wait until rabbitmq container is ready
+wait="Waiting for rabbitmq ready..."; test="curl -sfu guest:guest http://rabbitmq:15672/api/aliveness-test/%2F"
+if ! $test &> /dev/null; then
+  while ! $test &> /dev/null; do
+    [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
+    sleep 10
+  done
+  echo
+fi
+
 # Start php background processes
 $run 'php indi -d realtime/closetab'
 $run 'php indi realtime/maxwell/enable'

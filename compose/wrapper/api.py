@@ -113,7 +113,7 @@ def bash_stream(
         try:
 
             # Read as many bytes as written by script
-            bytes = child.read_nonblocking(size=1024, timeout=100)
+            bytes = child.read_nonblocking(size=1024, timeout=180)
 
             # If script has finished and no bytes were read
             # (maybe just before the PTY fully closed),

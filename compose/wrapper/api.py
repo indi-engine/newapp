@@ -137,7 +137,15 @@ def bash_stream(
 
     # Indicate all done, if all done
     if child.exitstatus == 0 and child.signalstatus is None:
+
+        # Default msg
         bytes = 'All done.'
+
+        # If it was update-command and container changes are required by restart scenario - change default msg
+        if (re.search(r'source update', command) and os.path.exists('var/restart')):
+            with open("var/restart", "r") as f: scenario = f.read()
+            if scenario != 5:
+                bytes = "Doing it, so please wait for 'Reconnected' message in the bottom-left corner."
     else:
         bytes = ''
 

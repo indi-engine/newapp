@@ -21,6 +21,9 @@ if [[ "${1:-}" == "watcher" ]]; then
     [[ -f "$PIDFILE" ]] && kill -0 "$(cat "$PIDFILE")" 2> /dev/null
   }
 
+  # Print newline
+  echo
+
   # If 2nd arg is 'run'
   if [[ "${2:-}" == "run" ]]; then
 
@@ -40,11 +43,12 @@ if [[ "${1:-}" == "watcher" ]]; then
 
       # Else
       else
-        # Print status
-        echo "[watcher] Starting in background..."
 
         # Start in background
         nohup ./restart $@ background >> "$LOGFILE" 2>&1 &
+
+        # Print status
+        echo "Restart watcher started running"
       fi
     fi
 

@@ -924,7 +924,7 @@ restore_dump() {
   fi
 
   # Restore downloaded possibly chunked dump
-  restore_dump_from_local_backup "data" "" "$step"
+  restore_dump_from_local "data" "" "$step"
 }
 
 # Restore database from local possibly chunked dump, located in a given directory
@@ -969,6 +969,9 @@ restore_dump_from_local() {
   if [[ $step != "init" ]]; then
     if [[ "$prepend" != "" ]]; then $fn4 2>&1 | prepend "» "; else $fn4; fi
   fi
+
+  # Create a file indicating that import is done
+  touch "/var/lib/mysql/import.done"
 }
 
 # Import dump with a given filename, or count

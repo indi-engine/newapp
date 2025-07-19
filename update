@@ -43,7 +43,7 @@ else
   exec_command "git -C $VDR/system status"
 
   # If system package has uncommitted changes - ask user if we should proceed
-  if [[ ! "$stdout" =~ "nothing to commit" ]]; then
+  if [[ ! "$stdout" =~ "nothing to commit" ]] && [ -z "${FLASK_APP:-}" ]; then
     echo -e "${gray}$stdout${d}"
     echo "----"
     echo "You have uncommitted changes. Do you want to proceed?"
@@ -241,4 +241,5 @@ else
     4) echo "Container restart is needed" ;;
     5) echo "No container changes are needed" ;;
   esac
+  echo
 fi

@@ -317,3 +317,13 @@ def backup_status():
 @app.route('/import/done', methods=['GET'])
 def import_done():
     return '', 200 if os.path.exists('/var/lib/mysql/import.done') else 404
+
+# Update and migrate, if need
+@app.route('/update', methods=['POST'])
+def update():
+
+    # Get json data
+    data = request.get_json(silent=True) or {}
+
+    # Run bash script and stream stdout/stderr
+    return bash_stream('source update', data)

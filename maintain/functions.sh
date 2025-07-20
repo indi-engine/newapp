@@ -1487,8 +1487,11 @@ gh_download() {
   # Run wget with progress bar only
   wget --progress=bar --header="$hdr" --header="Accept: application/octet-stream" --show-progress -q -O "$out" "$url"
 
+  # Get exit code
+  exit_code=$?
+
   # If wget failed
-  if [[ $? -ne 0 ]]; then
+  if [[ $exit_code -ne 0 ]]; then
 
     # Get and print http status
     echo "URL: $url"
@@ -1497,8 +1500,8 @@ gh_download() {
     # Enable exit on error
     set -e
 
-    # Return error
-    return 1
+    # Return wget call's exit code
+    return $exit_code
 
   # Else
   else
@@ -2209,6 +2212,19 @@ mysql_entrypoint() {
   # Path to a file to be created once init is done
   done=/var/lib/mysql/init.done;
 
+  # Path where mysql binaries should be copied
+  vmd="/usr/bin/volumed"
+
+  # If it does not exist
+  if [[ ! -f "$vmd/mysql" ]]; then
+
+    # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
+    # those two binaries with apache-container to be able to export/import sql-files
+    src="/usr/bin"
+    cp "$src/mysql"     "$vmd/mysql"
+    cp "$src/mysqldump" "$vmd/mysqldump"
+  fi
+
   # If init is not done
   if [[ ! -f "$done" ]]; then
 
@@ -2218,13 +2234,6 @@ mysql_entrypoint() {
     # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
     # that are recognized by mysql entrypoint as importable/executable ones
     rm -f ./*.sh ./*.sql ./*.sql.bz2 ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
-
-    # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
-    # those two binaries with apache-container to be able to export/import sql-files
-    src="/usr/bin"
-    vmd="/usr/bin/volumed"
-    cp "$src/mysql"     "$vmd/mysql"
-    cp "$src/mysqldump" "$vmd/mysqldump"
 
     # Shortcut to native entrypoint
     native="/usr/local/bin/docker-entrypoint.sh"

@@ -168,8 +168,8 @@ mysql_import() {
     else
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
       export GH_TOKEN="$GH_TOKEN_SYSTEM"
-      download_possibly_chunked_file "indi-engine/system" "default" "system.sql.gz"
-      import_possibly_chunked_dump "system.sql.gz"
+      download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
+      import_possibly_chunked_dump "dump.sql.gz"
 
       # Run maxwell-specific sql
       prepare_maxwell
@@ -2567,10 +2567,13 @@ is_repo_outdated() {
   fi
 
   # Get last commit on remote
-  stdout="$(git ls-remote -h -t "$url" $branch 2>&1)"
+  stdout="$(git ls-remote -h -t "$url" $branch 2>&1)"; exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    echo -e "\n$stdout"
+    exit $exit_code
+  fi
   stdout="$(echo "$stdout" | xargs)"
   commit="${stdout%% *}"
-  #commit=43bae0b260b913f7686ff284116f08f7ce69d0cb
 
   # Check if that commit exists locally
   set +e; stdout="$(git -C "$dir" branch --contains "$commit" 2>&1)"; exit_code=$?;

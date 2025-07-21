@@ -2409,6 +2409,7 @@ wrapper_entrypoint() {
     selector="mail"
     conf="/etc/postfix/main.cf"
     sock="inet:localhost:8891"
+    user="www-data"
 
     # If trusted.hosts file does not yet exist - it means we're setting up opendkim for the very first time
     if [[ ! -f "$dkim/trusted.hosts" ]]; then

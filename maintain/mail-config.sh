@@ -13,7 +13,7 @@ if command -v docker >/dev/null 2>&1; then
   [[ $- == *i* ]] && bash_flags=(-i) || bash_flags=()
 
   # Execute restore-command within the container environment passing all arguments, if any
-  docker compose exec -it -e TERM="$TERM" wrapper bash "${bash_flags[@]}" "$(basename "${BASH_SOURCE[0]}")" $@
+  docker compose exec -it -e TERM="$TERM" wrapper bash "${bash_flags[@]}" "maintain/$(basename "${BASH_SOURCE[0]}")" $@
 
 # Else it means we're in the wrapper-container, so proceed with the restore
 else

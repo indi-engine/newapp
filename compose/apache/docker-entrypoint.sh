@@ -123,7 +123,6 @@ chown "$user:$user" "$DOC/application/config.ini" "/var/www/tmp"
 for dir in "" vendor/indi-engine/system/; do
   if [ -d $dir ]; then
     chown -R "$user:$user" "${dir}application/lang"
-    ls -la "$dir/application/lang"
   fi
 done
 

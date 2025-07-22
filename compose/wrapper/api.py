@@ -143,11 +143,11 @@ def bash_stream(
 
         # If it was update-command and container changes are required by restart scenario - change default msg
         if (re.search(r'source update', command) and os.path.exists('var/restart')):
-            with open("var/restart", "r") as f: scenario = f.read()
+            with open("var/restart", "r") as f: scenario = int(f.read())
             if scenario == 4:
                 bytes = "Doing it. Please wait for 'Reconnected' message in the bottom-left corner."
             elif scenario != 5:
-                bytes = "Doing it. Please wait for 'Proceed to re-login' prompt and click OK there then. " + scenario
+                bytes = "Doing it. Please wait for 'Proceed to re-login' prompt and click OK there then."
     else:
         bytes = ''
 

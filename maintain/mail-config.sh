@@ -26,7 +26,7 @@ else
     addr=$(wget -qO- http://ipecho.net/plain)
 
     # Header line shortcut
-    line0="${g}Type${d}\t${g}Name${d}\t${g}Data${d}"
+    line0="${gray}Type${d}\t${gray}Name${d}\t${gray}Data${d}"
 
     # Split LETS_ENCRYPT_DOMAIN into an array
     IFS=' ' read -r -a senders <<< "$EMAIL_SENDER_DOMAIN"

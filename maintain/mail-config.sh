@@ -55,9 +55,10 @@ else
       echo -e "$line0\n$line1\n$line2\n$line3\n$line4" | column -t -s $'\t'
 
     done
-    echo ""
-    echo "NOTE: If you already have MX-record existing in your DNS-settings - then don't add the one mentioned above"
-    echo "NOTE: If you already have TXT-record having Data starting with 'v=spf1' - then amend the existing record to append new IP to the existing one, e.g. 'ip4:<existing-ip> ip4:$addr'"
+    echo
+    echo "${g}NOTE:${d} If you already have MX-record existing in your DNS-settings - then don't add the one mentioned above"
+    echo
+    echo "${g}NOTE:${d} If you already have TXT-record having Data starting with 'v=spf1' - then amend the existing record to append new IP to the existing one, e.g. 'ip4:<existing-ip> ip4:$addr'"
     echo ""
   else
     echo "No domain names were specified in \$EMAIL_SENDER_DOMAIN variable"

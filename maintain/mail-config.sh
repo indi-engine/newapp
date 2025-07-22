@@ -26,7 +26,7 @@ else
     addr=$(wget -qO- http://ipecho.net/plain)
 
     # Header line shortcut
-    line0="Type\tName\tData"
+    line0="${g}Type${d}\t${g}Name${d}\t${g}Data${d}"
 
     # Split LETS_ENCRYPT_DOMAIN into an array
     IFS=' ' read -r -a senders <<< "$EMAIL_SENDER_DOMAIN"
@@ -35,9 +35,9 @@ else
     for maildomain in "${senders[@]}"; do
 
       # Print the message for distinction between the records for different domains
-      echo ""
-      echo "DNS-records required to be added for $maildomain:"
-      echo ""
+      echo
+      echo "DNS-records required to be added for ${g}$maildomain${d}:"
+      echo
 
       # Get DKIM-key
       dkim=$(cat /etc/opendkim/keys/$maildomain/mail.txt)

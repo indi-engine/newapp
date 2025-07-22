@@ -36,7 +36,7 @@ else
 
       # Print the message for distinction between the records for different domains
       echo
-      echo "DNS-records required to be added for ${g}$maildomain${d}:"
+      echo -e "DNS-records required to be added for ${g}$maildomain${d}:"
       echo
 
       # Get DKIM-key

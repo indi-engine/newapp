@@ -56,9 +56,12 @@ else
 
     done
     echo
-    echo -e "${g}NOTE:${d} If you already have MX-record existing in your DNS-settings - then don't add the one mentioned above"
+    echo -e "${g}NOTE:${d} If you already have MX-record existing in your DNS-settings"
+    echo "      then don't add the one mentioned above"
     echo
-    echo -e "${g}NOTE:${d} If you already have TXT-record having Data starting with 'v=spf1' - then amend the existing record to append new IP to the existing one, e.g. 'ip4:<existing-ip> ip4:$addr'"
+    echo -e "${g}NOTE:${d} If you already have TXT-record having Data starting with 'v=spf1'"
+    echo "      then amend the existing record to append new IP to the existing one,"
+    echo "      e.g. 'ip4:<existing-ip> ip4:$addr'"
     echo
   else
     echo "No domain names were specified in \$EMAIL_SENDER_DOMAIN variable"

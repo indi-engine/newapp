@@ -147,7 +147,7 @@ def bash_stream(
             if scenario == 4:
                 bytes = "Doing it. Please wait for 'Reconnected' message in the bottom-left corner."
             elif scenario != 5:
-                bytes = "Doing it. Please wait for 'Proceed to re-login' prompt and click OK there then. "
+                bytes = "Doing it. Please wait for 'Proceed to re-login' prompt and click OK there then."
     else:
         bytes = ''
 

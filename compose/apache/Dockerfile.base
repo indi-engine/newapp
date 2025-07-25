@@ -1,7 +1,7 @@
 FROM php:8.3-apache-bookworm
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy certbot cron python3-certbot-apache mc git
+RUN apt-get update && apt-get install -fy certbot cron python3-certbot-apache mc git wget
 ## </Misc> ##
 
 ## <User> ##

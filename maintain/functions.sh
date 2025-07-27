@@ -18,6 +18,11 @@ getup() {
   # If failed - return error
   if [[ $exit_code -ne 0 ]]; then return 1; else set -e; fi
 
+  # Run pre-getup hook, if exists
+  if [[ -f ~/.indi/pre-getup ]]; then
+    source ~/.indi/pre-getup
+  fi
+
   # Import files mentioned in MYSQL_DUMP with preliminary download, if need
   mysql_import
 

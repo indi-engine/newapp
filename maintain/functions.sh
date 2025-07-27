@@ -93,6 +93,11 @@ getup() {
   # Periodically check if var/restart file appeared, and when yes - initiate a certain scenario of a restart for the
   # current docker compose project, depending on what DevOps-related files were updated during any further 'source update' call
   source restart watcher run
+
+  # Run post-getup hook, if exists
+  if [[ -f ~/.indi/post-getup ]]; then
+    source ~/.indi/post-getup
+  fi
 }
 
 # shellcheck disable=SC2120

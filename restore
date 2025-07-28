@@ -259,7 +259,7 @@ else
     echo -e "RESTORED VERSION: ${g}$(git notes show)${d}\n"
 
     # Print the clarification
-    echo "Your development instance is now in an 'uncommitted restore' state. Now you can"
+    echo "Your $APP_ENV instance is now in an 'uncommitted restore' state. Now you can"
     echo "look around and decide whether the version you've just restored - is REALLY the"
     echo "right one for keeping this instance at and for switching other instances to, if"
     echo "any, once any updated. If so - run 'source restore commit' command. Otherwise,"

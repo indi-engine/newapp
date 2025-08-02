@@ -76,6 +76,8 @@ export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
 # Gzip dump with splitting into chunks
 msg="${pref}Gzipping $(basename "$sql")"
 pv --name "$msg" -pert $sql | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
+clear_last_lines 1
+echo "$msg... Done"
 
 # Remove original sql file
 rm -f $sql

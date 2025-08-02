@@ -51,6 +51,10 @@ mysqldump --single-transaction -h $host -u $user -y $name | \
         last = percent
     }
   }'
+
+# Exit if above command failed
+exit_code=$?; if [[ $exit_code -ne 0 ]]; then echo "mysqldump exited with code $exit_code"; exit $exit_code; fi
+
 echo ""
 clear_last_lines 1
 echo -n "$msg Done"
@@ -70,9 +74,8 @@ rm -f $base*
 export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
 
 # Gzip dump with splitting into chunks
-echo -n "${pref}Gzipping $(basename "$sql")..."
-gzip -f $sql -c | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
-echo -n " Done"
+msg="${pref}Gzipping $(basename "$sql")"
+pv --name "$msg" -pert $sql | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
 
 # Remove original sql file
 rm -f $sql

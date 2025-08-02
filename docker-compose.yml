@@ -51,7 +51,6 @@ services:
       --collation-server=utf8mb4_unicode_ci
       --innodb_buffer_pool_size=4294967296
       --wait_timeout=31536000
-      --max_execution_time=20000
       --slow_query_log=ON
       --general-log=OFF
       --general-log-file=/var/log/mysql/general.log

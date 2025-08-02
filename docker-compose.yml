@@ -5,7 +5,7 @@ services:
       dockerfile: compose/apache/Dockerfile
       args:
         - DOC=${DOC}
-        - GH_TOKEN_SYSTEM=${GH_TOKEN_SYSTEM}
+        - GH_TOKEN_SYSTEM_RO=${GH_TOKEN_SYSTEM_RO}
     ports:
       - "80:80"
       - "443:443"
@@ -99,8 +99,8 @@ services:
       DOC: ${DOC}
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
-      GH_TOKEN_CUSTOM: ${GH_TOKEN_CUSTOM:-}
-      GH_TOKEN_SYSTEM: ${GH_TOKEN_SYSTEM:-}
+      GH_TOKEN_CUSTOM_RW: ${GH_TOKEN_CUSTOM_RW:-}
+      GH_TOKEN_SYSTEM_RO: ${GH_TOKEN_SYSTEM_RO:-}
       GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}

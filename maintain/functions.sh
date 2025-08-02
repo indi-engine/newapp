@@ -56,12 +56,12 @@ getup() {
     echo "cd "$(pwd) >> /root/.bashrc
   fi
 
-  # If .env.hard file does not yet exist - create it as a copy of .env.dist but with a pre-filled value for GH_TOKEN_CUSTOM
+  # If .env.hard file does not yet exist - create it as a copy of .env.dist but with a pre-filled value for GH_TOKEN_CUSTOM_RW
   #if [[ ! -f ".env.hard" ]]; then
   #  cp ".env.dist" ".env.hard"
-  #  GH_TOKEN_CUSTOM=$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)
-  #  if [[ ! -z $GH_TOKEN_CUSTOM ]]; then
-  #    sed -i "s~GH_TOKEN_CUSTOM=~&${GH_TOKEN_CUSTOM:-}~" ".env.hard"
+  #  GH_TOKEN_CUSTOM_RW=$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)
+  #  if [[ ! -z $GH_TOKEN_CUSTOM_RW ]]; then
+  #    sed -i "s~GH_TOKEN_CUSTOM_RW=~&${GH_TOKEN_CUSTOM_RW:-}~" ".env.hard"
   #  fi
   #fi
 
@@ -85,7 +85,7 @@ getup() {
   # Make sure 'custom/data/upload' dir is created and filled, if does not exist
   init_uploads_if_need
 
-  # If $GH_TOKEN_CUSTOM is set but there are no releases yet in the current repo due to it's
+  # If $GH_TOKEN_CUSTOM_RW is set but there are no releases yet in the current repo due to it's
   # a forked or generated repo and it's a very first time of the instance getting
   # up and running for the current repo - backup current state into a very first own release,
   # so that any further deployments won't rely on parent repo releases anymore
@@ -152,8 +152,8 @@ mysql_import() {
   # Else if at least one dump file is missing
   else
 
-    # Use GH_TOKEN_CUSTOM as GH_TOKEN
-    export GH_TOKEN="$GH_TOKEN_CUSTOM"
+    # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
+    export GH_TOKEN="$GH_TOKEN_CUSTOM_RW"
 
     # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
     # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
@@ -180,7 +180,7 @@ mysql_import() {
     # Else temporary switch to system token to download and import system dump
     else
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
-      export GH_TOKEN="$GH_TOKEN_SYSTEM"
+      export GH_TOKEN="$GH_TOKEN_SYSTEM_RO"
       download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
       import_possibly_chunked_dump "dump.sql.gz"
 
@@ -189,10 +189,10 @@ mysql_import() {
     fi
 
     # Restore GH_TOKEN back, as it might have been spoofed with
-    # GH_TOKEN_PARENT by (load_releases .. "init") call above
+    # GH_TOKEN_PARENT_RO by (load_releases .. "init") call above
     # or with
-    # GH_TOKEN_SYSTEM in case of blank Indi Engine instance setup
-    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+    # GH_TOKEN_SYSTEM_RO in case of blank Indi Engine instance setup
+    export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
   fi
 
   # Print newline
@@ -468,7 +468,7 @@ load_releases() {
 
     # Try to detect parent repo, if:
     #  - current repo was forked or generated from that parent repo
-    #  - parent repo is a public one, or is a private one but accessible with current GH_TOKEN_CUSTOM
+    #  - parent repo is a public one, or is a private one but accessible with current GH_TOKEN_CUSTOM_RW
     parent_repo=$(get_parent_repo "$repo")
 
     # If parent repo detected, it means current repo was recently forked or generated from it,
@@ -476,11 +476,11 @@ load_releases() {
     # instance is getting up and running for the current repo, so try to load releases of parent repo
     if [[ $parent_repo != "null" ]]; then
 
-      # Set up GH_TOKEN_PARENT to be further accessible
-      export GH_TOKEN_PARENT="$(grep "^GH_TOKEN_PARENT=" .env | cut -d '=' -f 2-)"
+      # Set up GH_TOKEN_PARENT_RO to be further accessible
+      export GH_TOKEN_PARENT_RO="$(grep "^GH_TOKEN_PARENT_RO=" .env | cut -d '=' -f 2-)"
 
-      # If GH_TOKEN_PARENT is given - use it for loading releases of parent repo
-      if [[ ! -z "${GH_TOKEN_PARENT:-}" ]]; then export GH_TOKEN="${GH_TOKEN_PARENT:-}"; fi
+      # If GH_TOKEN_PARENT_RO is given - use it for loading releases of parent repo
+      if [[ ! -z "${GH_TOKEN_PARENT_RO:-}" ]]; then export GH_TOKEN="${GH_TOKEN_PARENT_RO:-}"; fi
 
       # Load releases for parent repo
       load_releases "$parent_repo" "init"
@@ -690,7 +690,7 @@ get_tag_hash() {
 set_tag_hash() {
 
   # Do set and get result
-  result=$(git tag "$1" "$2" --force)$(git push "https://$GH_TOKEN_CUSTOM@github.com/$repo.git" "$1" --force 2>&1)
+  result=$(git tag "$1" "$2" --force)$(git push "https://$GH_TOKEN_CUSTOM_RW@github.com/$repo.git" "$1" --force 2>&1)
 
   # Print result
   if echo "$result" | grep -q "forced update" ; then
@@ -860,7 +860,7 @@ delete_asset() {
   release=$2
 
   # Do delete
-  if [[ ! -z "$GH_TOKEN_CUSTOM" ]]; then
+  if [[ ! -z "$GH_TOKEN_CUSTOM_RW" ]]; then
     gh release delete-asset -y "$release" "$asset"
   else
     echo "Not yet supported"
@@ -877,7 +877,7 @@ upload_asset() {
   p=${3:-}
 
   # Shortcuts
-  local hdr1="Authorization: Bearer ${GH_TOKEN_CUSTOM}"
+  local hdr1="Authorization: Bearer ${GH_TOKEN_CUSTOM_RW}"
   local hdr2="Content-Type: application/octet-stream"
   local hdr3="Accept: application/vnd.github+json"
   local out="var/tmp/chunks.json"
@@ -1359,13 +1359,13 @@ prepare_env() {
   mv $PROD .env
 }
 
-# Spoof TIP and make GH_TOKEN_CUSTOM required if current repo is private
-env_GH_TOKEN_CUSTOM() {
+# Spoof TIP and make GH_TOKEN_CUSTOM_RW required if current repo is private
+env_GH_TOKEN_CUSTOM_RW() {
 
   # Don't put this directly into 'if' to make sure everything will stop on return 1, if happen
   is_private=$(repo_is_private)
 
-  # If repo is private - spoof TIP and make GH_TOKEN_CUSTOM variable to be required
+  # If repo is private - spoof TIP and make GH_TOKEN_CUSTOM_RW variable to be required
   if [[ "$is_private" = true ]]; then
     repo="${g}$(get_current_repo)${gray}"
     href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
@@ -1376,8 +1376,8 @@ env_GH_TOKEN_CUSTOM() {
   fi
 }
 
-# Spoof TIP and make GH_TOKEN_PARENT required if parent repo exists and is private
-env_GH_TOKEN_PARENT() {
+# Spoof TIP and make GH_TOKEN_PARENT_RO required if parent repo exists and is private
+env_GH_TOKEN_PARENT_RO() {
 
   # Get current repo name and visibility
   local current_repo="$(get_current_repo)"
@@ -1385,7 +1385,7 @@ env_GH_TOKEN_PARENT() {
 
   # If current repo is private - set GH_TOKEN as otherwise we won't be able to detect parent repo
   if [[ "$current_is_private" = true ]]; then
-    export GH_TOKEN="$(grep "^GH_TOKEN_CUSTOM=" .env.prod | cut -d '=' -f 2-)"
+    export GH_TOKEN="$(grep "^GH_TOKEN_CUSTOM_RW=" .env.prod | cut -d '=' -f 2-)"
   fi
 
   # Get parent repo, if any exists for current repo
@@ -1399,7 +1399,7 @@ env_GH_TOKEN_PARENT() {
     # Check if parent repo is private
     parent_is_private=$(repo_is_private "$parent_repo")
 
-    # If yes - spoof TIP and make GH_TOKEN_SYSTEM variable to be required
+    # If yes - spoof TIP and make GH_TOKEN_SYSTEM_RO variable to be required
     if [[ "$parent_is_private" = true ]]; then
       TIP="\n# [Required] This repo is ${child_type} from parent ${g}$parent_repo${gray} repo,"
       TIP+="\n# which is private, so this means you were added to the list of collaborators"
@@ -1585,8 +1585,8 @@ init_uploads_if_need() {
     # If asset file does not exist locally
     if [[ ! -f "data/$file" ]]; then
 
-      # Use GH_TOKEN_CUSTOM as GH_TOKEN
-      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+      # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
+      export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
       # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
       # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
@@ -1600,8 +1600,8 @@ init_uploads_if_need() {
         download_possibly_chunked_file "$init_repo" "$init_release" "$file"
       fi
 
-      # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT by (load_releases .. "init") call above
-      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+      # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT_RO by (load_releases .. "init") call above
+      export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
     fi
 
     # If asset file does exist locally (due to it was just downloaded or it was already existing locally)
@@ -1630,7 +1630,7 @@ init_uploads_if_need() {
   chmod +x "$dest/../" "$dest"
 }
 
-# If $GH_TOKEN_CUSTOM is set but there are no releases yet in the current repo due to it's
+# If $GH_TOKEN_CUSTOM_RW is set but there are no releases yet in the current repo due to it's
 # a forked or generated repo and it's a very first time of the instance getting
 # up and running for the current repo - backup current state into a very first own release,
 # so that any further deployments won't rely on parent repo releases anymore
@@ -1645,15 +1645,15 @@ make_very_first_release_if_need() {
   # Get current repo
   current_repo="$(get_current_repo)"
 
-  # Use GH_TOKEN_CUSTOM as GH_TOKEN
-  export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+  # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
+  export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
   # If global releaseQty array is empty, it means load_releases() function was NOT
   # called yet, so call it now as we need to know whether current repo has releases
   if (( ${#releaseQty[@]} == 0 )); then load_releases "$current_repo"; fi
 
   # If current repo has no own releases so far - create very first one
-  if (( releaseQty["$current_repo"] == 0 )) && [[ -n $GH_TOKEN_CUSTOM ]]; then
+  if (( releaseQty["$current_repo"] == 0 )) && [[ -n $GH_TOKEN_CUSTOM_RW ]]; then
 
     # Print header
     echo "» ------------------------------------------------------------- «"
@@ -2187,7 +2187,7 @@ commit_restore() {
 
   # Push changes to remote repo, and pull back for git log to show last commit in origin/main as well
   echo ""
-  git remote set-url origin https://$GH_TOKEN_CUSTOM@github.com/$(get_current_repo)
+  git remote set-url origin https://$GH_TOKEN_CUSTOM_RW@github.com/$(get_current_repo)
   git push
   pull=$(git pull) && [[ ! "$pull" = "Already up to date." ]] && echo -e "\n$pull";
 
@@ -2395,7 +2395,7 @@ wrapper_entrypoint() {
   if [[ ! -f $known ]] || ! grep -q "github.com" $known; then ssh-keyscan github.com >> $known; fi
 
   # Setup github token for composer
-  composer --global config github-oauth.github.com "$(grep "^GH_TOKEN_SYSTEM=" .env | cut -d '=' -f 2-)"
+  composer --global config github-oauth.github.com "$(grep "^GH_TOKEN_SYSTEM_RO=" .env | cut -d '=' -f 2-)"
 
   # Setup git filemode
   git config --global core.filemode false
@@ -2468,10 +2468,10 @@ wrapper_entrypoint() {
   service postfix start
 
   # Refresh token
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
 
-  # Export GH_TOKEN from $GH_TOKEN_CUSTOM
-  [[ ! -z $GH_TOKEN_CUSTOM ]] && export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+  # Export GH_TOKEN from $GH_TOKEN_CUSTOM_RW
+  [[ ! -z $GH_TOKEN_CUSTOM_RW ]] && export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
   # Setup crontab
   export TERM=xterm && env | grep -E "MYSQL|GIT|GH|DOC|EMAIL|TERM|BACKUPS|APP_ENV" >> /etc/environment
@@ -2641,11 +2641,11 @@ git_askpass() {
 
   # Set GH_TOKEN based on $token-arg
   if [[ "$token" = "custom" ]]; then
-    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+    export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
   elif [[ "$token" = "system" ]]; then
-    export GH_TOKEN="${GH_TOKEN_SYSTEM:-}"
+    export GH_TOKEN="${GH_TOKEN_SYSTEM_RO:-}"
   elif [[ "$token" = "parent" ]]; then
-    export GH_TOKEN="${GH_TOKEN_PARENT:-}"
+    export GH_TOKEN="${GH_TOKEN_PARENT_RO:-}"
   else
     export GH_TOKEN=""
   fi

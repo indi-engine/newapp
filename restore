@@ -22,8 +22,8 @@ if command -v docker >/dev/null 2>&1; then
 else
 
   # Refresh tokens
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
-  export GH_TOKEN_PARENT="$(grep "^GH_TOKEN_PARENT=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_PARENT_RO="$(grep "^GH_TOKEN_PARENT_RO=" .env | cut -d '=' -f 2-)"
 
   # Set up restore scenario based on 1st arg
   if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" || "${1:-}" = "cancel" || "${1:-}" = "commit" ]]; then
@@ -42,7 +42,7 @@ else
     if [[ "$scenario" = "dump" || "$scenario" = "uploads" ]]; then
 
       # Set token as it's needed in get_parent_repo
-      export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+      export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
       # Try to detect parent repo
       parent_repo="$(get_parent_repo "$current_repo")"
@@ -52,7 +52,7 @@ else
         echo "Unable to detect parent repo for $(get_current_repo)" >&2
         exit 1
       else
-        export GH_TOKEN="${GH_TOKEN_PARENT:-}"
+        export GH_TOKEN="${GH_TOKEN_PARENT_RO:-}"
       fi
     else
       echo "Restore from parent repo is supported only for 'dump' or 'uploads' scenarios" >&2
@@ -62,7 +62,7 @@ else
   # Else indicate parent repo won't be involved and use current repo's token
   else
     parent_repo="false"
-    export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+    export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
   fi
 
   # Make sure execution stops on any error

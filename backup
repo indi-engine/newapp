@@ -21,12 +21,12 @@ else
   # Load functions
   source maintain/functions.sh
 
-  # Pick GH_TOKEN_CUSTOM from .env
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+  # Pick GH_TOKEN_CUSTOM_RW from .env
+  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
 
   # Set up is_cloned flag and has_token flags
   if [[ "$(get_current_repo)" = "indi-engine/custom" ]]; then is_cloned=true; else is_cloned=false; fi
-  if [[ "$GH_TOKEN_CUSTOM" = "" ]]; then has_token=false; else has_token=true; fi
+  if [[ "$GH_TOKEN_CUSTOM_RW" = "" ]]; then has_token=false; else has_token=true; fi
 
   # If current repo is 'indi-engine/custom' - it means it's a clone of Indi Engine blank repo,
   # so to be able to create a backup - we have to ask user to create own repo with access token
@@ -53,16 +53,16 @@ else
       line1="# Please goto $href, create"
       line2="# there and input here a fine-grained personal access token with read-write"
       line3="# access to the Contents of ${g}${repo}${gray} repository:"
-      read_text "$line1\n$line2\n$line3" "GH_TOKEN_CUSTOM" true
+      read_text "$line1\n$line2\n$line3" "GH_TOKEN_CUSTOM_RW" true
       token="$INPUT_VALUE"
       echo
     else
       token="$TOKEN"
     fi
 
-    # Set value for GH_TOKEN_CUSTOM in .env
-    echo -n "Updating .env with GH_TOKEN_CUSTOM..."
-    sed -Ei 's~^(GH_TOKEN_CUSTOM=).*?$~\1'"$token"'~' .env && echo " Done"
+    # Set value for GH_TOKEN_CUSTOM_RW in .env
+    echo -n "Updating .env with GH_TOKEN_CUSTOM_RW..."
+    sed -Ei 's~^(GH_TOKEN_CUSTOM_RW=).*?$~\1'"$token"'~' .env && echo " Done"
   fi
 
   # Push cloned repo to user's github
@@ -82,10 +82,10 @@ else
   fi
 
   # Refresh token
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
 
   # Export token and into current shell session
-  export GH_TOKEN="${GH_TOKEN_CUSTOM:-}"
+  export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
   # If repo was cloned or token was missing - do full initial backup
   if [[ $is_cloned = true || $has_token = false ]]; then

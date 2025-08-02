@@ -237,8 +237,8 @@ def restore_choices():
     # Prepare choices object
     choices = {'current': {'name': get_current_repo(), 'list': []}}
 
-    # Get GH_TOKEN_CUSTOM from .env
-    token = get_dot_env('GH_TOKEN_CUSTOM')
+    # Get GH_TOKEN_CUSTOM_RW from .env
+    token = get_dot_env('GH_TOKEN_CUSTOM_RW')
 
     # Prepare curl command
     command = ['curl']
@@ -265,8 +265,8 @@ def restore_choices():
         # Append 'parent'-key into choices object
         choices['parent'] = {'name': parent_repo, 'list': []}
 
-        # Get GH_TOKEN_PARENT from .env
-        token = get_dot_env('GH_TOKEN_PARENT')
+        # Get GH_TOKEN_PARENT_RO from .env
+        token = get_dot_env('GH_TOKEN_PARENT_RO')
 
         # Prepare curl command
         command = ['curl']
@@ -319,7 +319,7 @@ def backup_status():
     return jsonify({
         'success': True,
         'repo': get_current_repo(),
-        'has_token': bool(get_dot_env('GH_TOKEN_CUSTOM')),
+        'has_token': bool(get_dot_env('GH_TOKEN_CUSTOM_RW')),
         'GH_ASSET_MAX_SIZE': get_dot_env('GH_ASSET_MAX_SIZE')
     }), 200
 

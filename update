@@ -34,9 +34,9 @@ else
   VDR="custom/vendor/indi-engine"
 
   # Load custom token
-  export GH_TOKEN_CUSTOM="$(grep "^GH_TOKEN_CUSTOM=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
 
-  # Use GH_TOKEN_CUSTOM as git password
+  # Use GH_TOKEN_CUSTOM_RW as git password
   git_askpass "custom"
 
   # Get 'git status' for system repo
@@ -77,7 +77,7 @@ else
   # Declare associative array to track which of indi-engine/* repos are outdated
   declare -A is_outdated=()
 
-  # Use GH_TOKEN_SYSTEM as git password as now we'll check if any Indi Engine packages are outdated
+  # Use GH_TOKEN_SYSTEM_RO as git password as now we'll check if any Indi Engine packages are outdated
   echo "Checking if any of local indi-engine/* packages are outdated:"
   git_askpass "system"
 
@@ -108,7 +108,7 @@ else
     fi
   done
 
-  # Use GH_TOKEN_CUSTOM as git password, back
+  # Use GH_TOKEN_CUSTOM_RW as git password, back
   git_askpass "custom"
 
   # If one/both of indi-engine packages is/are outdated, or their mentions
@@ -125,8 +125,8 @@ else
     msg=".git/COMMIT_EDITMSG"; if [[ ! -f "$msg" ]]; then touch $msg; fi;
     git commit -F "$msg" 2>&1 | prepend "» "
 
-    # If GH_TOKEN_CUSTOM is given
-    if [[ ! "${GH_TOKEN_CUSTOM:-}" = "" ]]; then
+    # If GH_TOKEN_CUSTOM_RW is given
+    if [[ ! "${GH_TOKEN_CUSTOM_RW:-}" = "" ]]; then
 
       # Push changes to remote repo
       echo "Pushing to github:"
@@ -134,7 +134,7 @@ else
 
     # Else
     else
-      echo "NOTE: Updates are committed but not pushed to github as no GH_TOKEN_CUSTOM given"
+      echo "NOTE: Updates are committed but not pushed to github as no GH_TOKEN_CUSTOM_RW given"
     fi
   fi
 

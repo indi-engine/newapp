@@ -29,7 +29,7 @@ msg="${pref}Calculating total rows..."; echo $msg
 total=0; tables=0
 args="-h $host -u $user -N -e"
 for table in $(mysql $args 'SHOW TABLES FROM `'$name'`;'); do
-  count=$(mysql $args "SELECT COUNT(*) FROM \`$name\`.\`$table\` FORCE INDEX(PRIMARY);")
+  count=$(mysql $args "SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$name' AND TABLE_NAME = '$table';")
   (( total+=count )) || true
   (( tables++ )) || true
   clear_last_lines 1

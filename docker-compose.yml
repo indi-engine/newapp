@@ -72,6 +72,10 @@ services:
       test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
       start_period: 3m
       interval: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_add:
+      - SYS_NICE
     entrypoint: ["bash", "custom-entrypoint.sh"]
 
   rabbitmq:

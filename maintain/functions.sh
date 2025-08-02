@@ -3,6 +3,9 @@
 # Declare array of [repo name => releases qty] pairs
 declare -gA releaseQty=()
 
+# Windows: Git Bash specific fix
+GIT_PS1_SHOWCONFLICTSTATE=
+
 # Colors
 r="\e[31m" # red
 g="\e[36m" # cyan

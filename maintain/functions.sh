@@ -1652,17 +1652,25 @@ make_very_first_release_if_need() {
   # called yet, so call it now as we need to know whether current repo has releases
   if (( ${#releaseQty[@]} == 0 )); then load_releases "$current_repo"; fi
 
-  # If current repo has no own releases so far - create very first one
-  if (( releaseQty["$current_repo"] == 0 )) && [[ -n $GH_TOKEN_CUSTOM_RW ]]; then
-
-    # Print header
-    echo "» ------------------------------------------------------------- «"
-    echo "» -- Running backup script (to create very first own backup) -- «"
-    echo "» ------------------------------------------------------------- «"
-    echo
-
-    # Do backup
-    source backup init
+  # If custom token is given
+  if [[ -n $GH_TOKEN_CUSTOM_RW ]]; then
+    
+    # If current repo has no own releases so far - create very first one
+    if (( releaseQty["$current_repo"] == 0 )); then
+  
+      # Print header
+      echo "» ------------------------------------------------------------- «"
+      echo "» -- Running backup script (to create very first own backup) -- «"
+      echo "» ------------------------------------------------------------- «"
+      echo
+  
+      # Do backup
+      source backup init
+      
+    # Else clear one line
+    else
+      clear_last_lines 1
+    fi
   fi
 }
 

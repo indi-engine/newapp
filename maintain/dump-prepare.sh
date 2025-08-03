@@ -25,7 +25,7 @@ sql=$(echo "$dump" | sed 's/\.gz$//')
 export MYSQL_PWD=$pass
 
 # Estimate export as number of records to be dumped
-msg="${pref}Calculating approx. count of total rows..."; echo $msg
+msg="${pref}Calculating approximate qty of total rows..."; echo $msg
 total=0; tables=0
 args="-h $host -u $user -N -e"
 for table in $(mysql $args 'SHOW TABLES FROM `'$name'`;'); do

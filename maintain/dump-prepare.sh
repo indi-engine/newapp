@@ -25,7 +25,7 @@ sql=$(echo "$dump" | sed 's/\.gz$//')
 export MYSQL_PWD=$pass
 
 # Estimate export as number of records to be dumped
-msg="${pref}Calculating total rows..."; echo $msg
+msg="${pref}Calculating approx. count of total rows..."; echo $msg
 total=0; tables=0
 args="-h $host -u $user -N -e"
 for table in $(mysql $args 'SHOW TABLES FROM `'$name'`;'); do
@@ -77,7 +77,7 @@ export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
 msg="${pref}Gzipping $(basename "$sql")"
 pv --name "$msg" -pert $sql | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
 clear_last_lines 1
-echo "$msg... Done"
+echo -n "$msg... Done"
 
 # Remove original sql file
 rm -f $sql

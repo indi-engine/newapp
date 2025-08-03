@@ -37,18 +37,22 @@ getup() {
   # If DKIM-keys are expected to be created
   if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 
-    # Shortcuts
-    local wait="Waiting for DKIM-keys to be prepared.."
+    # If DKIM-keys are not already created
+    if ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q $EMAIL_SENDER_DOMAIN; then
 
-    # Wait while DKIM-keys are ready
-    while ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q $EMAIL_SENDER_DOMAIN; do
-      [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
-      sleep 1
-    done
-    echo ""
+      # Shortcuts
+      local wait="Waiting for DKIM-keys to be prepared.."
 
-    # Print mail config
-    docker compose exec wrapper bash -c "source maintain/mail-config.sh"
+      # Wait while DKIM-keys are ready
+      while ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q $EMAIL_SENDER_DOMAIN; do
+        [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
+        sleep 1
+      done
+      echo ""
+
+      # Print mail config
+      docker compose exec wrapper bash -c "source maintain/mail-config.sh"
+    fi
   fi
 
   # Force current directory to be the default directory

@@ -2684,6 +2684,9 @@ restart_if_need() {
   # If restart scenario is from 1 to 4
   if [[ "$scenario" =~ (1|2|3|4) ]]; then
 
+    # Pick GH_TOKEN_CUSTOM_RO from .env
+    export GH_TOKEN_SYSTEM_RO="$(grep "^GH_TOKEN_SYSTEM_RO=" .env | cut -d '=' -f 2-)"
+
     # Pull base images and/or rebuild own ones, if need
     if [[ "$scenario" == 1 ]]; then docker compose build --pull;  echo 3 > "$artifact"; scenario=3; fi
     if [[ "$scenario" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; scenario=3; fi

@@ -33,8 +33,11 @@ else
   # Vendor dir
   VDR="custom/vendor/indi-engine"
 
+  # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
+  prompt_git_commit_identify_if_missing
+
   # Load custom token
-  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env GH_TOKEN_CUSTOM_RW)"
 
   # Use GH_TOKEN_CUSTOM_RW as git password
   git_askpass "custom"

@@ -42,7 +42,7 @@ if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
   echo "0 */12 * * * certbot renew --logs-dir $logs" | crontab -
 
   # If $EMAIL_SENDER_DOMAIN is empty - use LETS_ENCRYPT_DOMAIN by default
-  if [[ -z "$EMAIL_SENDER_DOMAIN" ]]; then EMAIL_SENDER_DOMAIN=$LETS_ENCRYPT_DOMAIN; fi
+  if [[ -z "$EMAIL_SENDER_DOMAIN" ]]; then EMAIL_SENDER_DOMAIN="$LETS_ENCRYPT_DOMAIN"; fi
 fi
 
 # Configure postfix and opendkim to ensure outgoing emails deliverability

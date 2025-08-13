@@ -269,12 +269,15 @@ read_text() {
   local tip="${1:-}"
   local env_name="${2:-$ENV_NAME}"
   local req=${3:-$REQ}
+  local _set_env=${4:-false}
+  [[ $tip == true ]] && tip=$(get_env_tip "$env_name")
   echo -e "${gray}${tip}${d}" && echo -n "$env_name=" && while :; do
     read -r INPUT_VALUE
-    if [[ $req == true && -z $INPUT_VALUE ]]; then
-        echo -n "$env_name="
+    if [[ $req == true && -z "$INPUT_VALUE" ]]; then
+      echo -n "$env_name="
     else
-        break
+      [[ "$_set_env" == true ]] && set_env "$env_name" "$INPUT_VALUE"
+      break
     fi
   done
 }
@@ -2233,6 +2236,9 @@ prepare_backup_tag() {
 # Make restored version to become the new latest
 commit_restore() {
 
+  # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
+  prompt_git_commit_identify_if_missing
+
   # Print where we are
   echo "Make restored version to become the new latest:"
 
@@ -3009,4 +3015,78 @@ migrate_if_need() {
 prepended() {
   cat "$DOC/var/prepended"
   rm "$DOC/var/prepended"
+}
+
+# Get the value of given variable from .env file
+get_env() {
+  grep "^$1=" .env | cut -d '=' -f 2-
+}
+
+# Search .env file for a given variable and update it's value with  a given one
+set_env() {
+
+  # Arguments
+  local name="$1"
+  local value="$2"
+
+  # Do update in .env file
+  if [[ "$value" =~ [[:space:]] ]]; then
+    sed -i 's~^'"$name"'=.*$~'"$name"'="'"$value"'"~' .env
+  else
+    sed -i 's~^'"$name"'=.*$~'"$name"'='"$value"'~' .env
+  fi
+
+  # Replace in current bash environment
+  export "$name"="$value"
+}
+
+# Get the comment for a variable
+# Usage: get_env_comment_raw VAR [FILE]
+get_env_tip() {
+
+  # Arguments
+  local var="$1"
+  local file="${2:-.env}"
+
+  # Get comment
+  awk -v var="$var" '
+    # Collect consecutive comment lines (preserve exactly)
+    /^#/ { buf[++n] = $0; next }
+
+    # If a blank or whitespace-only line appears, the block is no longer adjacent
+    /^[[:space:]]*$/ { n = 0; split("", buf); next }
+
+    # When we hit the target variable at column 1, print buffered comments and exit
+    $0 ~ "^" var "=" {
+        for (i = 1; i <= n; i++) print buf[i]
+        exit
+    }
+
+    # Any other non-comment line clears the buffer
+    { n = 0; split("", buf) }
+  ' "$file"
+}
+
+# Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
+prompt_git_commit_identify_if_missing() {
+
+  # If current execution was not triggered from Flask
+  if [ -z "${FLASK_APP:-}" ]; then
+
+    # If GIT_COMMIT_NAME is not defined - prompt for it
+    env="GIT_COMMIT_NAME"
+    if [[ "$(get_env $env)" == "" ]]; then
+      echo
+      read_text true "$env" true true
+      git config user.name "${!env}"
+    fi
+
+    # If GIT_COMMIT_EMAIL is not defined - prompt for it
+    env="GIT_COMMIT_EMAIL"
+    if [[ "$(get_env $env)" == "" ]]; then
+      echo
+      read_text true "$env" true true
+      git config user.email "${!env}"
+    fi
+  fi
 }

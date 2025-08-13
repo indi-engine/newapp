@@ -1297,6 +1297,7 @@ prepare_env() {
   local TIP=""
   local REQ=false
   local enum_rex='\[enum=([a-zA-Z0-9_]+(,[a-zA-Z0-9_]+)*)\]'
+  local ENUM=false
 
   # Read the file into an array, preserving lines with spaces
   mapfile -t lines < "$DIST"
@@ -1328,8 +1329,14 @@ prepare_env() {
         env_$ENV_NAME
       fi
 
-      # If default value is empty
-      if [[ -z $DEFAULT_VALUE ]]; then
+      # If default value is NOT empty, or value prompting should be skipped
+      if [[ ! -z $DEFAULT_VALUE || "$REQ" == "skip" ]]; then
+
+        # Write as is
+        echo "$ENV_NAME=$DEFAULT_VALUE" >> "$PROD"
+
+      # Else prompt
+      else
 
         # Ask user to type or choose the value
         if [[ $ENUM == false ]]; then read_text "${TIP}"; else read_choice_env "${TIP}" "$ENUM"; fi
@@ -1342,10 +1349,6 @@ prepare_env() {
 
         # Write inputted value
         echo "$ENV_NAME=$INPUT_VALUE" >> "$PROD"
-
-      # Else write as is
-      else
-        echo "$ENV_NAME=$DEFAULT_VALUE" >> "$PROD"
       fi
 
     # Else if line is an empty line or contains only whitespaces
@@ -1366,6 +1369,12 @@ prepare_env() {
 # Spoof TIP and make GH_TOKEN_CUSTOM_RW required if current repo is private
 env_GH_TOKEN_CUSTOM_RW() {
 
+  # If it's a blank cloned Indi Engine repo - skip
+  if [[ "$(get_current_repo)" == "indi-engine/custom" ]]; then
+    REQ="skip"
+    return 0
+  fi
+
   # Don't put this directly into 'if' to make sure everything will stop on return 1, if happen
   is_private=$(repo_is_private)
 
@@ -1382,6 +1391,12 @@ env_GH_TOKEN_CUSTOM_RW() {
 
 # Spoof TIP and make GH_TOKEN_PARENT_RO required if parent repo exists and is private
 env_GH_TOKEN_PARENT_RO() {
+
+  # If it's a blank cloned Indi Engine repo - skip
+  if [[ "$(get_current_repo)" == "indi-engine/custom" ]]; then
+    REQ="skip"
+    return 0
+  fi
 
   # Get current repo name and visibility
   local current_repo="$(get_current_repo)"
@@ -1413,6 +1428,54 @@ env_GH_TOKEN_PARENT_RO() {
       TIP+="\n# their fresh database/uploads - vital if your repo has no own backup so far"
       REQ=true
     fi
+  fi
+}
+
+# Shorten comment for APP_ENV variable
+env_APP_ENV() {
+  TIP=$(printf "%s" "$TIP" | grep -Pzo '.*if any.' | tr -d '\0')
+}
+
+# Skip prompting for LETS_ENCRYPT_DOMAIN if APP_ENV is 'development'
+env_LETS_ENCRYPT_DOMAIN() {
+
+  # Load custom token
+  local APP_ENV="$(grep "^APP_ENV=" .env.prod | cut -d '=' -f 2-)"
+
+  # If current instance will be a development instance - skip prompt for LETS_ENCRYPT_DOMAIN
+  if [[ "$APP_ENV" == "development" ]]; then
+    REQ="skip"
+  fi
+}
+
+# Skip prompting for EMAIL_SENDER_DOMAIN if APP_ENV is 'development'
+env_EMAIL_SENDER_DOMAIN() {
+
+  # Get APP_ENV
+  local APP_ENV="$(grep "^APP_ENV=" .env.prod | cut -d '=' -f 2-)"
+
+  # If current instance will be a development instance - skip prompt for LETS_ENCRYPT_DOMAIN
+  if [[ "$APP_ENV" == "development" ]]; then
+    REQ="skip"
+  fi
+}
+
+# Skip to simplify initial setup. It will be prompted further on attempt to
+# 'source restore commit' and 'source update'
+env_GIT_COMMIT_NAME() {
+  REQ="skip"
+}
+
+# Skip to simplify initial setup if neither LETS_ENCRYPT_DOMAIN nor EMAIL_SENDER_DOMAIN is given
+env_GIT_COMMIT_EMAIL() {
+
+  # Load configs which require GIT_COMMIT_EMAIL
+  local APP_ENV="$(grep "^APP_ENV=" .env.prod | cut -d '=' -f 2-)"
+  local LETS_ENCRYPT_DOMAIN="$(grep "^LETS_ENCRYPT_DOMAIN=" .env.prod | cut -d '=' -f 2-)"
+
+  # Ask for GIT_COMMIT_EMAIL only if it's a production instance with $LETS_ENCRYPT_DOMAIN specified
+  if [[ "$APP_ENV" != "production" || "$LETS_ENCRYPT_DOMAIN" == "" ]]; then
+    REQ="skip"
   fi
 }
 
@@ -2403,7 +2466,7 @@ wrapper_entrypoint() {
   if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $(git config user.email) ]]; then git config user.email "$GIT_COMMIT_EMAIL"; fi
 
   # Add github.com to known hosts, if missing
-  if [[ ! -d ~/.ssh ]]; then mkdir ~/.ssh; fi; known=~/.ssh/known_hosts;    
+  if [[ ! -d ~/.ssh ]]; then mkdir ~/.ssh; fi; known=~/.ssh/known_hosts;
   if [[ ! -f $known ]] || ! grep -q "github.com" $known; then ssh-keyscan github.com >> $known; fi
 
   # Setup github token for composer

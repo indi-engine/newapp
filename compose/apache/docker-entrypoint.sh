@@ -35,7 +35,9 @@ if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
   # Obtain certificate and stop apache in background
   # and setup cron job for certificate renewal check
   domainsArg=$(echo "$LETS_ENCRYPT_DOMAIN" | sed 's/ / -d /g')
-  certbot --apache -n -d $domainsArg -m "$LETS_ENCRYPT_NOTIFY" --agree-tos -v --logs-dir "$logs"
+  if [[ ! -z "$LETS_ENCRYPT_NOTIFY" ]];  then emailArg="-m $LETS_ENCRYPT_NOTIFY"
+  elif [[ "$APP_ENV" != "production" ]]; then emailArg="--register-unsafely-without-email"; fi
+  certbot --apache -n -d $domainsArg $emailArg --agree-tos -v --logs-dir "$logs"
   service apache2 stop
   echo "0 */12 * * * certbot renew --logs-dir $logs" | crontab -
 

@@ -25,7 +25,6 @@ services:
       LETS_ENCRYPT_DOMAIN: ${LETS_ENCRYPT_DOMAIN:-}
       LETS_ENCRYPT_NOTIFY: ${GIT_COMMIT_EMAIL:-}
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-}
-      GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
       APP_ENV: ${APP_ENV}
     working_dir: ${DOC}
     volumes:

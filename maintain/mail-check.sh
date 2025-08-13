@@ -24,17 +24,24 @@ else
     # Shortcuts
     sub="Test subject"
     msg="Test message"
+    email=${1:-$(get_env GIT_COMMIT_EMAIL)}
+
+    # Prompt for recipient email address
+    if [[ "$email" == "" ]]; then
+      read_text "\nPlease input recipient email address" "email" true
+      email="$INPUT_VALUE"
+    fi
 
     # Print what's going on
     echo ""
     echo "An attempt to send an email will now be done:"
     echo ""
-    echo "Recepient: $GIT_COMMIT_EMAIL"
+    echo "Recipient: $email"
     echo "Subject: $sub"
     echo "Message: $msg"
 
-    # Attempt to send test mail message at $GIT_COMMIT_EMAIL address
-    echo -e "Subject: $sub\n\n$msg" | sendmail $GIT_COMMIT_EMAIL
+    # Attempt to send test mail message at $email address
+    echo -e "Subject: $sub\n\n$msg" | sendmail "$email"
 
     echo ""
     echo "Done, please check INBOX for that email address"

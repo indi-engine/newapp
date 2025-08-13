@@ -120,9 +120,10 @@ chown -R "$user:$user" "/var/log/custom"; chown "root:root" "/var/log/custom/.gi
 chown "$user:$user" "$DOC/application/config.ini" "/var/www/tmp"
 
 # Change owner for locale files to apache user
-for dir in "" vendor/indi-engine/system/; do
-  if [ -d $dir ]; then
-    chown -R "$user:$user" "${dir}application/lang"
+for repo in "" vendor/indi-engine/system/; do
+  dir="${repo}application/lang"
+  if [ -d "$dir" ]; then
+    chown -R "$user:$user" "$dir"
   fi
 done
 

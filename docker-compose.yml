@@ -14,7 +14,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    #restart: always
+    restart: always
     environment:
       DOC: ${DOC}
       MYSQL_HOST: mysql
@@ -44,7 +44,7 @@ services:
 
   mysql:
     image: mysql:8.0.36-debian
-    #restart: always
+    restart: always
     command:
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
       --character-set-server=utf8mb4
@@ -55,6 +55,7 @@ services:
       --general-log=OFF
       --general-log-file=/var/log/mysql/general.log
       --slow-query-log-file=/var/log/mysql/slow.log
+      --binlog_expire_logs_seconds=86400
     environment:
       TZ: ${TIMEZONE}
       MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-custom}

@@ -36,33 +36,6 @@ for table in $(mysql $args 'SHOW TABLES FROM `'$name'`;'); do
   echo -n "$msg "; printf "%'d" "$total"; echo " in $tables tables"
 done
 
-# Export dump with printing progress
-[ -d "$dir" ] || mkdir -p "$dir"
-msg="${pref}Exporting $(basename "$sql") into $dir/ dir...";
-mysqldump --single-transaction -h $host -u $user -y $name | \
-  tee $sql | \
-  grep --line-buffered '^INSERT INTO' | \
-  awk -v total="$total" -v msg="$msg" '{
-    count += gsub(/\),\(/, "&") + 1
-    percent = int((count / total) * 100)
-    if (percent != last) {
-        printf "\r%s %d / %d (%d%%)", msg, count, total, percent
-        fflush()
-        last = percent
-    }
-  }'
-
-# Exit if above command failed
-exit_code=$?; if [[ $exit_code -ne 0 ]]; then echo "mysqldump exited with code $exit_code"; exit $exit_code; fi
-
-echo ""
-clear_last_lines 1
-echo -n "$msg Done"
-size=$(du -scbh $sql 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo ", ${size,,}b"
-
-# Unset from env
-unset MYSQL_PWD
-
 # Target gz file path
 gz="$sql.gz"
 base=$gz*
@@ -73,14 +46,31 @@ rm -f $base*
 # Pick GH_ASSET_MAX_SIZE from .env
 export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
 
-# Gzip dump with splitting into chunks
-msg="${pref}Gzipping $(basename "$sql")"
-pv --name "$msg" -pert $sql | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
-clear_last_lines 1
-echo -n "$msg... Done"
+# Export dump with printing progress
+[ -d "$dir" ] || mkdir -p "$dir"
+msg="${pref}Exporting $(basename "$gz") into $dir/ dir...";
+mysqldump --single-transaction -h $host -u $user -y $name \
+| tee >(grep --line-buffered '^INSERT INTO' \
+    | awk -v total="$total" -v msg="$msg" '{
+        count += gsub(/\),\(/, "&") + 1
+        percent = int((count / total) * 100)
+        if (percent != last) {
+          printf "\r%s %d / %d (%d%%)", msg, count, total, percent
+          fflush()
+          last = percent
+        }
+      }' >&2) \
+| gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
 
-# Remove original sql file
-rm -f $sql
+# Unset from env
+unset MYSQL_PWD
+
+# Exit if above command failed
+exit_code=$?; if [[ $exit_code -ne 0 ]]; then echo "mysqldump exited with code $exit_code"; exit $exit_code; fi
+
+echo ""
+clear_last_lines 1
+echo -n "$msg Done"
 
 # Remove suffix from single chunk
 chunks=($base); if [ "${#chunks[@]}" -eq 1 ]; then mv "${chunks[0]}" $gz; fi

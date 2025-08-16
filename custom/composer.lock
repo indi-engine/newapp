@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "8676dc55ecaf8ee37efd586142f6a68a",
+    "content-hash": "0c89832a2dde82db263c71fe779ce2a6",
     "packages": [
         {
             "name": "brick/math",
@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "c07ba7d06bed55f2d73cc375e4c7ac4a25335941"
+                "reference": "a72a87d79b6ea7975e92862e601b4220d604130f"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1230,7 +1230,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2025-08-14T18:03:42+00:00"
+            "time": "2025-08-16T09:31:35+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

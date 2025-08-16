@@ -25,10 +25,10 @@ else
   export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
 
   # Set up is_cloned flag and has_token flags
-  if [[ "$(get_current_repo)" = "indi-engine/custom" ]]; then is_cloned=true; else is_cloned=false; fi
+  if [[ "$(get_current_repo)" = "indi-engine/newapp" ]]; then is_cloned=true; else is_cloned=false; fi
   if [[ "$GH_TOKEN_CUSTOM_RW" = "" ]]; then has_token=false; else has_token=true; fi
 
-  # If current repo is 'indi-engine/custom' - it means it's a clone of Indi Engine blank repo,
+  # If current repo is 'indi-engine/newapp' - it means it's a clone of Indi Engine blank repo,
   # so to be able to create a backup - we have to ask user to create own repo with access token
   if [[ $is_cloned = true ]]; then
 

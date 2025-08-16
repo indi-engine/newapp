@@ -93,7 +93,7 @@ getup() {
   # a forked or generated repo and it's a very first time of the instance getting
   # up and running for the current repo - backup current state into a very first own release,
   # so that any further deployments won't rely on parent repo releases anymore
-  if [[ "$(get_current_repo)" != "indi-engine/custom" ]]; then
+  if [[ "$(get_current_repo)" != "indi-engine/newapp" ]]; then
     make_very_first_release_if_need
   fi
 
@@ -1373,7 +1373,7 @@ prepare_env() {
 env_GH_TOKEN_CUSTOM_RW() {
 
   # If it's a blank cloned Indi Engine repo - skip
-  if [[ "$(get_current_repo)" == "indi-engine/custom" ]]; then
+  if [[ "$(get_current_repo)" == "indi-engine/newapp" ]]; then
     REQ="skip"
     return 0
   fi
@@ -1396,7 +1396,7 @@ env_GH_TOKEN_CUSTOM_RW() {
 env_GH_TOKEN_PARENT_RO() {
 
   # If it's a blank cloned Indi Engine repo - skip
-  if [[ "$(get_current_repo)" == "indi-engine/custom" ]]; then
+  if [[ "$(get_current_repo)" == "indi-engine/newapp" ]]; then
     REQ="skip"
     return 0
   fi
@@ -1415,8 +1415,8 @@ env_GH_TOKEN_PARENT_RO() {
   local parent_repo="${parent%:*}"
   local child_type="${parent#*:}"
 
-  # If parent repo exists and is not indi-engine/custom
-  if [[ $parent_repo != null && $parent_repo != "indi-engine/custom" ]]; then
+  # If parent repo exists and is not indi-engine/newapp
+  if [[ $parent_repo != null && $parent_repo != "indi-engine/newapp" ]]; then
 
     # Check if parent repo is private
     parent_is_private=$(repo_is_private "$parent_repo")

@@ -152,7 +152,7 @@ else
   current_repo="$(get_current_repo)"
 
   # If current repo is NOT a user's own repo yet
-  if [[ "$current_repo" = "indi-engine/custom" ]]; then
+  if [[ "$current_repo" = "indi-engine/newapp" ]]; then
 
     # Fetch latest changes
     git fetch origin
@@ -167,7 +167,7 @@ else
   else
 
     # Ensure devops remote exists
-    git remote | grep -q "^devops$" || git remote add devops https://github.com/indi-engine/custom
+    git remote | grep -q "^devops$" || git remote add devops https://github.com/indi-engine/newapp
 
     # Fetch latest from devops remote
     echo "Fetching latest DevOps-setup files:"
@@ -207,11 +207,11 @@ else
   fi
 
   # If there is something added to commit for user's own repo
-  if [[ "$current_repo" != "indi-engine/custom" ]] && ! git diff --cached --quiet; then
+  if [[ "$current_repo" != "indi-engine/newapp" ]] && ! git diff --cached --quiet; then
 
     # Do commit
     echo "Adding to local repo:"
-    git commit -m "Updated DevOps-setup files from indi-engine/custom" 2>&1 | prepend "» "
+    git commit -m "Updated DevOps-setup files from indi-engine/newapp" 2>&1 | prepend "» "
 
     # Push to github
     echo "Pushing to github:"; git push 2>&1 | prepend "» "

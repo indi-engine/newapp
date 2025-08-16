@@ -1,5 +1,5 @@
 {
-    "name": "indi-engine/custom",
+    "name": "indi-engine/newapp",
     "description": "Entry point for a blank Indi Engine project development from scratch",
     "type": "project",
     "repositories": [

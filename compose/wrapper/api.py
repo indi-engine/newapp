@@ -260,7 +260,7 @@ def restore_choices():
     parent_repo = get_parent_repo()
 
     # If detected
-    if (parent_repo not in ["null", "indi-engine/custom"]):
+    if (parent_repo not in ["null", "indi-engine/newapp"]):
 
         # Append 'parent'-key into choices object
         choices['parent'] = {'name': parent_repo, 'list': []}

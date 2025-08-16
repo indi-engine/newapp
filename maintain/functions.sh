@@ -3069,24 +3069,31 @@ get_env_tip() {
 
 # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
 prompt_git_commit_identify_if_missing() {
+  prompt_env "GIT_COMMIT_NAME" "git config user.name"
+  prompt_env "GIT_COMMIT_EMAIL" "git config user.email"
+}
 
-  # If current execution was not triggered from Flask
-  if [ -z "${FLASK_APP:-}" ]; then
+# Prompt for a certain variable if it has empty value in .env, and optionally run callback command
+prompt_env() {
 
-    # If GIT_COMMIT_NAME is not defined - prompt for it
-    env="GIT_COMMIT_NAME"
-    if [[ "$(get_env $env)" == "" ]]; then
+  # Arguments
+  local env="$1"
+  local cmd="$2"
+
+  # If missing in .env
+  if [[ "$(get_env "$env")" == "" ]]; then
+
+    # If we're here due to call from Flask and ${!env} variable is given from there as well - use it
+    if [[ ! -z "${FLASK_APP:-}" && ! -z "${!env}" ]]; then
+      set_env "$env" "${!env}"
+
+    # Else prompt for it
+    else
       echo
       read_text true "$env" true true
-      git config user.name "${!env}"
     fi
 
-    # If GIT_COMMIT_EMAIL is not defined - prompt for it
-    env="GIT_COMMIT_EMAIL"
-    if [[ "$(get_env $env)" == "" ]]; then
-      echo
-      read_text true "$env" true true
-      git config user.email "${!env}"
-    fi
+    # Run callback
+    [[ "$cmd" != "" ]] && $cmd "${!env}"
   fi
 }

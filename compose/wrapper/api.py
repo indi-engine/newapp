@@ -1,10 +1,11 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql, os
+import subprocess, pika, json, pexpect, re, pymysql, os, shlex
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app
 app = Flask(__name__)
+app.config["JSON_SORT_KEYS"] = False
 
 # Get parent repo
 def get_current_repo():
@@ -37,7 +38,15 @@ def get_dot_env(name):
     with open('.env') as f:
         for line in f:
             if line.startswith(name + '='):
-                return line.strip().split('=', 1)[1]
+                value = line.strip().split('=', 1)[1]
+
+                # Remove optional surrounding single or double quotes
+                if (value.startswith('"') and value.endswith('"')) or \
+                   (value.startswith("'") and value.endswith("'")):
+                    value = value[1:-1]
+
+                # Return value with trimmed surrounding single/double quotes
+                return value
     return ''
 
 # Send websocket message to open xterm in Indi Engine UI
@@ -192,10 +201,10 @@ def backup():
         command += f" {data.get('scenario')} --recent"
 
     # If repo param is given - prepend as variable
-    if data.get('token'): command = f"TOKEN={data.get('token')} {command}"
+    if data.get('token'): command = f"TOKEN={shlex.quote(data.get('token'))} {command}"
 
     # If repo param is given - prepend as variable
-    if data.get('repo'): command = f"REPO={data.get('repo')} {command}"
+    if data.get('repo'): command = f"REPO={shlex.quote(data.get('repo'))} {command}"
 
     # Run bash script and stream stdout/stderr
     return bash_stream(command, data)
@@ -296,6 +305,12 @@ def restore():
     # Basic restore command
     command = 'CACHED=1 source restore'
 
+    # If name param is given - prepend as variable
+    if data.get('name'): command = f"GIT_COMMIT_NAME={shlex.quote(data.get('name'))} {command}"
+
+    # If email param is given - prepend as variable
+    if data.get('email'): command = f"GIT_COMMIT_EMAIL={shlex.quote(data.get('email'))} {command}"
+
     # If scenario is to restore just the database (or uploads), or to commit/cancel the restore - add to command
     if data.get('scenario') in ['dump', 'uploads', 'commit', 'cancel']:
         command += f" {data.get('scenario')}"
@@ -323,6 +338,16 @@ def backup_status():
         'GH_ASSET_MAX_SIZE': get_dot_env('GH_ASSET_MAX_SIZE')
     }), 200
 
+@app.route('/commit/identity', methods=['GET'])
+def commit_identity():
+
+    # Return backup status as current repo name and has_token flag
+    return jsonify({
+        'success': True,
+        'GIT_COMMIT_NAME': get_dot_env('GIT_COMMIT_NAME'),
+        'GIT_COMMIT_EMAIL': get_dot_env('GIT_COMMIT_EMAIL')
+    }), 200
+
 # Get mysql import status
 @app.route('/import/done', methods=['GET'])
 def import_done():
@@ -335,5 +360,14 @@ def update():
     # Get json data
     data = request.get_json(silent=True) or {}
 
+    # Basic update command
+    command = 'source update'
+
+    # If name param is given - prepend as variable
+    if data.get('name'): command = f"GIT_COMMIT_NAME={shlex.quote(data.get('name'))} {command}"
+
+    # If email param is given - prepend as variable
+    if data.get('email'): command = f"GIT_COMMIT_EMAIL={shlex.quote(data.get('email'))} {command}"
+
     # Run bash script and stream stdout/stderr
-    return bash_stream('source update', data)
+    return bash_stream(command, data)

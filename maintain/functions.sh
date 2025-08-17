@@ -2714,7 +2714,7 @@ is_lock_outdated() {
   return 1
 }
 
-# Make sure a certain token will be used for any sunsequent git-command calls
+# Make sure a certain token will be used for any subsequent git-command calls
 git_askpass() {
 
   # Arguments
@@ -2730,8 +2730,6 @@ git_askpass() {
   else
     export GH_TOKEN=""
   fi
-
-  # Get current dir
 
   # Setup GIT_ASKPASS
   local dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

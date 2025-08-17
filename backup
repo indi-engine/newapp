@@ -68,17 +68,20 @@ else
   # Push cloned repo to user's github
   if [[ $is_cloned = true ]]; then
 
+    # Load custom token
+    export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
+
+    # Use GH_TOKEN_CUSTOM_RW as git password
+    git_askpass "custom"
+
     # Change repo url in .git/config
-    echo -n "Changing cloned repo url to https://<token>@github.com/$repo ..."
-    git remote set-url origin "https://$token@github.com/$repo" && echo " Done"
+    echo -n "Changing cloned repo url to https://github.com/$repo ..."
+    git remote set-url origin "https://github.com/$repo" && echo " Done"
 
     # Push cloned repo to github
     echo "Pushing cloned repo to github:"
     git push -u origin main 2>&1 | prepend "» "
-
-    # Remove token from repo url in .git/config
-    echo -ne "Removing <token> from repo url..."
-    git remote set-url origin "https://github.com/$repo" && echo -e " Done\n"
+    echo
   fi
 
   # Refresh token

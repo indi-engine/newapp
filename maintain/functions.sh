@@ -2484,6 +2484,9 @@ wrapper_entrypoint() {
   # Copy 'mysql' and 'mysqldump' binaries to /usr/bin, to make it possible to restore/backup the whole database as sql-file
   cp /usr/bin/mysql_client_binaries/* /usr/bin/
 
+  # Logs dir
+  logs="var/log/compose/wrapper"
+
   # Trim leading/trailing whitespaces from domain name(s)
   LETS_ENCRYPT_DOMAIN=$(echo "${LETS_ENCRYPT_DOMAIN:-}" | xargs)
   EMAIL_SENDER_DOMAIN=$(echo "${EMAIL_SENDER_DOMAIN:-}" | xargs)
@@ -2512,7 +2515,11 @@ wrapper_entrypoint() {
 
     # Setup postfix to use opendkim as milter
     if ! grep -q $sock <<< "$(<"$conf")"; then
-      echo -e "smtpd_milters = $sock\nnon_smtpd_milters = $sock" >> $conf
+      echo "smtpd_milters = $sock"            >> $conf
+      echo "non_smtpd_milters = $sock"        >> $conf
+      echo "maillog_file = $logs/postfix.log" >> $conf
+      echo "debug_peer_level = 2"             >> $conf
+      echo "debug_peer_list = 127.0.0.1"      >> $conf
     fi
 
     # Split LETS_ENCRYPT_DOMAIN into an array

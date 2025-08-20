@@ -2527,7 +2527,7 @@ wrapper_entrypoint() {
 
     # Use first item of that array as myhostname in postfix config
     # This is executed on container (re)start so you can apply new value without container re-creation
-    sed -Ei "s~(myhostname\s*=)\s*.*~\1 ${senders[0]}~" "/etc/postfix/main.cf"
+    sed -Ei "s~(myhostname\s*=)\s*.*~\1 ${senders[0]}~" "$conf"
 
     # Iterate over each domain for postfix and opendkim configuration
     for maildomain in "${senders[@]}"; do
@@ -2537,17 +2537,20 @@ wrapper_entrypoint() {
 
       # If private key file was not generated so far
       if [[ ! -f $priv ]]; then
+
         # Generate key files
         mkdir -p $domainkeys
         opendkim-genkey -D $domainkeys -s $selector -d $maildomain
-        chown opendkim:opendkim $priv
-        chown $user:$user "$domainkeys/$selector.txt"
 
         # Setup key.table, signing.table and trusted.hosts files to be picked by opendkim
         echo "$DNSname $maildomain:$selector:$priv"   >> "$dkim/key.table"
         echo "*@$maildomain $DNSname"                 >> "$dkim/signing.table"
         echo "*.$maildomain"                          >> "$dkim/trusted.hosts"
       fi
+
+      # Refresh permissions
+      chown opendkim:opendkim "$priv"
+      chown $user:$user "$domainkeys/$selector.txt"
     done
   fi
 

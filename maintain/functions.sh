@@ -2550,6 +2550,7 @@ wrapper_entrypoint() {
 
       # Refresh permissions
       chown opendkim:opendkim "$priv"
+      chmod 640 "$priv"
       chown $user:$user "$domainkeys/$selector.txt"
     done
   fi

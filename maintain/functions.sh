@@ -2485,7 +2485,7 @@ wrapper_entrypoint() {
   cp /usr/bin/mysql_client_binaries/* /usr/bin/
 
   # Logs dir
-  logs="var/log/compose/wrapper"
+  logs="$DOC/var/log/compose/wrapper"
 
   # Trim leading/trailing whitespaces from domain name(s)
   LETS_ENCRYPT_DOMAIN=$(echo "${LETS_ENCRYPT_DOMAIN:-}" | xargs)

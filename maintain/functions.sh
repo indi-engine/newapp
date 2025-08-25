@@ -30,21 +30,21 @@ getup() {
   mysql_import
 
   # Pick LETS_ENCRYPT_DOMAIN and EMAIL_SENDER_DOMAIN from .env file, if possible
-  LETS_ENCRYPT_DOMAIN=$(grep "^LETS_ENCRYPT_DOMAIN=" .env | cut -d '=' -f 2-)
-  EMAIL_SENDER_DOMAIN=$(grep "^EMAIL_SENDER_DOMAIN=" .env | cut -d '=' -f 2-)
+  LETS_ENCRYPT_DOMAIN="$(get_env "LETS_ENCRYPT_DOMAIN")"
+  EMAIL_SENDER_DOMAIN="$(get_env "EMAIL_SENDER_DOMAIN")"
   if [[ -z "$EMAIL_SENDER_DOMAIN" ]]; then EMAIL_SENDER_DOMAIN="$LETS_ENCRYPT_DOMAIN"; fi
 
   # If DKIM-keys are expected to be created
   if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 
     # If DKIM-keys are not already created
-    if ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q $EMAIL_SENDER_DOMAIN; then
+    if ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q "${EMAIL_SENDER_DOMAIN##* }"; then
 
       # Shortcuts
       local wait="Waiting for DKIM-keys to be prepared.."
 
       # Wait while DKIM-keys are ready
-      while ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q $EMAIL_SENDER_DOMAIN; do
+      while ! docker compose exec wrapper sh -c "cat /etc/opendkim/trusted.hosts" | grep -q "${EMAIL_SENDER_DOMAIN##* }"; do
         [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
         sleep 1
       done
@@ -395,6 +395,9 @@ get_current_repo() {
 
 # Setup values for is_rotated_backup and rotated_qty variables
 check_rotated_backup() {
+
+  # Get info about backups rotation
+  BACKUPS="$(get_env "BACKUPS")"
 
   # Prepare array of [period => rotated qty] pairs out of $BACKUPS .env-variable
   declare -gA qty=() && for pair in $BACKUPS; do qty["${pair%%=*}"]="${pair#*=}"; done
@@ -1378,18 +1381,22 @@ env_GH_TOKEN_CUSTOM_RW() {
     return 0
   fi
 
-  # Don't put this directly into 'if' to make sure everything will stop on return 1, if happen
+  # Don't put this directly into 'if' to make sure everything will stop on return code 1, if happen
   is_private=$(repo_is_private)
 
-  # If repo is private - spoof TIP and make GH_TOKEN_CUSTOM_RW variable to be required
-  if [[ "$is_private" = true ]]; then
-    repo="${g}$(get_current_repo)${gray}"
-    href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
-    TIP="\n# [Required] Please goto $href,"
-    TIP+="\n# create there and input here a fine-grained personal access token with"
-    TIP+="\n# read-write access to the Contents of this $repo repo:"
-    REQ=true
+  # If repo is NOT private - skip
+  if [[ "$is_private" == false ]]; then
+    REQ=skip
+    return 0
   fi
+
+  # Else - spoof TIP and make GH_TOKEN_CUSTOM_RW variable to be required
+  repo="${g}$(get_current_repo)${gray}"
+  href="${g}https://github.com/settings/personal-access-tokens/new${d}${gray}"
+  TIP="\n# [Required] Please goto $href,"
+  TIP+="\n# create there and input here a fine-grained personal access token with"
+  TIP+="\n# read-write access to the Contents of this $repo repo:"
+  REQ=true
 }
 
 # Spoof TIP and make GH_TOKEN_PARENT_RO required if parent repo exists and is private
@@ -1430,7 +1437,11 @@ env_GH_TOKEN_PARENT_RO() {
       TIP+="\n# of that repo, as otherwise you won't be able to update your instance with"
       TIP+="\n# their fresh database/uploads - vital if your repo has no own backup so far"
       REQ=true
+    else
+      REQ="skip"
     fi
+  else
+    REQ="skip"
   fi
 }
 
@@ -2550,7 +2561,6 @@ wrapper_entrypoint() {
 
       # Refresh permissions
       chown opendkim:opendkim "$priv"
-      chmod 640 "$priv"
       chown $user:$user "$domainkeys/$selector.txt"
     done
   fi

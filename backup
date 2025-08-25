@@ -139,7 +139,7 @@ else
 
         # Print that we're going to update dump (or uploads) inside already existing backup
         if [[ $most_recent = 0 ]]; then
-          echo -e "\nBACKUP ONLY: $scenario\n"
+          echo -e "\nBACKUP ONLY: ${g}${scenario}${d}\n"
         fi
 
         # Ask user to select which backup should be patched with new dump or uploads
@@ -149,7 +149,7 @@ else
         if [[ $most_recent = 0 ]]; then
 
           # Print that version
-          echo -e "SELECTED VERSION: $(get_release_title $selected)\n"
+          echo -e "SELECTED VERSION: ${g}$(get_release_title $selected)${d}\n"
 
         # Else
         else

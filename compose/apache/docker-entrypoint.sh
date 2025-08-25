@@ -97,7 +97,6 @@ if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 
     # Refresh permissions
     chown opendkim:opendkim "$priv"
-    chmod 640 "$priv"
     chown $user:$user "$domainkeys/$selector.txt"
   done
 fi

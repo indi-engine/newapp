@@ -142,9 +142,11 @@ else
   fi
 
   # Change owner for locale files to apache user
-  for dir in custom custom/vendor/indi-engine/system; do
-    if [ -d $dir ]; then
-      chown -R "www-data:www-data" $dir/application/lang
+  user="www-data"
+  for repo in "" vendor/indi-engine/system/; do
+    dir="custom/${repo}application/lang"
+    if [ -d "$dir" ]; then
+      chown -R "$user:$user" "$dir"
     fi
   done
 

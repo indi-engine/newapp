@@ -2743,11 +2743,11 @@ git_askpass() {
 
   # Set GH_TOKEN based on $token-arg
   if [[ "$token" = "custom" ]]; then
-    export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
+    export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
   elif [[ "$token" = "system" ]]; then
-    export GH_TOKEN="${GH_TOKEN_SYSTEM_RO:-}"
+    export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
   elif [[ "$token" = "parent" ]]; then
-    export GH_TOKEN="${GH_TOKEN_PARENT_RO:-}"
+    export GH_TOKEN="$(get_env "GH_TOKEN_PARENT_RO")"
   else
     export GH_TOKEN=""
   fi

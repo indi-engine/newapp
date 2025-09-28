@@ -1190,12 +1190,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "f8686553479943e98f4da64afe3176402ca505ca"
+                "reference": "426d73c0b4e429351a1c48d0480782d7f7b71311"
             },
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2025-09-21T06:36:13+00:00"
+            "time": "2025-09-27T09:17:04+00:00"
         },
         {
             "name": "indi-engine/public",
@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "0f36753b5a1308090707d1c013ffabf140b8f636"
+                "reference": "4efb106836a71ab57f9c017e4db885c939569398"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1230,7 +1230,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2025-09-21T06:27:04+00:00"
+            "time": "2025-09-27T11:52:21+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

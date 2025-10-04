@@ -77,7 +77,7 @@ RewriteRule .* %{ENV:VDR}/client%{ENV:URI} [L]
 RewriteRule ^admin(.*) %{ENV:VDR}/client$1 [L]
 
 RewriteCond %{REQUEST_FILENAME} !-f
-RewriteRule \.(jpg|jpeg|png|gif|css|js|ico|txt)$ system/application/static404.php
+RewriteRule \.(jpg|jpeg|png|apng|gif|css|js|ico|txt)$ system/application/static404.php
 
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}/index.php -f

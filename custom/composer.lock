@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "d55c5684bdd37199756b7dcfd8607f8c09f2ff6b"
+                "reference": "e19e562a315c3dec60ac59536740a263e9505616"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1224,13 +1224,13 @@
                 "mpdf/mpdf": "^8.0",
                 "php-amqplib/php-amqplib": "3.6.2",
                 "phpmailer/phpmailer": "^6.5",
-                "phpoffice/phpspreadsheet": "^1.21",
+                "phpoffice/phpspreadsheet": "^1.30",
                 "phpoffice/phpword": "^0.18.2"
             },
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2025-10-13T19:45:56+00:00"
+            "time": "2025-10-17T15:21:48+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2095,16 +2095,16 @@
         },
         {
             "name": "phpoffice/phpspreadsheet",
-            "version": "1.29.11",
+            "version": "1.30.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/PHPOffice/PhpSpreadsheet.git",
-                "reference": "05b6c4378ddf3e81b460ea645c42b46432c0db25"
+                "reference": "2f39286e0136673778b7a142b3f0d141e43d1714"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/05b6c4378ddf3e81b460ea645c42b46432c0db25",
-                "reference": "05b6c4378ddf3e81b460ea645c42b46432c0db25",
+                "url": "https://api.github.com/repos/PHPOffice/PhpSpreadsheet/zipball/2f39286e0136673778b7a142b3f0d141e43d1714",
+                "reference": "2f39286e0136673778b7a142b3f0d141e43d1714",
                 "shasum": ""
             },
             "require": {
@@ -2195,9 +2195,9 @@
             ],
             "support": {
                 "issues": "https://github.com/PHPOffice/PhpSpreadsheet/issues",
-                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/1.29.11"
+                "source": "https://github.com/PHPOffice/PhpSpreadsheet/tree/1.30.0"
             },
-            "time": "2025-06-23T01:22:06+00:00"
+            "time": "2025-08-10T06:28:02+00:00"
         },
         {
             "name": "phpoffice/phpword",

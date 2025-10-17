@@ -80,6 +80,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.10-management-alpine
+    restart: always
     volumes:
       - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins

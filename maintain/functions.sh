@@ -3038,7 +3038,7 @@ prepended() {
 
 # Get the value of given variable from .env file
 get_env() {
-  grep "^$1=" .env | cut -d '=' -f 2-
+  grep "^$1=" .env | cut -d '=' -f 2- | sed 's/^"//; s/"$//'
 }
 
 # Search .env file for a given variable and update it's value with  a given one

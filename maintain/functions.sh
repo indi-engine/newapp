@@ -78,7 +78,7 @@ getup() {
     # If certbot is added to crontab - it means SSL step is done (successful or not)
     while ! docker compose exec apache sh -c "crontab -l 2>/dev/null | grep -q certbot"; do
       [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
-      sleep 1
+      sleep 2
     done
     echo ""
   fi

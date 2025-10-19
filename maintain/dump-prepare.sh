@@ -27,11 +27,6 @@ else
   dump="$dir/$MYSQL_DUMP"
   pref="${2:-}"
 
-  # Clear last X lines
-  clear_last_lines() {
-    for ((i = 0; i < $1; i++)); do tput cuu1 && tput el; done
-  }
-
   # Goto project root
   cd $DOC
 

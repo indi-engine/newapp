@@ -120,7 +120,7 @@ else
 
     # Update indi-engine/* packages
     echo "Updating outdated ones:"
-    composer -d custom update -n --no-ansi "indi-engine/*" 2>&1 | grep -v " fund" | prepend "» "
+    composer -d custom update -W -n --no-ansi "indi-engine/*" 2>&1 | grep -v " fund" | prepend "» "
 
     # Commit composer.lock
     echo "Committing composer.lock:"

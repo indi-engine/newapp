@@ -1660,9 +1660,6 @@ init_uploads_if_need() {
   # If that dir does not exist
   if [[ ! -d "$dest" ]]; then
 
-    # Print newline
-    echo
-
     # Define file name of the asset, that is needed for creation of the above mentioned dir
     file="uploads.zip"
 
@@ -1681,6 +1678,11 @@ init_uploads_if_need() {
 
       # Download it from github into data/ dir
       if [[ ! -z "${init_repo:-}" ]]; then
+
+        # Print newline
+        echo
+
+        # Do download
         download_possibly_chunked_file "$init_repo" "$init_release" "$file"
       fi
 

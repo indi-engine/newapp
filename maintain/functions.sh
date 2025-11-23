@@ -157,7 +157,7 @@ mysql_import() {
   else
 
     # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
-    export GH_TOKEN="$GH_TOKEN_CUSTOM_RW"
+    export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
     # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
     # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
@@ -184,7 +184,7 @@ mysql_import() {
     # Else temporary switch to system token to download and import system dump
     else
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
-      export GH_TOKEN="$GH_TOKEN_SYSTEM_RO"
+      export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
       download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
       import_possibly_chunked_dump "dump.sql.gz"
 
@@ -196,7 +196,7 @@ mysql_import() {
     # GH_TOKEN_PARENT_RO by (load_releases .. "init") call above
     # or with
     # GH_TOKEN_SYSTEM_RO in case of blank Indi Engine instance setup
-    export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
+    export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
   fi
 
   # Print newline
@@ -2487,7 +2487,7 @@ wrapper_entrypoint() {
   if [[ ! -f $known ]] || ! grep -q "github.com" $known; then ssh-keyscan github.com >> $known; fi
 
   # Setup github token for composer
-  composer --global config github-oauth.github.com "$(grep "^GH_TOKEN_SYSTEM_RO=" .env | cut -d '=' -f 2-)"
+  composer --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
 
   # Setup git filemode
   git config --global core.filemode false
@@ -2773,7 +2773,7 @@ restart_if_need() {
   if [[ "$scenario" =~ (1|2|3|4) ]]; then
 
     # Pick GH_TOKEN_CUSTOM_RO from .env
-    export GH_TOKEN_SYSTEM_RO="$(grep "^GH_TOKEN_SYSTEM_RO=" .env | cut -d '=' -f 2-)"
+    export GH_TOKEN_SYSTEM_RO="$(get_env "GH_TOKEN_SYSTEM_RO")"
 
     # Pull base images and/or rebuild own ones, if need
     if [[ "$scenario" == 1 ]]; then docker compose build --pull;  echo 3 > "$artifact"; scenario=3; fi
@@ -3038,7 +3038,8 @@ prepended() {
 
 # Get the value of given variable from .env file
 get_env() {
-  grep "^$1=" .env | cut -d '=' -f 2- | sed 's/^"//; s/"$//'
+  local chars=0; [[ "$1" = "GH_TOKEN_SYSTEM_RO" ]] && chars=44;
+  grep "^$1=" .env | cut -d '=' -f 2- | sed 's/^"//; s/"$//' | trim "$chars"
 }
 
 # Search .env file for a given variable and update it's value with  a given one
@@ -3115,4 +3116,10 @@ prompt_env() {
     # Run callback
     [[ "$cmd" != "" ]] && $cmd "${!env}"
   fi
+}
+
+# Trim last X chars from the piped string
+trim() {
+  local n="${1:-0}"
+  sed "s/.\{$n\}$//"
 }

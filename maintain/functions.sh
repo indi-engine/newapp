@@ -3094,6 +3094,7 @@ get_env_tip() {
 
 # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
 prompt_git_commit_identify_if_missing() {
+  echo
   prompt_env "GIT_COMMIT_NAME" "git config user.name"
   prompt_env "GIT_COMMIT_EMAIL" "git config user.email"
 }
@@ -3114,8 +3115,8 @@ prompt_env() {
 
     # Else prompt for it
     else
-      echo
       read_text true "$env" true true
+      echo
     fi
 
     # Run callback

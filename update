@@ -137,8 +137,8 @@ else
 
     # Else
     else
-      echo "NOTE: Updates are committed but not pushed to github as"
-      echo "      no GH_TOKEN_CUSTOM_RW given"
+      echo "NOTE: Updates committed but not pushed to github as no GH_TOKEN_CUSTOM_RW given"
+      echo
     fi
   fi
 

@@ -15,6 +15,9 @@ gray='\033[38;5;240m' #lightgray
 # Get the whole project up and running
 getup() {
 
+  # Setup GH_TOKEN_SYSTEM_RO
+  export GH_TOKEN_SYSTEM_RO="$(get_env "GH_TOKEN_SYSTEM_RO")"
+
   # Setup the docker compose project
   set +e; docker compose up -d; exit_code=$?;
 

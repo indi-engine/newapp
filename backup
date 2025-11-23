@@ -22,7 +22,7 @@ else
   source maintain/functions.sh
 
   # Pick GH_TOKEN_CUSTOM_RW from .env
-  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
   # Set up is_cloned flag and has_token flags
   if [[ "$(get_current_repo)" = "indi-engine/newapp" ]]; then is_cloned=true; else is_cloned=false; fi
@@ -85,7 +85,7 @@ else
   fi
 
   # Refresh token
-  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
   # Export token and into current shell session
   export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"

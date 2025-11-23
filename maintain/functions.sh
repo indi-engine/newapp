@@ -63,7 +63,7 @@ getup() {
   # If .env.hard file does not yet exist - create it as a copy of .env.dist but with a pre-filled value for GH_TOKEN_CUSTOM_RW
   #if [[ ! -f ".env.hard" ]]; then
   #  cp ".env.dist" ".env.hard"
-  #  GH_TOKEN_CUSTOM_RW=$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)
+  #  GH_TOKEN_CUSTOM_RW=$(get_env "GH_TOKEN_CUSTOM_RW")
   #  if [[ ! -z $GH_TOKEN_CUSTOM_RW ]]; then
   #    sed -i "s~GH_TOKEN_CUSTOM_RW=~&${GH_TOKEN_CUSTOM_RW:-}~" ".env.hard"
   #  fi
@@ -487,7 +487,7 @@ load_releases() {
     if [[ $parent_repo != "null" ]]; then
 
       # Set up GH_TOKEN_PARENT_RO to be further accessible
-      export GH_TOKEN_PARENT_RO="$(grep "^GH_TOKEN_PARENT_RO=" .env | cut -d '=' -f 2-)"
+      export GH_TOKEN_PARENT_RO="$(get_env "GH_TOKEN_PARENT_RO")"
 
       # If GH_TOKEN_PARENT_RO is given - use it for loading releases of parent repo
       if [[ ! -z "${GH_TOKEN_PARENT_RO:-}" ]]; then export GH_TOKEN="${GH_TOKEN_PARENT_RO:-}"; fi
@@ -2570,7 +2570,7 @@ wrapper_entrypoint() {
   service postfix start
 
   # Refresh token
-  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
   # Export GH_TOKEN from $GH_TOKEN_CUSTOM_RW
   [[ ! -z $GH_TOKEN_CUSTOM_RW ]] && export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"

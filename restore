@@ -22,8 +22,8 @@ if command -v docker >/dev/null 2>&1; then
 else
 
   # Refresh tokens
-  export GH_TOKEN_CUSTOM_RW="$(grep "^GH_TOKEN_CUSTOM_RW=" .env | cut -d '=' -f 2-)"
-  export GH_TOKEN_PARENT_RO="$(grep "^GH_TOKEN_PARENT_RO=" .env | cut -d '=' -f 2-)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
+  export GH_TOKEN_PARENT_RO="$(get_env "GH_TOKEN_PARENT_RO")"
 
   # Set up restore scenario based on 1st arg
   if [[ "${1:-}" = "dump" || "${1:-}" = "uploads" || "${1:-}" = "cancel" || "${1:-}" = "commit" ]]; then

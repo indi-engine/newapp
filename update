@@ -37,7 +37,7 @@ else
   prompt_git_commit_identify_if_missing
 
   # Load custom token
-  export GH_TOKEN_CUSTOM_RW="$(get_env GH_TOKEN_CUSTOM_RW)"
+  export GH_TOKEN_CUSTOM_RW="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
   # Use GH_TOKEN_CUSTOM_RW as git password
   git_askpass "custom"

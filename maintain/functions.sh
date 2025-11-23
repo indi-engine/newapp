@@ -1667,7 +1667,7 @@ init_uploads_if_need() {
     if [[ ! -f "data/$file" ]]; then
 
       # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
-      export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
+      export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
       # Load list of available releases for current repo. If no releases - load ones for parent repo, if current repo
       # was forked or generated. But anyway, $init_repo and $init_release variables will be set up to clarify where to
@@ -1682,7 +1682,7 @@ init_uploads_if_need() {
       fi
 
       # Restore GH_TOKEN back, as it might have been spoofed with GH_TOKEN_PARENT_RO by (load_releases .. "init") call above
-      export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
+      export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
     fi
 
     # If asset file does exist locally (due to it was just downloaded or it was already existing locally)
@@ -1727,14 +1727,14 @@ make_very_first_release_if_need() {
   current_repo="$(get_current_repo)"
 
   # Use GH_TOKEN_CUSTOM_RW as GH_TOKEN
-  export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
+  export GH_TOKEN="$(get_env "GH_TOKEN_CUSTOM_RW")"
 
   # If global releaseQty array is empty, it means load_releases() function was NOT
   # called yet, so call it now as we need to know whether current repo has releases
   if (( ${#releaseQty[@]} == 0 )); then load_releases "$current_repo"; fi
 
   # If custom token is given
-  if [[ -n $GH_TOKEN_CUSTOM_RW ]]; then
+  if [[ -n "$(get_env "GH_TOKEN_CUSTOM_RW")" ]]; then
     
     # If current repo has no own releases so far - create very first one
     if (( releaseQty["$current_repo"] == 0 )); then

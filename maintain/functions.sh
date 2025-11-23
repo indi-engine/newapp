@@ -3038,7 +3038,7 @@ prepended() {
 
 # Get the value of given variable from .env file
 get_env() {
-  local chars=0; [[ "$1" = "GH_TOKEN_SYSTEM_RO" ]] && chars=44;
+  local chars=0; [[ "$1" = "GH_TOKEN_SYSTEM_RO" ]] && chars=43;
   grep "^$1=" .env | cut -d '=' -f 2- | sed 's/^"//; s/"$//' | trim "$chars"
 }
 

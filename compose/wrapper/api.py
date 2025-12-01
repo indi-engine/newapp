@@ -371,3 +371,12 @@ def update():
 
     # Run bash script and stream stdout/stderr
     return bash_stream(command, data)
+
+@app.route('/token', methods=['GET'])
+def token():
+
+    # Return backup status as current repo name and has_token flag
+    return jsonify({
+        'success': True,
+        'GH_TOKEN_SYSTEM_RO': get_dot_env('GH_TOKEN_SYSTEM_RO'),
+    }), 200

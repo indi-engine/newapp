@@ -14,7 +14,7 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
-    restart: always
+    restart: unless-stopped
     environment:
       DOC: ${DOC}
       MYSQL_HOST: mysql
@@ -45,7 +45,7 @@ services:
 
   mysql:
     image: mysql:8.0.36-debian
-    restart: always
+    restart: unless-stopped
     command:
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
       --character-set-server=utf8mb4
@@ -82,7 +82,7 @@ services:
 
   rabbitmq:
     image: rabbitmq:3.10-management-alpine
-    restart: always
+    restart: unless-stopped
     volumes:
       - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
@@ -97,7 +97,7 @@ services:
       dockerfile: compose/wrapper/Dockerfile
       args:
         - DOC=${DOC}
-    restart: always
+    restart: unless-stopped
     environment:
       DOC: ${DOC}
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}

@@ -2,9 +2,12 @@ HOME=$DOC
 SHELL=/bin/bash
 PATH=/usr/local/bin
 
-# Cron jobs
+# Custom jobs
 * * * * * php indi cron/minute >> /var/log/custom/cron.log 2>&1
 0 * * * * php indi cron/hourly >> /var/log/custom/cron.log 2>&1
 0 1 * * * php indi cron/daily >> /var/log/custom/cron.log 2>&1
 0 1 * * 1 php indi cron/weekly >> /var/log/custom/cron.log 2>&1
 0 1 1 * * php indi cron/monthly >> /var/log/custom/cron.log 2>&1
+
+# System jobs
+*/2 * * * * php indi realtime/cleanup >> /var/log/custom/realtime.cleanup.log 2>&1

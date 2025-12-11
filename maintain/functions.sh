@@ -111,6 +111,9 @@ getup() {
 
   # Setup journald config
   journald
+
+  # Cleanup orphaned overlay files to prevent /var/lib/docker/overlay2 dir from infinitely growing
+  overlay2
 }
 
 # shellcheck disable=SC2120
@@ -2795,6 +2798,9 @@ restart_if_need() {
     # Setup journald config
     journald
 
+    # Cleanup overlay2 dir
+    overlay2
+
   # Else assume we may have update artifact containing restart scenario
   elif [[ "$scenario" == "" ]]; then
 
@@ -3154,4 +3160,10 @@ journald() {
 
   # Vacuum old logs (optional but recommended)
   journalctl --vacuum-size=200M 2> /dev/null || true
+}
+
+# Cleanup orphaned overlay files to prevent /var/lib/docker/overlay2 dir from infinitely growing
+overlay2() {
+  docker image prune -af > /dev/null
+  docker buildx prune -af > /dev/null
 }

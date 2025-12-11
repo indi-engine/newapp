@@ -83,7 +83,7 @@ getup() {
       [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
       sleep 3
     done
-    echo ""
+    [[ -z $wait ]] && echo ""
   fi
 
   # Print newline and URL to proceed
@@ -236,7 +236,7 @@ get_self_prot() {
 
   # If SSL cert was expected to be created and was really created - setup protocol to be 'https'
   if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
-    if docker compose exec apache certbot certificates | grep -q "Domains: $LETS_ENCRYPT_DOMAIN"; then
+    if docker compose exec apache certbot certificates 2> /dev/null | grep -q "Domains: $LETS_ENCRYPT_DOMAIN"; then
       prot="https"
     fi
   fi
@@ -1743,22 +1743,18 @@ make_very_first_release_if_need() {
 
   # If custom token is given
   if [[ -n "$(get_env "GH_TOKEN_CUSTOM_RW")" ]]; then
-    
+
     # If current repo has no own releases so far - create very first one
     if (( releaseQty["$current_repo"] == 0 )); then
-  
+
       # Print header
       echo "» ------------------------------------------------------------- «"
       echo "» -- Running backup script (to create very first own backup) -- «"
       echo "» ------------------------------------------------------------- «"
       echo
-  
+
       # Do backup
       source backup init
-      
-    # Else clear one line
-    else
-      clear_last_lines 1
     fi
   fi
 }
@@ -3157,5 +3153,5 @@ journald() {
   systemctl restart systemd-journald
 
   # Vacuum old logs (optional but recommended)
-  journalctl --vacuum-size=200M || true
+  journalctl --vacuum-size=200M 2> /dev/null || true
 }

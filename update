@@ -70,6 +70,7 @@ else
 
     # Install possibly updated composer packages
     echo "Installing possibly updated composer packages:"
+    composer -d custom config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
     composer -d custom install 2>&1 | grep -v " fund" | prepend "» "
 
   # Else indicate no
@@ -120,6 +121,7 @@ else
 
     # Update indi-engine/* packages
     echo "Updating outdated ones:"
+    composer -d custom config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
     composer -d custom update -n --no-ansi "indi-engine/*" 2>&1 | grep -v " fund" | prepend "» "
 
     # Commit composer.lock

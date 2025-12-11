@@ -2787,7 +2787,9 @@ restart_if_need() {
     if [[ "$scenario" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; scenario=3; fi
 
     # Stop maxwell and closetab, if need
-    docker compose exec -it wrapper bash -c "source maintain/functions.sh; stop_maxwell_and_closetab_if_need"
+    if docker compose ps -q wrapper > /dev/null; then
+      docker compose exec -it wrapper bash -c "source maintain/functions.sh; stop_maxwell_and_closetab_if_need"
+    fi
 
     # Act further according to current restart level
     case "$scenario" in

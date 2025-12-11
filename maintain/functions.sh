@@ -108,6 +108,9 @@ getup() {
   if [[ -f ~/.indi/post-getup ]]; then
     source ~/.indi/post-getup
   fi
+
+  # Setup journald config
+  journald
 }
 
 # shellcheck disable=SC2120
@@ -2808,6 +2811,9 @@ restart_if_need() {
   else
     echo "Unknown restart scenario: $scenario"
   fi
+
+  # Setup journald config
+  journald
 }
 
 # Get hash of the commit up to which the db migrations are executed
@@ -3128,4 +3134,28 @@ prompt_env() {
 trim() {
   local n="${1:-0}"
   sed "s/.\{$n\}$//"
+}
+
+# This function is called on host to set up a journald config that
+# will prevent journald logs from infinitely growing and bloating disk space
+journald() {
+
+  # Variables
+  local src="compose/journald.conf"
+  local dst="/etc/systemd/journald.conf.d/indi-engine.conf"
+
+  # If systemd-journald NOT exists - skip
+  if ! pidof systemd-journald >/dev/null 2>&1; then
+    exit 0
+  fi
+
+  # Ensure drop-in folder exists and copy config file (overwrite if exists)
+  mkdir -p /etc/systemd/journald.conf.d
+  cp -f "$src" "$dst"
+
+  # Reload journald
+  systemctl restart systemd-journald
+
+  # Vacuum old logs (optional but recommended)
+  journalctl --vacuum-size=200M || true
 }

@@ -2796,6 +2796,9 @@ restart_if_need() {
       4) docker compose restart ;;
     esac
 
+    # Setup journald config
+    journald
+
   # Else assume we may have update artifact containing restart scenario
   elif [[ "$scenario" == "" ]]; then
 
@@ -2811,9 +2814,6 @@ restart_if_need() {
   else
     echo "Unknown restart scenario: $scenario"
   fi
-
-  # Setup journald config
-  journald
 }
 
 # Get hash of the commit up to which the db migrations are executed

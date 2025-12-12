@@ -1,6 +1,6 @@
 HOME=$DOC
 SHELL=/bin/bash
-PATH=/usr/local/bin
+PATH=/usr/local/bin:/usr/bin
 
 # Custom jobs
 * * * * * php indi cron/minute >> /var/log/custom/cron.log 2>&1
@@ -11,3 +11,4 @@ PATH=/usr/local/bin
 
 # System jobs
 */2 * * * * php indi realtime/cleanup >> /var/log/custom/realtime.cleanup.log 2>&1
+* * * * * php indi realtime/status/keepup >> /var/log/custom/realtime.keepup.log 2>&1

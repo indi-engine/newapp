@@ -30,6 +30,17 @@
             "url": "https://github.com/zendesk/maxwell/releases/download/v1.39.4/maxwell-1.39.4.tar.gz"
           }
         }
+      },
+      {
+        "type": "package",
+        "package": {
+          "name": "robinherbots/inputmask",
+          "version": "5.0.9",
+          "dist": {
+            "type": "zip",
+            "url": "https://github.com/RobinHerbots/Inputmask/archive/refs/tags/5.0.9.zip"
+          }
+        }
       }
     ],
     "require": {
@@ -39,7 +50,8 @@
         "indi-engine/ckeditor": "dev-master",
         "indi-engine/ckfinder": "dev-master",
         "stomp-js/stompjs": "6.1.2",
-        "zendesk/maxwell": "1.39.4"
+        "zendesk/maxwell": "1.39.4",
+        "robinherbots/inputmask": "^5.0"
     },
     "scripts": {    
         "post-update-cmd" : "@hook",

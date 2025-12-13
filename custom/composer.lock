@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0c89832a2dde82db263c71fe779ce2a6",
+    "content-hash": "e35eea26aa37fe5a1258cd626debca4c",
     "packages": [
         {
             "name": "brick/math",
@@ -2760,6 +2760,15 @@
                 }
             ],
             "time": "2025-12-02T15:19:04+00:00"
+        },
+        {
+            "name": "robinherbots/inputmask",
+            "version": "5.0.9",
+            "dist": {
+                "type": "zip",
+                "url": "https://github.com/RobinHerbots/Inputmask/archive/refs/tags/5.0.9.zip"
+            },
+            "type": "library"
         },
         {
             "name": "stomp-js/stompjs",

@@ -1502,6 +1502,24 @@ env_GIT_COMMIT_EMAIL() {
   fi
 }
 
+# Amend COMPOSE_FILE for cases when mysql needs to be exposed
+env_COMPOSE_FILE() {
+
+  # Variables
+  local MYSQL_EXPOSE_PORT="$(grep "^MYSQL_EXPOSE_PORT=" .env.prod | cut -d '=' -f 2-)"
+  local insert="docker-compose.mysql-expose.yml"
+
+  # If mysql expose is not yet in the list - add it right after default YAML
+  if [[ "$MYSQL_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$insert"* ]]; then
+    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/&:${insert}}"
+  fi
+
+  # If we're on windows - spoof colon with semi-colon
+  if is_windows; then
+    DEFAULT_VALUE="${DEFAULT_VALUE//:/;}"
+  fi
+}
+
 # Check whether given repo is private
 repo_is_private() {
 
@@ -3150,7 +3168,7 @@ journald() {
 
   # If systemd-journald NOT exists - skip
   if ! pidof systemd-journald >/dev/null 2>&1; then
-    exit 0
+    return 0
   fi
 
   # Ensure drop-in folder exists and copy config file (overwrite if exists)
@@ -3166,6 +3184,12 @@ journald() {
 
 # Cleanup orphaned overlay files to prevent /var/lib/docker/overlay2 dir from infinitely growing
 overlay2() {
+  if is_windows; then return 0; fi
   docker image prune -af > /dev/null
   docker buildx prune -af > /dev/null
+}
+
+# Check if we're on Windows
+is_windows() {
+  uname -s | grep -Eq '^(MINGW|MSYS|CYGWIN)'
 }

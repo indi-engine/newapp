@@ -19,6 +19,7 @@ trap on_exit EXIT
 # needed, and get the whole project up and running for the very first time
 if [[ ! -f ".env" ]]; then
   prepare_env ".env.dist"
+  echo
   getup
 
 # Else if .env file exists and named volumes exist for the project, it means

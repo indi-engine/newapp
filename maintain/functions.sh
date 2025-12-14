@@ -217,7 +217,7 @@ mysql_import() {
 
 # Run maxwell-specific sql
 prepare_maxwell() {
-  export MYSQL_PWD=$MYSQL_PASSWORD
+  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
   mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'%';"
   mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'%';"
   unset MYSQL_PWD
@@ -1017,7 +1017,7 @@ import_possibly_chunked_dump() {
   # Shortcuts
   local path="$dir/$dump"
   local msg="${prepend}Importing $dump"
-  local run="mysql -h mysql -u root $MYSQL_DATABASE"
+  local run="mysql -h mysql -u $MYSQL_USER $MYSQL_DATABASE"
 
   # Prevent warning
   export MYSQL_PWD=$MYSQL_PASSWORD
@@ -1142,7 +1142,7 @@ start_maxwell_and_closetab_if_need() {
 reset_mysql() {
 
   # Shut down mysql
-  export MYSQL_PWD=$MYSQL_PASSWORD
+  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
   local msg="Shutting down MySQL server..." && echo "$msg"
   mysql -h mysql -u root -e "SHUTDOWN"
   unset MYSQL_PWD
@@ -1359,6 +1359,11 @@ prepare_env() {
         # Trim leading and trailing whitespaces
         INPUT_VALUE=$(echo "$INPUT_VALUE" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
 
+        # Check if a function exists for validating the given value, and if yes - call it
+        if declare -f "env_validate_$ENV_NAME" > /dev/null; then
+          env_validate_$ENV_NAME
+        fi
+
         # If the trimmed input contains whitespace - enclose in double quotes
         if [[ "$INPUT_VALUE" =~ [[:space:]] ]]; then INPUT_VALUE="\"$INPUT_VALUE\""; fi
 
@@ -1379,6 +1384,13 @@ prepare_env() {
 
   # Rename .env.prod to .env
   mv $PROD .env
+}
+
+# Check if MYSQL_ROOT_PASSWORD is left empty, and if yes - generate a randome value
+env_validate_MYSQL_ROOT_PASSWORD() {
+  if [[ "$INPUT_VALUE" = "" ]]; then
+     INPUT_VALUE="$(echo "$(< /dev/urandom tr -dc 'A-Za-z0-9!@%^&*()-_=+[]{}|;:,.<>?' | head -c32)")"
+  fi
 }
 
 # Spoof TIP and make GH_TOKEN_CUSTOM_RW required if current repo is private

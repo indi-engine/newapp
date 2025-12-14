@@ -19,23 +19,23 @@ if command -v docker >/dev/null 2>&1; then
 else
 
   # Shortcuts
-  dir=${1:-data}
-  host=mysql
-  user=$MYSQL_USER
-  pass=$MYSQL_PASSWORD
-  name=$MYSQL_DATABASE
+  dir="${1:-data}"
+  host="$MYSQL_HOST"
+  user="$MYSQL_USER"
+  pass="$MYSQL_PASSWORD"
+  name="$MYSQL_DATABASE"
   dump="$dir/$MYSQL_DUMP"
   pref="${2:-}"
 
   # Goto project root
-  cd $DOC
+  cd "$DOC"
 
   # Trim .gz from dump filename
   sql=$(echo "$dump" | sed 's/\.gz$//')
 
   # Put password into env to solve the warning message:
   # 'mysqldump: [Warning] Using a password on the command line interface can be insecure.'
-  export MYSQL_PWD=$pass
+  export MYSQL_PWD="$pass"
 
   # Estimate export as number of records to be dumped
   msg="${pref}Calculating approximate qty of total rows..."; echo $msg

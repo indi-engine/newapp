@@ -60,7 +60,7 @@ services:
       --default-time-zone='+00:00'
     environment:
       TZ: UTC
-      MYSQL_ROOT_PASSWORD: ${MYSQL_PASSWORD:-custom}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_USER: ${MYSQL_USER:-custom}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}

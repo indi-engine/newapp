@@ -67,13 +67,13 @@ else
   if [ -z "$(ls -A ".")" ]; then
 
     # Use 7z-command to create an empty zip archive, because zip-command does not support that
-    echo -n "$msg" && 7z a -tzip -bso0 -bse0 "../../../$uploads" && echo -n " Done"
+    echo -n "$msg" && 7z a -tzip -bso0 -bse0 "../../../../$uploads" && echo -n " Done"
 
   # Else
   else
 
     # Prepare arguments for zip-command
-    args="-r -0 -s $GH_ASSET_MAX_SIZE ../../../$uploads ."
+    args="-r -0 -s $GH_ASSET_MAX_SIZE ../../../../$uploads ."
 
     # If we're within an interactive shell
     if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then

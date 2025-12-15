@@ -9,11 +9,11 @@
 compose/wrapper/__pycache__
 
 # Config and 3rd-party packages
-custom/application/config.ini
-custom/vendor/
+custom/public/application/config.ini
+custom/public/vendor/
 
 # Uploads
-custom/data/upload/
+custom/public/data/upload/
 
 # Other files to me ignored
 custom/**/*.gz

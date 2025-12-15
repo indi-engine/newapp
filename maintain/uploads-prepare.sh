@@ -28,7 +28,7 @@ else
   pref="${2:-}"
 
   # Source dir to be zipped
-  source="custom/data/upload"
+  source="custom/public/data/upload"
 
   # Target path to the zip file
   uploads="$dir/uploads.zip"

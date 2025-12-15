@@ -28,15 +28,16 @@ services:
       APP_ENV: ${APP_ENV}
     working_dir: ${DOC}
     volumes:
-      - ./custom/:${DOC}/
+      - ./custom/public/:${DOC}/
       - letsencrypt:/etc/letsencrypt
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
       - ./compose/apache/ioncube.ini:/usr/local/etc/php/conf.d/00-ioncube.ini
       - ./compose/apache/ioncube.so:/usr/local/lib/php/extensions/ioncube.so
-      - ./compose/apache/php.system.ini:/usr/local/etc/php/conf.d/php.system.ini
+      - ./compose/apache/php.ini:/usr/local/etc/php/conf.d/01-system.ini
+      - ./custom/compose/apache/php.ini:/usr/local/etc/php/conf.d/02-custom.ini
       - ./compose/apache/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
-      - ./compose/apache/apache2.conf:/etc/apache2/conf-enabled/custom.conf:ro
+      - ./compose/apache/apache2.conf:/etc/apache2/conf-enabled/01-system.conf:ro
       - ./compose/apache/htpasswd.conf:/etc/apache2/conf-available/htpasswd.conf:ro
       - ./compose/apache/crontab:/var/www/crontab:ro
       - ./var/log/compose/apache/:/var/log/apache2

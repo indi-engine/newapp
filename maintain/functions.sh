@@ -89,7 +89,7 @@ getup() {
   # Print newline and URL to proceed
   echo -e "Your app is here: ${g}$(get_self_href)${d}"
 
-  # Make sure 'custom/data/upload' dir is created and filled, if does not exist
+  # Make sure 'custom/public/data/upload' dir is created and filled, if does not exist
   init_uploads_if_need
 
   # If $GH_TOKEN_CUSTOM_RW is set but there are no releases yet in the current repo due to it's
@@ -1238,7 +1238,7 @@ reset_mysql() {
   fi
 }
 
-# Restore state of custom/data/upload dir from the uploads.zip of a given release tag
+# Restore state of custom/public/data/upload dir from the uploads.zip of a given release tag
 # If release tag is not given - existing data/uploads.zip file will be used
 restore_uploads() {
 
@@ -1253,7 +1253,7 @@ restore_uploads() {
   download_possibly_chunked_file "$repo" "$release" "$file"
 
   # Extract
-  unzip_file "data/$file" "custom/data/upload" "www-data:www-data"
+  unzip_file "data/$file" "custom/public/data/upload" "www-data:www-data"
 }
 
 # Set given $string at given position as $column and $lines_up relative to the current line
@@ -1718,7 +1718,7 @@ ghcli_install() {
   fi
 }
 
-# Make sure 'custom/data/upload' dir is created and filled, if does not exist
+# Make sure 'custom/public/data/upload' dir is created and filled, if does not exist
 init_uploads_if_need() {
 
   # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
@@ -1728,7 +1728,7 @@ init_uploads_if_need() {
   fi
 
   # Destination dir for Indi Engine uploads
-  dest="custom/data/upload"
+  dest="custom/public/data/upload"
 
   # If that dir does not exist
   if [[ ! -d "$dest" ]]; then
@@ -1780,7 +1780,7 @@ init_uploads_if_need() {
   # if current project have been deployed from a hard copy coming from a disk storage
   # system (e.g. USB Flash Drive) that might not preserve ownership for the stored
   # files and directories, which can lead to that all files and folders copied from
-  # such a hard copy into a server will have 'root' as owner, including custom/data/upload
+  # such a hard copy into a server will have 'root' as owner, including custom/public/data/upload
   # dir, so it won't be writable to 'www-data'-user on behalf of which Indi Engine's apache-container is working,
   # so below code is there to solve that problem
   chown -R "www-data:www-data" "$dest"
@@ -2071,7 +2071,7 @@ restore_source() {
 
   # Apply composer packages state
   echo "Setting up composer packages state:"
-  composer -d custom install --no-ansi 2>&1 | grep -v " fund" | prepend "» "
+  composer -d custom/public install --no-ansi 2>&1 | grep -v " fund" | prepend "» "
   echo ""
 }
 
@@ -2207,7 +2207,7 @@ cancel_restore_source() {
 
   # Revert composer packages state
   echo "Setting up composer packages state:"
-  composer -d custom install --no-ansi 2>&1 | grep -v " fund" | prepend "» "
+  composer -d custom/public install --no-ansi 2>&1 | grep -v " fund" | prepend "» "
 }
 
 # Cancel uploads restore, i.e. revert uploads to the state which was before restore

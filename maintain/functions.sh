@@ -1560,7 +1560,7 @@ env_COMPOSE_FILE() {
 
   # If mysql expose is not yet in the list - add it right after default YAML
   if [[ "$MYSQL_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$insert"* ]]; then
-    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/&:${insert}}"
+    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/docker-compose.yml:${insert}}"
   fi
 
   # If we're on windows - spoof colon with semi-colon

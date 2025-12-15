@@ -2897,10 +2897,10 @@ get_migration_commit() {
   local fraction="${1:-}"
 
   # Add mysql password to env
-  export MYSQL_PWD=$MYSQL_PASSWORD
+  export MYSQL_PWD="$MYSQL_PASSWORD"
 
   # Get commit
-  mysql -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
+  mysql -u "$MYSQL_USER" -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
 
   # Remove mysql password from env
   unset MYSQL_PWD
@@ -2914,10 +2914,10 @@ set_migration_commit() {
   local commit=$2
 
   # Add mysql password to env
-  export MYSQL_PWD=$MYSQL_PASSWORD
+  export MYSQL_PWD="$MYSQL_PASSWORD"
 
   # Get commit
-  mysql -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
+  mysql -u "$MYSQL_USER" -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
 
   # Remove mysql password from env
   unset MYSQL_PWD

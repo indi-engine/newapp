@@ -160,7 +160,7 @@ mysql_import() {
     done
 
     # Run maxwell-specific sql
-    prepare_maxwell
+    prepare_privileges
 
   # Else if at least one dump file is missing
   else
@@ -198,7 +198,7 @@ mysql_import() {
       import_possibly_chunked_dump "dump.sql.gz"
 
       # Run maxwell-specific sql
-      prepare_maxwell
+      prepare_privileges
     fi
 
     # Restore GH_TOKEN back, as it might have been spoofed with
@@ -215,12 +215,48 @@ mysql_import() {
   touch "$done"
 }
 
+# Prepare Change Data Capture / CDC privileges, and amend MYSQL_USER host
+prepare_privileges() {
+  prepare_maxwell
+  sync_host_for_MYSQL_USER
+}
+
 # Run maxwell-specific sql
 prepare_maxwell() {
+
+  # Get subnet as host
+  local MYSQL_USER_host="$(get_mysql_host_prefix)"
+
+  # Grant privileges needed for maxwell
   export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
-  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'%';"
-  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'%';"
+  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'$MYSQL_USER_host';"
+  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'$MYSQL_USER_host';"
   unset MYSQL_PWD
+}
+
+# Get subnet for current container and use it as a host for MYSQL_USER
+# so that the connections on behalf of MYSQL_USER to NOT be possible
+# from outside of the Indi Engine's Docker Compose project
+sync_host_for_MYSQL_USER() {
+
+  # Get subnet as host
+  local MYSQL_USER_host="$(get_mysql_host_prefix)"
+
+  # Update host for MYSQL_USER
+  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
+  mysql -h mysql -u root mysql -e "UPDATE user SET host = '$MYSQL_USER_host' WHERE user = '$MYSQL_USER';"
+  mysql -h mysql -u root mysql -e "FLUSH PRIVILEGES;"
+  unset MYSQL_PWD
+}
+
+# Get the current Docker Compose project's subnet in a format usable as Host for MYSQL_USER
+get_mysql_host_prefix() {
+
+  # Get IP address
+  local ip="$(hostname -i)"
+
+  # Cut last numeric value and append '%' char instead
+  echo "${ip%.*}.%"
 }
 
 # Get URL of current instance
@@ -974,7 +1010,7 @@ restore_dump_from_local() {
   # Shortcuts
   fn1='stop_maxwell_and_closetab_if_need'
   fn2='reset_mysql'
-  fn3='prepare_maxwell'
+  fn3='prepare_privileges'
   fn4='start_maxwell_and_closetab_if_need'
 
   # Stop maxwell and/or closetab php processes if any running
@@ -1386,10 +1422,11 @@ prepare_env() {
   mv $PROD .env
 }
 
-# Check if MYSQL_ROOT_PASSWORD is left empty, and if yes - generate a randome value
+# Check if MYSQL_ROOT_PASSWORD is left empty, and if yes - generate a random value
 env_validate_MYSQL_ROOT_PASSWORD() {
   if [[ "$INPUT_VALUE" = "" ]]; then
-     INPUT_VALUE="$(echo "$(< /dev/urandom tr -dc 'A-Za-z0-9!@%^&*()-_=+[]{}|;:,.<>?' | head -c32)")"
+    # Excluded chars #$<>&|\;()! to prevent problems on CLI
+    INPUT_VALUE="$(echo "$(LC_ALL=C tr -dc 'A-Za-z0-9@%^*\-_=+[\]{}:,.?' < /dev/urandom | head -c32)")"
   fi
 }
 
@@ -2621,6 +2658,9 @@ wrapper_entrypoint() {
   if [[ ! -z "${GH_TOKEN:-}" ]]; then
     gh repo set-default "$(get_current_repo)"
   fi
+
+  # Sync MYSQL_USER host
+  sync_host_for_MYSQL_USER
 
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80

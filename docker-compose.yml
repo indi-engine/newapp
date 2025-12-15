@@ -57,6 +57,7 @@ services:
       --general-log-file=/var/log/mysql/general.log
       --slow-query-log-file=/var/log/mysql/slow.log
       --binlog_expire_logs_seconds=86400
+      --log-bin
       --default-time-zone='+00:00'
     environment:
       TZ: UTC

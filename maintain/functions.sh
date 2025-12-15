@@ -217,8 +217,8 @@ mysql_import() {
 
 # Prepare Change Data Capture / CDC privileges, and amend MYSQL_USER host
 prepare_privileges() {
-  prepare_maxwell
   sync_host_for_MYSQL_USER
+  prepare_maxwell
 }
 
 # Run maxwell-specific sql

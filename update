@@ -31,7 +31,7 @@ else
   declare -g stdout
 
   # Vendor dir
-  VDR="custom/vendor/indi-engine"
+  VDR="custom/public/vendor/indi-engine"
 
   # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
   prompt_git_commit_identify_if_missing
@@ -117,7 +117,7 @@ else
 
   # If one/both of indi-engine packages is/are outdated, or their mentions
   # inside composer.lock are outdated, or composer.lock file is changed but not committed
-  if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/composer.lock)" ]]; then
+  if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/public/composer.lock)" ]]; then
 
     # Update indi-engine/* packages
     echo "Updating outdated ones:"
@@ -126,7 +126,7 @@ else
 
     # Commit composer.lock
     echo "Committing composer.lock:"
-    git add custom/composer.lock 2>&1 | prepend "» "
+    git add custom/public/composer.lock 2>&1 | prepend "» "
     msg=".git/COMMIT_EDITMSG"; if [[ ! -f "$msg" ]]; then touch $msg; fi;
     git commit -F "$msg" 2>&1 | prepend "» "
 
@@ -147,7 +147,7 @@ else
   # Change owner for locale files to apache user
   user="www-data"
   for repo in "" vendor/indi-engine/system/; do
-    dir="custom/${repo}application/lang"
+    dir="custom/public/${repo}application/lang"
     if [ -d "$dir" ]; then
       chown -R "$user:$user" "$dir"
     fi

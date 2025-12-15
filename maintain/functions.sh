@@ -2796,7 +2796,7 @@ is_lock_outdated() {
   # Extract the 'reference' for the matching package from composer.lock
   reference=$(jq -r --arg repo "indi-engine/$repo" '
       .packages[] | select(.name == $repo) | .source.reference
-  ' custom/composer.lock)
+  ' custom/public/composer.lock)
 
   # If reference not found, package doesn't exist — consider outdated
   if [[ -z "$reference" || "$reference" == "null" ]]; then

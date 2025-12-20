@@ -3066,9 +3066,9 @@ migrate_if_need() {
 
         # Prepare and print msg, change dir to webroot, run migration action and change dir back
         local msg=" - ${g}php indi ${action}${d} ..."; echo -e "$msg"
-        cd "custom"
+        cd "custom/public"
         set +e; php indi $action 2>&1 | prepend "     " true; exit_code=$?; set -e
-        cd "../"
+        cd "../../"
 
         # If migration failed
         if [[ $exit_code -ne 0 ]]; then

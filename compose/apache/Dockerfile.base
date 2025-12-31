@@ -43,5 +43,18 @@ RUN apt-get update && \
 RUN apt-get install -y default-jre
 ## </JRE> ##
 
+## <LibreOffice> ##
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libreoffice-core \
+    libreoffice-common \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-freefont-ttf \
+    && rm -rf /var/lib/apt/lists/*
+## </LibreOffice> ##
+
 # Use custom entrypoint
 ENTRYPOINT ["bash", "custom-entrypoint.sh"]

@@ -37,6 +37,7 @@ services:
       - ./compose/apache/php.ini:/usr/local/etc/php/conf.d/01-system.ini
       - ./custom/compose/apache/php.ini:/usr/local/etc/php/conf.d/02-custom.ini
       - ./compose/apache/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./compose/apache/excel-to-pdf.py:/usr/local/bin/excel-to-pdf.py:ro
       - ./compose/apache/apache2.conf:/etc/apache2/conf-enabled/01-system.conf:ro
       - ./compose/apache/htpasswd.conf:/etc/apache2/conf-available/htpasswd.conf:ro
       - ./compose/apache/crontab:/var/www/crontab:ro

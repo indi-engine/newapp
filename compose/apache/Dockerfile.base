@@ -5,13 +5,13 @@ RUN apt-get update && apt-get install -fy certbot cron python3-certbot-apache mc
 ## </Misc> ##
 
 ## <User> ##
-ENV user www-data
+ENV user=www-data
 RUN usermod -s /bin/bash $user
 ## </User> ##
 
 ## <Apache> ##
 ARG DOC
-ENV DOC $DOC
+ENV DOC=$DOC
 WORKDIR /etc/apache2
 RUN echo "ServerName indi-engine"      >> apache2.conf  && \
     echo "<Directory $DOC>"            >> apache2.conf  && \

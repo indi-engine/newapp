@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "5ca79a342b6a72df9bdcd3e7641ed60b1acb3ec5"
+                "reference": "524efaf7b3eb92362aba49a47e134a075c18bf2a"
             },
             "require": {
                 "doctrine/inflector": "^2.0",

@@ -3,10 +3,7 @@
 ###################
 DirectoryIndex index.php index.html
 AddDefaultCharset UTF-8
-php_value short_open_tag On
-php_value magic_quotes_gpc Off
 php_value error_reporting 30711
-php_value display_errors On
 Options FollowSymLinks
 RedirectMatch 404 \.(ini|git)
 
@@ -53,9 +50,16 @@ RewriteCond %{ENV:URI} ^$
 RewriteCond %{DOCUMENT_ROOT}%{ENV:L3}/%{ENV:VDR}/system -d
 RewriteRule .* - [E=STD:%{ENV:L3},E=URI:%{ENV:URI3}]
 
+# Check for WebSocket version 13 and set an environment variable if matched
 RewriteCond %{HTTP:Sec-WebSocket-Version} 13 [NC]
-RequestHeader set Connection Upgrade
-RequestHeader set Upgrade websocket
+RewriteRule ^ - [E=IS_WEBSOCKET:1]
+
+# Conditionally set headers for WebSocket upgrade
+Header set Connection "Upgrade" env=IS_WEBSOCKET
+Header set Upgrade "websocket" env=IS_WEBSOCKET
+
+# Proxy WebSocket requests if the environment variable is set
+RewriteCond %{ENV:IS_WEBSOCKET} 1
 RewriteRule ^/?(.*) "ws://%{ENV:RABBITMQ_HOST}:15674/ws" [P]
 
 RewriteCond %{DOCUMENT_ROOT}%{ENV:STD}%{ENV:URI} !-f

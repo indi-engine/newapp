@@ -2954,7 +2954,7 @@ migrate_if_need() {
     set +e; files=$(git -C "$folder" diff --name-only "$commit" 2>&1); exit_code=$?; set -e
 
     # If the above 'git diff ...' command failed
-    if [[ "$files" == *"fatal: bad object"* ]] && [[ exit_code -ne 0 ]]; then
+    if [[ "$files" == *"fatal: bad object"* ]] && [[ $exit_code -ne 0 ]]; then
 
       # If it failed because of $commit does not exist in custom repo
       if [[ $fraction == "custom" ]]; then
@@ -3055,8 +3055,13 @@ migrate_if_need() {
       restore_dump_from_local "data/before" "» "
     fi
 
-    # Foreach fraction as a key within $migrate array
-    for fraction in "${!migrate[@]}"; do
+    # Foreach fraction
+    for fraction in system custom; do
+
+      # Skip if no migrations detected
+      if [[ -z "${migrate[$fraction]}" ]]; then
+          continue
+      fi
 
       # Print status
       echo "Running migrations for $fraction fraction:"

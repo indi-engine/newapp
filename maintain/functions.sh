@@ -2940,8 +2940,8 @@ migrate_if_need() {
       folder="$VDR/system"
       detect="library/Indi/Controller/Migrate.php"
     else
-      folder="custom"
-      detect="application/controllers/admin/MigrateController.php"
+      folder=""
+      detect="custom/public/application/controllers/admin/MigrateController.php"
     fi
 
     # Get hash of the last commit up to which migrations were run
@@ -3101,7 +3101,7 @@ migrate_if_need() {
     if [[ "$fraction" == "system" ]]; then
       folder="$VDR/system"
     else
-      folder="custom"
+      folder=""
     fi
 
     # Spoof existing migration commit with the most recent one

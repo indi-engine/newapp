@@ -64,10 +64,6 @@ getup() {
       last_printed="false"
     fi
 
-    # Debug
-    echo "Last updated: $last_updated"
-    echo "Last printed: $last_printed"
-
     # If trusted hosts list was updated after mail config last time printed
     if [[ "$last_printed" = "false" || "$last_updated" > "$last_printed" ]]; then
 

@@ -52,9 +52,30 @@ getup() {
         sleep 1
       done
       echo ""
+    fi
+
+    # Get last modification time
+    last_updated="$(docker compose exec wrapper stat -c '%y' /etc/opendkim/trusted.hosts | cut -d. -f1)"
+
+    # If last.printed file exists in /etc/opendkim in container filesystem - pick last printed datetime from there
+    if docker compose exec wrapper test -f "/etc/opendkim/last.printed"; then
+      last_printed="$(docker compose exec wrapper cat "/etc/opendkim/last.printed")"
+    else
+      last_printed="false"
+    fi
+
+    # Debug
+    echo "Last updated: $last_updated"
+    echo "Last printed: $last_printed"
+
+    # If trusted hosts list was updated after mail config last time printed
+    if [[ "$last_printed" = "false" || "$last_updated" > "$last_printed" ]]; then
 
       # Print mail config
-      docker compose exec wrapper bash -c "source maintain/mail-config.sh"
+      source maintain/mail-config.sh
+
+      # Update last_printed datetime
+      docker compose exec wrapper sh -c "date '+%Y-%m-%d %H:%M:%S' > /etc/opendkim/last.printed"
     fi
   fi
 
@@ -2665,7 +2686,7 @@ wrapper_entrypoint() {
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
 
-  # If we reached this line, it means mysql was shut down
+  # If we reached this line, it means flask was shut down
   echo "Flask server has been shut down"
 
   # Re-start flask

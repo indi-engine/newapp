@@ -3076,7 +3076,7 @@ migrate_if_need() {
     for fraction in system custom; do
 
       # Skip if no migrations detected
-      if [[ -z "${migrate[$fraction]}" ]]; then
+      if [[ -z "${migrate[$fraction]-}" ]]; then
           continue
       fi
 

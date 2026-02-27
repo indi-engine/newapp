@@ -380,3 +380,21 @@ def token():
         'success': True,
         'GH_TOKEN_SYSTEM_RO': get_dot_env('GH_TOKEN_SYSTEM_RO'),
     }), 200
+
+@app.route('/env', methods=['GET'])
+def env():
+
+    # Get the name of a env-variable to be retuned
+    name = request.args.get('name')
+
+    # Allowed variables
+    allowed = ['LETS_ENCRYPT_DOMAIN', 'EMAIL_SENDER_DOMAIN', 'LETS_ENCRYPT_NOTIFY']
+
+    # If not allowed - flush failure
+    if name not in allowed: return '', 403
+
+    # Use another env name here
+    if name == 'LETS_ENCRYPT_NOTIFY': name = 'GIT_COMMIT_EMAIL'
+
+    # Else flush variable's value
+    return get_dot_env(name), 200

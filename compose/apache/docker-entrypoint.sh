@@ -16,8 +16,8 @@ if [ -f "$pid_file" ]; then rm "$pid_file" && echo "Apache old pid-file removed"
 logs="/var/log/apache2"
 
 # Trim leading/trailing whitespaces from domain name(s)
-LETS_ENCRYPT_DOMAIN=$(echo "$LETS_ENCRYPT_DOMAIN" | xargs)
-EMAIL_SENDER_DOMAIN=$(echo "$EMAIL_SENDER_DOMAIN" | xargs)
+LETS_ENCRYPT_DOMAIN=$(curl -sSf http://wrapper/env?name=LETS_ENCRYPT_DOMAIN | xargs)
+EMAIL_SENDER_DOMAIN=$(curl -sSf http://wrapper/env?name=EMAIL_SENDER_DOMAIN | xargs)
 
 # Obtain Let's Encrypt certificate, if LETS_ENCRYPT_DOMAIN env is not empty:
 if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then

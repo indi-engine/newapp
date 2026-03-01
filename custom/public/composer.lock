@@ -1190,12 +1190,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "416fbaf8e705887f564cc85938eb4c7725cec9bd"
+                "reference": "4a929c27838f5f643454925ddedf642fd316a2d1"
             },
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2026-02-27T13:27:37+00:00"
+            "time": "2026-03-01T05:17:26+00:00"
         },
         {
             "name": "indi-engine/public",
@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "278557e0ee1df9bb4f31b35f4e220cda602ff67e"
+                "reference": "0b26919f9d2f218aa9f24bc8ddba816a78c66c0c"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1229,7 +1229,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2026-02-27T13:04:04+00:00"
+            "time": "2026-03-01T07:43:14+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2861,15 +2861,15 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "indi-engine/ckeditor": 20,
-        "indi-engine/ckfinder": 20,
+        "indi-engine/system": 20,
         "indi-engine/client": 20,
         "indi-engine/public": 20,
-        "indi-engine/system": 20
+        "indi-engine/ckeditor": 20,
+        "indi-engine/ckfinder": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": {},
-    "platform-dev": {},
+    "platform": [],
+    "platform-dev": [],
     "plugin-api-version": "2.6.0"
 }

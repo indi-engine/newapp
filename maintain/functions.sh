@@ -2580,6 +2580,9 @@ wrapper_entrypoint() {
   if [[ ! -z "$GIT_COMMIT_NAME"   && -z $(git config user.name)  ]]; then git config user.name  "$GIT_COMMIT_NAME" ; fi
   if [[ ! -z "$GIT_COMMIT_EMAIL"  && -z $(git config user.email) ]]; then git config user.email "$GIT_COMMIT_EMAIL"; fi
 
+  # Setup askpass for app repo
+  git config core.askpass maintain/git-askpass.sh
+
   # Add github.com to known hosts, if missing
   if [[ ! -d ~/.ssh ]]; then mkdir ~/.ssh; fi; known=~/.ssh/known_hosts;
   if [[ ! -f $known ]] || ! grep -q "github.com" $known; then ssh-keyscan github.com >> $known; fi

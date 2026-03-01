@@ -1216,7 +1216,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "0b26919f9d2f218aa9f24bc8ddba816a78c66c0c"
+                "reference": "df360406e549e65ca6da7d990c2001d8ff9ca6e7"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1229,7 +1229,7 @@
             "default-branch": true,
             "type": "package",
             "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2026-03-01T07:43:14+00:00"
+            "time": "2026-03-01T14:24:45+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -2861,15 +2861,15 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "indi-engine/system": 20,
+        "indi-engine/ckeditor": 20,
+        "indi-engine/ckfinder": 20,
         "indi-engine/client": 20,
         "indi-engine/public": 20,
-        "indi-engine/ckeditor": 20,
-        "indi-engine/ckfinder": 20
+        "indi-engine/system": 20
     },
     "prefer-stable": false,
     "prefer-lowest": false,
-    "platform": [],
-    "platform-dev": [],
+    "platform": {},
+    "platform-dev": {},
     "plugin-api-version": "2.6.0"
 }

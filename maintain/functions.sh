@@ -492,7 +492,7 @@ load_releases() {
   if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     # Get current repo releases list via GitHub CLI
-    list=$(gh release ls --json name,tagName -R "$repo" --jq '.[] | "\(.tagName)=\(.name)"')
+    list=$(gh release ls --json name,tagName -R "$repo" --limit 100 --jq '.[] | "\(.tagName)=\(.name)"')
 
     # Convert into array of [release tag => release name] pairs
     if [[ ${#list} > 0 ]]; then
@@ -505,7 +505,7 @@ load_releases() {
   else
 
     # Get current repo releases list
-    list=$(curl -s "https://api.github.com/repos/$repo/releases" | jq -r '.[] | "\(.tag_name)=\(.name)=\(.published_at)"')
+    list=$(curl -s "https://api.github.com/repos/$repo/releases?per_page=100" | jq -r '.[] | "\(.tag_name)=\(.name)=\(.published_at)"')
 
     # Convert into array of [release tag => release name] pairs
     if [[ ${#list} > 0 ]]; then
@@ -2116,7 +2116,7 @@ release_choices() {
   if [[ ! -z "${GH_TOKEN:-}" ]]; then
 
     local lerr="var/log/release_list.stderr"
-    local list=$(script -q -c "gh release -R $repo list 2> $lerr" /dev/null)
+    local list=$(script -q -c "gh release -R $repo --limit 100 list 2> $lerr" /dev/null)
     if [[ -s "$lerr" ]]; then echo ""; cat "$lerr" >&2; exit 1; fi
     rm -f "$lerr";
     echo " Done"

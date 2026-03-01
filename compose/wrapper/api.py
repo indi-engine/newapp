@@ -252,7 +252,7 @@ def restore_choices():
     # Prepare curl command
     command = ['curl']
     if bool(token): command += ['-H', f'Authorization: Bearer {token}']
-    command += ['-sS', '--fail-with-body', url := 'https://api.github.com/repos/' + choices['current']['name'] + '/releases']
+    command += ['-sS', '--fail-with-body', url := 'https://api.github.com/repos/' + choices['current']['name'] + '/releases?per_page=100']
 
     # Get restore choices list for current repo
     list = subprocess.run(command, capture_output=True, text=True)

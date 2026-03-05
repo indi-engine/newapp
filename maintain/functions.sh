@@ -2705,8 +2705,14 @@ function on_exit() {
   # Get the exit code of the last command/script
   local exit_code=$?
 
-  # If it's a error exit code and current execution was not triggered from Flask
-  if [ "$exit_code" -ne 0 ] && [ -z "${FLASK_APP:-}" ]; then
+  # If execution was originated from host CLI rather than from container CLI
+  if [[ "${HOST_CLI:-}" == "1" ]]; then
+
+    # Just exit
+    exit $exit_code
+
+  # Else if it's a error exit code and current execution was not triggered from Flask
+  elif [ "$exit_code" -ne 0 ] && [ -z "${FLASK_APP:-}" ]; then
 
     # Wait for user to press any key
     echo "-----"

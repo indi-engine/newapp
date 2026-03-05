@@ -27,6 +27,17 @@ if command -v docker >/dev/null 2>&1; then
 # Else it means we're in the wrapper-container, so proceed with the restore
 else
 
+  # Get packages to be updated and composer flags, if any
+  pkg2upd="indi-engine/*"
+  composer_args=()
+  while (($#)); do
+    case "$1" in
+      --all) pkg2upd=""; shift ;;
+         --) shift; composer_args+=("$@"); break ;;
+          *) composer_args+=("$1"); shift ;;
+    esac
+  done
+
   # Global msg
   declare -g stdout
 
@@ -71,7 +82,7 @@ else
     # Install possibly updated composer packages
     echo "Installing possibly updated composer packages:"
     composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
-    composer -d custom/public install 2>&1 | grep -v " fund" | prepend "» "
+    composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
 
   # Else indicate no
   else
@@ -122,7 +133,7 @@ else
     # Update indi-engine/* packages
     echo "Updating outdated ones:"
     composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
-    composer -d custom/public update -n --no-ansi "indi-engine/*" 2>&1 | grep -v " fund" | prepend "» "
+    composer -d custom/public update -n --no-ansi "${composer_args[@]}" "${pkg2upd:+$pkg2upd}" 2>&1 | grep -v " fund" | prepend "» "
 
     # Commit composer.lock
     echo "Committing composer.lock:"

@@ -128,7 +128,7 @@ else
 
   # If one/both of indi-engine packages is/are outdated, or their mentions
   # inside composer.lock are outdated, or composer.lock file is changed but not committed
-  if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/public/composer.lock)" ]]; then
+  if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/public/composer.lock)" || "$pkg2upd" == "" ]]; then
 
     # Update indi-engine/* packages
     echo "Updating outdated ones:"

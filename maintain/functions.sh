@@ -288,7 +288,7 @@ get_self_prot() {
   prot="http"
 
   # Pick LETS_ENCRYPT_DOMAIN from .env file, if possible
-  LETS_ENCRYPT_DOMAIN=$(grep "^LETS_ENCRYPT_DOMAIN=" .env | cut -d '=' -f 2-)
+  LETS_ENCRYPT_DOMAIN="$(get_env "LETS_ENCRYPT_DOMAIN")"
 
   # If SSL cert was expected to be created and was really created - setup protocol to be 'https'
   if [[ ! -z "$LETS_ENCRYPT_DOMAIN" ]]; then
@@ -305,20 +305,20 @@ get_self_prot() {
 get_self_host() {
 
   # Pick LETS_ENCRYPT_DOMAIN and APP_ENV from .env file
-  LETS_ENCRYPT_DOMAIN=$(grep "^LETS_ENCRYPT_DOMAIN=" .env | cut -d '=' -f 2-)
-  APP_ENV=$(grep "^APP_ENV=" .env | cut -d '=' -f 2-)
+  LETS_ENCRYPT_DOMAIN="$(get_env "LETS_ENCRYPT_DOMAIN")"
+  APP_ENV="$(get_env "APP_ENV")"
 
   # Detect host
   if [[ ! -z $LETS_ENCRYPT_DOMAIN ]]; then
-    host=${LETS_ENCRYPT_DOMAIN%% *}
+    host="${LETS_ENCRYPT_DOMAIN%% *}"
   elif [[ $APP_ENV == "production" || $APP_ENV == "staging" ]]; then
-    host=$(curl -sS --fail-with-body http://ipecho.net/plain)
+    host="$(curl -sS --fail-with-body http://ipecho.net/plain)"
   else
     host="localhost"
   fi
 
   # Print host
-  echo $host
+  echo "$host"
 }
 
 # Clear last X lines

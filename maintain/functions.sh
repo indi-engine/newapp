@@ -2793,7 +2793,7 @@ is_repo_outdated() {
   fi
 
   # Get last commit on remote
-  stdout="$(git ls-remote -h -t "$url" $branch 2>&1)"; exit_code=$?
+  stdout="$(git ls-remote -h -t "$url" "$branch" 2>&1)"; exit_code=$?
   if [[ $exit_code -ne 0 ]]; then
     echo -e "\n$stdout"
     exit $exit_code
@@ -2802,7 +2802,7 @@ is_repo_outdated() {
   commit="${stdout%% *}"
 
   # Check if that commit exists locally
-  set +e; stdout="$(git -C "$dir" branch --contains "$commit" 2>&1)"; exit_code=$?;
+  set +e; stdout="$(git -C "$dir" merge-base --is-ancestor "$commit" HEAD 2>&1)"; exit_code=$?;
 
   # If exists, it means repo is NOT outdated, so return exit code 1
   if [[ $exit_code -eq 0 ]]; then

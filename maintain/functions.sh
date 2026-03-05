@@ -2808,7 +2808,7 @@ is_repo_outdated() {
   if [[ $exit_code -eq 0 ]]; then
     stdout="$commit"
     return 1
-  elif [[ "$stdout" =~ "no such commit" ]]; then
+  elif [[ "$stdout" =~ "no such commit" || $stdout == "" ]]; then
     return 0
   else
     echo -e "\n$stdout"

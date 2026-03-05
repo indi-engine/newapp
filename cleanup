@@ -1,16 +1,34 @@
 #!/bin/bash
 
-# Cleanup docker stuff
-docker compose down
-docker volume prune -af
-docker system prune -af
+# If only logs should be cleaned up
+if [[ "$1" == logs ]]; then
 
-# Get current dir name
-dir=$(basename "$PWD")
+  # Cleanup container logs
+  for f in var/log/compose/*/*.log; do
+    : > "$f"
+  done
 
-# Remove cd-command from bashrc
-sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/c\\" /root/.bashrc
+  # Remove custom logs
+  rm -Rf var/log/custom/*/
+  rm -Rf var/log/custom/*.log
 
-# Remove current dir
-cd ../
-rm -R $dir
+# Else cleanup the whole app instance
+else
+
+  echo "full cleanup"
+
+  # Cleanup docker stuff
+  docker compose down
+  docker volume prune -af
+  docker system prune -af
+
+  # Get current dir name
+  dir=$(basename "$PWD")
+
+  # Remove cd-command from bashrc
+  sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/c\\" /root/.bashrc
+
+  # Remove current dir
+  cd ../
+  rm -R $dir
+fi

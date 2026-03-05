@@ -15,8 +15,6 @@ if [[ "$1" == logs ]]; then
 # Else cleanup the whole app instance
 else
 
-  echo "full cleanup"
-
   # Cleanup docker stuff
   docker compose down
   docker volume prune -af

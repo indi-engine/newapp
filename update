@@ -130,10 +130,13 @@ else
   # inside composer.lock are outdated, or composer.lock file is changed but not committed
   if (( ${#is_outdated[@]} > 0 )) || [[ -n "$(git status --porcelain custom/public/composer.lock)" || "$pkg2upd" == "" ]]; then
 
+    # Prepare packages array, which will be empty if --all flag is given
+    packages=(); [[ -n "$pkg2upd" ]] && packages+=("$pkg2upd")
+
     # Update indi-engine/* packages
     echo "Updating outdated ones:"
     composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
-    composer -d custom/public update -n --no-ansi "${composer_args[@]}" "${pkg2upd:+$pkg2upd}" 2>&1 | grep -v " fund" | prepend "» "
+    composer -d custom/public update -n --no-ansi "${composer_args[@]}" "${packages[@]}" 2>&1 | grep -v " fund" | prepend "» "
 
     # Commit composer.lock
     echo "Committing composer.lock:"

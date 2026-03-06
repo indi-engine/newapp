@@ -99,6 +99,7 @@ else
   # Else indicate no
   else
     echo " No"
+    changed_files1=""
   fi
 
   # Declare associative array to track which of indi-engine/* repos are outdated

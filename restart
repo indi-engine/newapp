@@ -53,7 +53,7 @@ if [[ "${1:-}" == "watcher" ]]; then
       if ! output=$(kill -9 "$( < "$PIDFILE" )" 2>&1); then
         echo "$output"
       else
-        echo "Restart watcher is now stopped"
+        echo "Restart watcher stopped running"
       fi
     else
       echo "Restart watcher is NOT running, nothing to be stopped"

@@ -21,12 +21,16 @@ if command -v docker >/dev/null 2>&1; then
   # Execute restore-command within the container environment passing all arguments, if any
   docker compose exec -it -e TERM="$TERM" -e HOST_CLI=1 wrapper bash "${bash_flags[@]}" "$(basename "${BASH_SOURCE[0]}")" $@
 
+  # Clear last newline
+  clear_last_lines 1
+
   # If restart has to be done
   if [[ -f var/restart ]]; then
 
     # If restart watcher is running - stop it to prevent conflict
     if restart_watcher_running; then
       source restart watcher stop
+      echo
     fi
 
     # Do restart in the current thread

@@ -25,12 +25,16 @@ if command -v docker >/dev/null 2>&1; then
   if [[ -f var/restart ]]; then
 
     # If restart watcher is running - stop it to prevent conflict
-    restart_watcher_running && source restart watcher stop
+    if restart_watcher_running; then
+      echo "watcher needs to be temporarily stopped"
+      source restart watcher stop
+    fi
 
     # Do restart in the current thread
     restart_if_need
 
     # Start watcher
+    echo "(re)start"
     source restart watcher start
   fi
 

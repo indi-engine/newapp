@@ -35,7 +35,7 @@ if command -v docker >/dev/null 2>&1; then
 
     # Start watcher
     echo "(re)start"
-    source restart watcher start
+    source restart watcher run
   fi
 
 # Else it means we're in the wrapper-container, so proceed with the restore

@@ -134,6 +134,7 @@ services:
       - ./var/log/custom:/var/log/custom
 
 volumes:
+  test:
   mysql_server_data:
   mysql_client_binaries:
   letsencrypt:

@@ -16,9 +16,6 @@ if [[ "${1:-}" == "watcher" ]]; then
   PIDFILE="var/tmp/restart-watcher.pid"
   LOGFILE="var/log/restart-watcher.log"
 
-  # Print newline
-  echo
-
   # If 2nd arg is 'run'
   if [[ "${2:-}" == "run" ]]; then
 

@@ -122,6 +122,7 @@ getup() {
 
   # Periodically check if var/restart file appeared, and when yes - initiate a certain scenario of a restart for the
   # current docker compose project, depending on what DevOps-related files were updated during any further 'source update' call
+  echo
   source restart watcher run
 
   # Run post-getup hook, if exists

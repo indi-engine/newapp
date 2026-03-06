@@ -12,6 +12,9 @@ g="\e[36m" # cyan
 d="\e[0m"  # default
 gray='\033[38;5;240m' #lightgray
 
+# Restart watched PID-file
+restart_watcher_pid="var/tmp/restart-watcher.pid"
+
 # Get the whole project up and running
 getup() {
 
@@ -3351,4 +3354,9 @@ get_restart_plan() {
   else
     echo "$plan"
   fi
+}
+
+# Check if restart watcher is running
+restart_watcher_running() {
+  [[ -f "$restart_watcher_pid" ]] && kill -0 "$(cat "$restart_watcher_pid")" 2> /dev/null
 }

@@ -41,6 +41,7 @@ if [[ "${1:-}" == "watcher" ]]; then
 
         # Start in background
         nohup ./restart $@ background >> "$LOGFILE" 2>&1 &
+        disown
 
         # Print status
         echo "Restart watcher started running"
@@ -52,7 +53,11 @@ if [[ "${1:-}" == "watcher" ]]; then
 
     # If watcher is running - kill, else print it's not running
     if restart_watcher_running; then
-      kill -9 "$(cat "$PIDFILE")"
+      if ! output=$(kill -9 "$( < "$PIDFILE" )" 2>&1); then
+        echo "$output"
+      else
+        echo "Restart watcher is now stopped"
+      fi
     else
       echo "Restart watcher is NOT running, nothing to be stopped"
     fi

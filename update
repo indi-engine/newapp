@@ -75,9 +75,21 @@ else
     # Indicate yes
     echo " Yes"
 
+    # Fetch changes from remote
+    echo "Fetching latest changes from github:"
+    git fetch origin 2>&1 | prepend  "» "
+
+    # Get a list of changed files (excl. ones non-meaningful for restart) BEFORE applying the update
+    changed_files1=$(git diff --name-only HEAD..origin/main -- . ":(exclude)custom/public/")
+
+    # Update restart scenario based on changed files, if needed, within var/restart.plan file
+    # If something will go wrong prior restart is really triggered, the restart scenario will
+    # be picked from that file on next attempt to run 'source update' command
+    update_restart_plan_if_needed "$changed_files1" "origin"
+
     # Pull changes from remote
-    echo "Pulling latest changes from github:"
-    git pull 2>&1 | prepend "» "
+    echo "Merging latest changes:"
+    git merge origin/main 2>&1 | prepend "» "
 
     # Install possibly updated composer packages
     echo "Installing possibly updated composer packages:"
@@ -177,7 +189,7 @@ else
     git fetch origin
 
     # Get a list of changed files BEFORE applying the update
-    changed_files=$(git diff --name-only HEAD origin/main -- . ":(exclude)custom/")
+    changed_files2=$(git diff --name-only HEAD origin/main -- . ":(exclude)custom/")
 
     # Apply the update
     git merge origin/main
@@ -193,36 +205,31 @@ else
     git fetch devops 2>&1 | prepend  "» "
 
     # Get a list of changed files BEFORE applying the update
-    changed_files=$(git diff --name-only HEAD devops/main -- . ":(exclude)custom/")
+    changed_files2=$(git diff --name-only HEAD devops/main -- . ":(exclude)custom/")
 
     # Apply the update
     git checkout devops/main -- . ":(exclude)custom/"
   fi
 
-  # Default restart scenario: do nothing
-  restart=5
+  # Update restart scenario based on changed files, if needed, within var/restart.plan file
+  # If something will go wrong prior restart is really triggered, the restart scenario will
+  # be picked from that file on next attempt to run 'source update' command
+  update_restart_plan_if_needed "$changed_files2" "devops"
 
-  # Foreach updated file
-  while IFS= read -r file; do
+  # Get restart plan
+  restart=$(get_restart_plan)
 
-    # Check if it affects restart scenario
-    case "$file" in
-      compose/wrapper/Dockerfile.base|compose/apache/Dockerfile.base)     [[ $restart -gt 1 ]] && restart=1 ;;
-      .dockerignore|compose/wrapper/Dockerfile|compose/apache/Dockerfile) [[ $restart -gt 2 ]] && restart=2 ;;
-      docker-compose.yml|.env.dist)                                       [[ $restart -gt 3 ]] && restart=3 ;;
-      compose/*)                                                          [[ $restart -gt 4 ]] && restart=4 ;;
-    esac
-
-    # Add to commit
-    [[ -e "$file" ]] && git add "$file"
-  done <<< "$changed_files"
-
-  # Print changes files and restart scenario
-  if [[ "$changed_files" = "" ]]; then
-    echo "No DevOps-setup files are changed"
+  # Print changes files and restart plan status
+  if [[ "$changed_files1" = "" && "$changed_files2" = "" ]]; then
+    if [[ "$restart" == "5" ]]; then
+      echo "No DevOps-setup files are changed"
+    else
+      echo "No DevOps-setup files are changed right now, but previously"
+    fi
   else
     echo "Changed ones:"
-    echo "$changed_files" | prepend  " - "
+    if [[ "$changed_files1" != "" ]]; then echo "$changed_files1" | prepend  " - "; fi
+    if [[ "$changed_files2" != "" ]]; then echo "$changed_files2" | prepend  " - "; fi
   fi
 
   # If there is something added to commit for user's own repo
@@ -234,23 +241,6 @@ else
 
     # Push to github
     echo "Pushing to github:"; git push 2>&1 | prepend "» "
-  fi
-
-  # If restart scenario is NOT 'do nothing'
-  if [[ "$restart" != 5 ]]; then
-
-    # IF restart was already planned but is still not done due to migration failure AND if current update assume
-    # 'harder' restart scenario is needed comparing with one previously planned based on previous update
-    # THEN update previously planned restart scenario with 'harder' one
-    if [[ -f var/restart.plan ]]; then
-      if [[ "$restart" -lt "$(cat var/restart.plan)" ]]; then
-        echo "$restart" > var/restart.plan
-      fi
-
-    # Write restart scenario to a temporary file
-    else
-      echo "$restart" > var/restart.plan
-    fi
   fi
 
   # Run database migrations, if any new ones detected for system and/or custom fractions

@@ -82,6 +82,6 @@ elif [[ "${1:-}" =~ (1|2|3|4) ]]; then
 # Else
 else
 
-  # Restart with containers recreation
-  restart_if_need "3"
+  # Restart containers without recreation
+  restart_if_need "4"
 fi

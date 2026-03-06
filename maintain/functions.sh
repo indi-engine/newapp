@@ -3283,3 +3283,72 @@ overlay2() {
 is_windows() {
   uname -s | grep -Eq '^(MINGW|MSYS|CYGWIN)'
 }
+
+# Update restart plan if needed based on changed files
+update_restart_plan_if_needed() {
+
+  # Get list of changed files from 1st argument, which is
+  # expected to be an output of 'git diff --name-only ...' command
+  local changed_files="${1:-}"
+
+  # Get the name of remote, where the diff comes from
+  # Can be 'origin' or 'devops'
+  local remote="${2:-}"
+
+  # Default restart plan: do nothing
+  local plan=5
+
+  # Plan-file path
+  local file=var/restart.plan
+
+  # Foreach changed file
+  while IFS= read -r changed_file; do
+
+    # Check if it affects restart scenario
+    case "$changed_file" in
+      compose/wrapper/Dockerfile.base|compose/apache/Dockerfile.base)     [[ $plan -gt 1 ]] && plan=1 ;;
+      .dockerignore|compose/wrapper/Dockerfile|compose/apache/Dockerfile) [[ $plan -gt 2 ]] && plan=2 ;;
+      docker-compose.yml|.env.dist)                                       [[ $plan -gt 3 ]] && plan=3 ;;
+      compose/*)                                                          [[ $plan -gt 4 ]] && plan=4 ;;
+    esac
+
+    # If file change is coming from devops/main - add to commit
+    [[ -e "$changed_file" && "$remote" == "devops" ]] && git add "$changed_file"
+
+  # Feed changed files list into while-loop
+  done <<< "$changed_files"
+
+  # If restart scenario is NOT 'do nothing'
+  if [[ "$plan" != 5 ]]; then
+
+    # IF restart was previously already planned but was not done yet
+    # AND if newly detected restart plan assume 'harder' scenario than the previous one
+    # THEN update previously planned restart scenario with a 'harder' one
+    if [[ -f "$file" ]]; then
+      if [[ "$plan" -lt "$(cat "$file")" ]]; then
+        echo "$plan" > "$file"
+      fi
+
+    # Write restart scenario to a temporary file
+    else
+      echo "$plan" > "$file"
+    fi
+  fi
+}
+
+# Get planed restart scenario
+get_restart_plan() {
+
+  # Default restart scenario: do nothing
+  local plan=5
+
+  # Plan-file path
+  local file=var/restart.plan
+
+  # If plan-file exists - print it's contents, else print default scenario
+  if [[ -f "$file" ]]; then
+    cat "$file"
+  else
+    echo "$plan"
+  fi
+}

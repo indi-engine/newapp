@@ -240,7 +240,7 @@ else
       echo "No DevOps-setup files are changed right now, but previously"
     fi
   else
-    echo "Changed ones:"
+    echo "Changed DevOps-setup files:"
     if [[ "$changed_files1" != "" ]]; then echo "$changed_files1" | prepend  " - "; fi
     if [[ "$changed_files2" != "" ]]; then echo "$changed_files2" | prepend  " - "; fi
   fi

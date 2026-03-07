@@ -56,6 +56,9 @@ else
   # Vendor dir
   VDR="custom/public/vendor/indi-engine"
 
+  # Make sure Composer always have the freshest github oauth token
+  composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
+
   # Prompt for GIT_COMMIT_NAME and/or GIT_COMMIT_EMAIL if any missing
   prompt_git_commit_identify_if_missing
 
@@ -105,7 +108,6 @@ else
 
     # Install possibly updated composer packages
     echo "Installing possibly updated composer packages:"
-    composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
     composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
 
   # Else indicate no

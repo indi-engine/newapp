@@ -3310,10 +3310,10 @@ update_restart_plan_if_needed() {
 
     # Check if it affects restart scenario
     case "$changed_file" in
-      compose/wrapper/Dockerfile.base|compose/apache/Dockerfile.base)     [[ $plan -gt 1 ]] && plan=1 ;;
-      .dockerignore|compose/wrapper/Dockerfile|compose/apache/Dockerfile) [[ $plan -gt 2 ]] && plan=2 ;;
-      docker-compose.yml|.env.dist)                                       [[ $plan -gt 3 ]] && plan=3 ;;
-      compose/*)                                                          [[ $plan -gt 4 ]] && plan=4 ;;
+      *Dockerfile.base)               (( plan > 1 )) && plan=1 ;;
+      *.dockerignore|*Dockerfile)     (( plan > 2 )) && plan=2 ;;
+      *docker-compose*.yml|.env.dist) (( plan > 3 )) && plan=3 ;;
+      *compose/*)                     (( plan > 4 )) && plan=4 ;;
     esac
 
     # If file change is coming from devops/main - add to commit

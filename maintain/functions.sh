@@ -61,8 +61,8 @@ getup() {
     last_updated="$(docker compose exec wrapper sh -c "stat -c '%y' /etc/opendkim/trusted.hosts" | cut -d. -f1)"
 
     # If last.printed file exists in /etc/opendkim in container filesystem - pick last printed datetime from there
-    if docker compose exec wrapper test -f "/etc/opendkim/last.printed"; then
-      last_printed="$(docker compose exec wrapper cat "/etc/opendkim/last.printed")"
+    if docker compose exec wrapper sh -c "test -f /etc/opendkim/last.printed"; then
+      last_printed="$(docker compose exec wrapper sh -c "cat /etc/opendkim/last.printed")"
     else
       last_printed="false"
     fi

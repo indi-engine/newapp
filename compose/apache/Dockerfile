@@ -13,5 +13,6 @@ RUN sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/client/.git/
   mv vendor ../vendor
 ## </Composer> ##
 
+
 # Use custom entrypoint
 ENTRYPOINT ["bash", "custom-entrypoint.sh"]

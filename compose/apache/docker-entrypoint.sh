@@ -12,6 +12,16 @@ pid_file="/var/run/apache2/apache2.pid"
 # Remove pid-file, if kept from previous start of apache container
 if [ -f "$pid_file" ]; then rm "$pid_file" && echo "Apache old pid-file removed"; fi
 
+# Set ServerName, if missing
+if ! grep -q "ServerName " /etc/apache2/apache2.conf; then
+  echo "ServerName localhost" >> /etc/apache2/apache2.conf
+fi
+
+# Set DOC to be visible to apache, if missing
+if ! grep -q "Define DOC " /etc/apache2/apache2.conf; then
+  sed -Ei "s~AccessFileName .htaccess~&\n\nDefine DOC $DOC\nSetEnv DOC $DOC~I" /etc/apache2/apache2.conf
+fi
+
 # Logs dir
 logs="/var/log/apache2"
 
@@ -109,16 +119,6 @@ service cron start
 # Start opendkim and postfix to be able to send DKIM-signed emails via sendmail used by php
 if [[ -f "/etc/opendkim/trusted.hosts" ]]; then service opendkim start; fi
 service postfix start
-
-# Set ServerName, if missing
-if ! grep -q "ServerName " /etc/apache2/apache2.conf; then
-  echo "ServerName localhost" >> /etc/apache2/apache2.conf
-fi
-
-# Set DOC to be visible to apache, if missing
-if ! grep -q "SetEnv DOC " /etc/apache2/apache2.conf; then
-  echo "SetEnv DOC $DOC" >> /etc/apache2/apache2.conf
-fi
 
 # Make logs dir is writable for apache user except .gitignore
 # Also, make writable ini file and temporary files

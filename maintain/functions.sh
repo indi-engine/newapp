@@ -106,6 +106,17 @@ getup() {
     [[ -z $wait ]] && echo ""
   fi
 
+  # Wait until Apache is running inside apache-container
+  wait="Waiting for app ready.."
+  if ! apache_ready; then
+    while ! apache_ready; do
+      [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
+      sleep 3
+    done
+    clear_last_lines
+    echo
+  fi
+
   # Print newline and URL to proceed
   echo -e "Your app is here: ${g}$(get_self_href)${d}"
 
@@ -330,7 +341,7 @@ get_self_host() {
 
 # Clear last X lines
 clear_last_lines() {
-  for ((i = 0; i < $1; i++)); do tput cuu1 && tput el; done
+  for ((i = 0; i < ${1:-1}; i++)); do tput cuu1 && tput el; done
 }
 
 # Ask user for some value to be inputted
@@ -3381,4 +3392,9 @@ composer_install() {
 
   # Start php and java background processes back, if need
   start_maxwell_and_closetab_if_need
+}
+
+# Check if apache is ready
+apache_ready() {
+  docker compose exec apache sh -c "bash -c '</dev/tcp/localhost/80'" &>/dev/null
 }

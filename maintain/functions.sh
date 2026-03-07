@@ -109,6 +109,9 @@ getup() {
   # Print newline and URL to proceed
   echo -e "Your app is here: ${g}$(get_self_href)${d}"
 
+  # Run composer install/update hook directly
+  docker compose exec wrapper sh -c "cd custom/public; php vendor/indi-engine/system/hook/init"
+
   # Make sure 'custom/public/data/upload' dir is created and filled, if does not exist
   init_uploads_if_need
 

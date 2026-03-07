@@ -2101,8 +2101,7 @@ restore_source() {
   git notes add -f -m "$title · ${hash:0:7}"
 
   # Apply composer packages state
-  echo "Setting up composer packages state:"
-  composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
+  composer_install "Setting up composer packages state:"
   echo ""
 }
 
@@ -2237,8 +2236,7 @@ cancel_restore_source() {
   echo -e " Done"
 
   # Revert composer packages state
-  echo "Setting up composer packages state:"
-  composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
+  composer_install "Setting up composer packages state:"
 }
 
 # Cancel uploads restore, i.e. revert uploads to the state which was before restore
@@ -3363,4 +3361,24 @@ get_restart_plan() {
 # Check if restart watcher is running
 restart_watcher_running() {
   [[ -f "$restart_watcher_pid" ]] && kill -0 "$(cat "$restart_watcher_pid")" 2> /dev/null
+}
+
+# Run pre-configured 'composer install' command
+composer_install() {
+
+  # Pick title from 1st arg
+  local title="${1:-}"
+
+  # Stop php and java background processes, if any running within apache-container,
+  # as their source code might be affected by 'composer install' command
+  stop_maxwell_and_closetab_if_need
+
+  # Print title, if given
+  [[ "$title" != "" ]] && echo "$title"
+
+  # Do install
+  composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
+
+  # Start php and java background processes back, if need
+  start_maxwell_and_closetab_if_need
 }

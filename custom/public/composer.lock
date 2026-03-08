@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "01374a1e38f7548434c21394fb8c21f3",
+    "content-hash": "8e036ac3c03d3ba6a755f5f719d3d13a",
     "packages": [
         {
             "name": "brick/math",
@@ -1191,25 +1191,20 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "732dd8d01d66d38d55061027e8970572c8a6f2f7"
+                "reference": "1d9acd1331f9c3387798d184c60973ed154fc83c"
+            },
+            "require": {
+                "npm-asset/inputmask": "^5.0",
+                "npm-asset/js-sha256": "0.9.0",
+                "npm-asset/stomp--stompjs": "6.1.2",
+                "npm-asset/xterm": "5.3.0",
+                "npm-asset/xterm-addon-fit": "0.7.0",
+                "npm-asset/xterm-addon-web-links": "0.8.0"
             },
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2026-03-05T06:13:40+00:00"
-        },
-        {
-            "name": "indi-engine/public",
-            "version": "dev-master",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/indi-engine/public.git",
-                "reference": "8cb594c8389ae3ad25f953d89cbe108c5b885281"
-            },
-            "default-branch": true,
-            "type": "library",
-            "description": "Special package for Indi Engine projects having public area, covering frontend needs",
-            "time": "2026-01-08T09:57:06+00:00"
+            "time": "2026-03-08T11:11:04+00:00"
         },
         {
             "name": "indi-engine/system",
@@ -1217,7 +1212,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "ac25a6377b8861d139898def0163e92ed67ef663"
+                "reference": "215610c8e45b52a9df7bae0a6c4c846ca2493fdf"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1225,12 +1220,13 @@
                 "php-amqplib/php-amqplib": "3.6.2",
                 "phpmailer/phpmailer": "^6.5",
                 "phpoffice/phpspreadsheet": "^1.30",
-                "phpoffice/phpword": "^0.18.2"
+                "phpoffice/phpword": "^0.18.2",
+                "zendesk/maxwell": "1.39.4"
             },
             "default-branch": true,
             "type": "package",
-            "description": "Indi Engine system package, should be used as composer dependency only",
-            "time": "2026-03-07T12:15:03+00:00"
+            "description": "Indi Engine AI system package, should be used as composer dependency only",
+            "time": "2026-03-08T10:44:32+00:00"
         },
         {
             "name": "laminas/laminas-escaper",
@@ -1580,6 +1576,78 @@
                 }
             ],
             "time": "2026-01-02T08:56:05+00:00"
+        },
+        {
+            "name": "npm-asset/inputmask",
+            "version": "5.0.9",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/inputmask/-/inputmask-5.0.9.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/js-sha256",
+            "version": "0.9.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/js-sha256/-/js-sha256-0.9.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/stomp--stompjs",
+            "version": "6.1.2",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/@stomp/stompjs/-/stompjs-6.1.2.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "Apache-2.0"
+            ]
+        },
+        {
+            "name": "npm-asset/xterm",
+            "version": "5.3.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm/-/xterm-5.3.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/xterm-addon-fit",
+            "version": "0.7.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm-addon-fit/-/xterm-addon-fit-0.7.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/xterm-addon-web-links",
+            "version": "0.8.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm-addon-web-links/-/xterm-addon-web-links-0.8.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
         },
         {
             "name": "paragonie/constant_time_encoding",
@@ -2765,25 +2833,6 @@
             "time": "2025-12-02T15:19:04+00:00"
         },
         {
-            "name": "robinherbots/inputmask",
-            "version": "5.0.9",
-            "dist": {
-                "type": "zip",
-                "url": "https://github.com/RobinHerbots/Inputmask/archive/refs/tags/5.0.9.zip"
-            },
-            "type": "library"
-        },
-        {
-            "name": "stomp-js/stompjs",
-            "version": "6.1.2",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/stomp-js/stompjs.git",
-                "reference": "origin/master"
-            },
-            "type": "library"
-        },
-        {
             "name": "symfony/deprecation-contracts",
             "version": "v3.6.0",
             "source": {
@@ -2851,33 +2900,6 @@
             "time": "2024-09-25T14:21:43+00:00"
         },
         {
-            "name": "xtermjs/xterm-addon-fit",
-            "version": "0.7.0",
-            "dist": {
-                "type": "tar",
-                "url": "https://registry.npmjs.org/xterm-addon-fit/-/xterm-addon-fit-0.7.0.tgz"
-            },
-            "type": "library"
-        },
-        {
-            "name": "xtermjs/xterm-addon-web-links",
-            "version": "0.8.0",
-            "dist": {
-                "type": "tar",
-                "url": "https://registry.npmjs.org/xterm-addon-web-links/-/xterm-addon-web-links-0.8.0.tgz"
-            },
-            "type": "library"
-        },
-        {
-            "name": "xtermjs/xterm.js",
-            "version": "5.3.0",
-            "dist": {
-                "type": "tar",
-                "url": "https://registry.npmjs.org/xterm/-/xterm-5.3.0.tgz"
-            },
-            "type": "library"
-        },
-        {
             "name": "zendesk/maxwell",
             "version": "1.39.4",
             "dist": {
@@ -2894,7 +2916,6 @@
         "indi-engine/ckeditor": 20,
         "indi-engine/ckfinder": 20,
         "indi-engine/client": 20,
-        "indi-engine/public": 20,
         "indi-engine/system": 20
     },
     "prefer-stable": false,

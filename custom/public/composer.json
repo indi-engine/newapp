@@ -1,25 +1,12 @@
 {
     "name": "indi-engine/newapp",
-    "description": "Entry point for a blank Indi Engine project development from scratch",
+    "description": "Entry point for a blank Indi Engine AI project development from scratch",
     "type": "project",
     "repositories": [
-       {"type": "git", "url": "https://github.com/indi-engine/system.git"}, 
-       {"type": "git", "url": "https://github.com/indi-engine/client.git"}, 
-       {"type": "git", "url": "https://github.com/indi-engine/public.git"},
-       {"type": "git", "url": "https://github.com/indi-engine/ckeditor.git"},
-       {"type": "git", "url": "https://github.com/indi-engine/ckfinder.git"},
-       {
-        "type": "package",
-        "package": {
-          "name": "stomp-js/stompjs",
-          "version": "6.1.2",
-          "source": {
-            "type": "git",
-            "reference": "origin/master",
-            "url": "https://github.com/stomp-js/stompjs.git"
-          }
-        }
-      },
+      {"type": "git", "url": "https://github.com/indi-engine/system.git"},
+      {"type": "git", "url": "https://github.com/indi-engine/client.git"},
+      {"type": "git", "url": "https://github.com/indi-engine/ckeditor.git"},
+      {"type": "git", "url": "https://github.com/indi-engine/ckfinder.git"},
       {
         "type": "package",
         "package": {
@@ -31,27 +18,13 @@
           }
         }
       },
-      {
-        "type": "package",
-        "package": {
-          "name": "robinherbots/inputmask",
-          "version": "5.0.9",
-          "dist": {
-            "type": "zip",
-            "url": "https://github.com/RobinHerbots/Inputmask/archive/refs/tags/5.0.9.zip"
-          }
-        }
-      }
+      {"type": "composer", "url": "https://asset-packagist.org"}
     ],
     "require": {
         "indi-engine/system": "dev-master",
         "indi-engine/client": "dev-master",
-        "indi-engine/public": "dev-master",
         "indi-engine/ckeditor": "dev-master",
-        "indi-engine/ckfinder": "dev-master",
-        "stomp-js/stompjs": "6.1.2",
-        "zendesk/maxwell": "1.39.4",
-        "robinherbots/inputmask": "^5.0"
+        "indi-engine/ckfinder": "dev-master"
     },
     "scripts": {    
         "post-update-cmd" : "@hook",

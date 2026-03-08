@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e35eea26aa37fe5a1258cd626debca4c",
+    "content-hash": "eb376044a1af6a9bee281ca1653dba7e",
     "packages": [
         {
             "name": "brick/math",
@@ -2849,6 +2849,15 @@
                 }
             ],
             "time": "2024-09-25T14:21:43+00:00"
+        },
+        {
+            "name": "xtermjs/xterm.js",
+            "version": "5.3.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm/-/xterm-5.3.0.tgz"
+            },
+            "type": "library"
         },
         {
             "name": "zendesk/maxwell",

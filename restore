@@ -133,7 +133,7 @@ else
         echo
       elif [[ -d "data/$tag" ]]; then
         echo -e "\nRESTORE ONLY: ${g}${1:-}${d}, FROM: ${g}data/$tag${d} local directory\n"
-        restore_dump_from_local "data/before"
+        restore_dump_from_local "data/$tag"
         exit
       fi
 

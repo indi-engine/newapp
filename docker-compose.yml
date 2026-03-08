@@ -87,6 +87,7 @@ services:
     volumes:
       - ./compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf
       - ./compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
+      - rabbitmq:/var/lib/rabbitmq
     healthcheck:
       test: rabbitmq-diagnostics check_port_connectivity
       timeout: 20s
@@ -136,5 +137,6 @@ services:
 volumes:
   mysql_server_data:
   mysql_client_binaries:
+  rabbitmq:
   letsencrypt:
   opendkim:

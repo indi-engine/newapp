@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "eb376044a1af6a9bee281ca1653dba7e",
+    "content-hash": "01374a1e38f7548434c21394fb8c21f3",
     "packages": [
         {
             "name": "brick/math",
@@ -2849,6 +2849,24 @@
                 }
             ],
             "time": "2024-09-25T14:21:43+00:00"
+        },
+        {
+            "name": "xtermjs/xterm-addon-fit",
+            "version": "0.7.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm-addon-fit/-/xterm-addon-fit-0.7.0.tgz"
+            },
+            "type": "library"
+        },
+        {
+            "name": "xtermjs/xterm-addon-web-links",
+            "version": "0.8.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/xterm-addon-web-links/-/xterm-addon-web-links-0.8.0.tgz"
+            },
+            "type": "library"
         },
         {
             "name": "xtermjs/xterm.js",

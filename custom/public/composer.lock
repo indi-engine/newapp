@@ -1191,11 +1191,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "1d9acd1331f9c3387798d184c60973ed154fc83c"
+                "reference": "b1f34c62a9f3d214b368551aa21a83e20d937717"
             },
             "require": {
                 "npm-asset/inputmask": "^5.0",
                 "npm-asset/js-sha256": "0.9.0",
+                "npm-asset/simonwep--pickr": "^1.9",
                 "npm-asset/stomp--stompjs": "6.1.2",
                 "npm-asset/xterm": "5.3.0",
                 "npm-asset/xterm-addon-fit": "0.7.0",
@@ -1204,7 +1205,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2026-03-08T11:11:04+00:00"
+            "time": "2026-03-08T11:41:06+00:00"
         },
         {
             "name": "indi-engine/system",
@@ -1578,6 +1579,18 @@
             "time": "2026-01-02T08:56:05+00:00"
         },
         {
+            "name": "npm-asset/core-js",
+            "version": "3.37.0",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/core-js/-/core-js-3.37.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
             "name": "npm-asset/inputmask",
             "version": "5.0.9",
             "dist": {
@@ -1595,6 +1608,34 @@
             "dist": {
                 "type": "tar",
                 "url": "https://registry.npmjs.org/js-sha256/-/js-sha256-0.9.0.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/nanopop",
+            "version": "2.4.2",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/nanopop/-/nanopop-2.4.2.tgz"
+            },
+            "type": "npm-asset",
+            "license": [
+                "MIT"
+            ]
+        },
+        {
+            "name": "npm-asset/simonwep--pickr",
+            "version": "1.9.1",
+            "dist": {
+                "type": "tar",
+                "url": "https://registry.npmjs.org/@simonwep/pickr/-/pickr-1.9.1.tgz"
+            },
+            "require": {
+                "npm-asset/core-js": "3.37.0",
+                "npm-asset/nanopop": "2.4.2"
             },
             "type": "npm-asset",
             "license": [

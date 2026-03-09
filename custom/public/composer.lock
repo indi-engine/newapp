@@ -1191,7 +1191,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "b1f34c62a9f3d214b368551aa21a83e20d937717"
+                "reference": "c1e110df99bc035a579ad826f76096d61e4e621b"
             },
             "require": {
                 "npm-asset/inputmask": "^5.0",
@@ -1205,7 +1205,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2026-03-08T11:41:06+00:00"
+            "time": "2026-03-09T12:27:29+00:00"
         },
         {
             "name": "indi-engine/system",

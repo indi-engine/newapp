@@ -2180,7 +2180,7 @@ release_choices() {
 
   # If no releases exist in github for $repo - print error and return
   if [[ "${#releases[@]}" -eq 0 ]]; then
-    echo "No backup versions available on github for ${g}${repo}${d} repo"
+    echo -e "No backup versions available on github for ${g}${repo}${d} repo"
     set +e
     return 1
   fi

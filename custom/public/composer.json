@@ -10,11 +10,10 @@
       {
         "type": "package",
         "package": {
-          "name": "zendesk/maxwell",
-          "version": "1.39.4",
+          "name": "indi-engine/bridge",
           "dist": {
-            "type": "tar",
-            "url": "https://github.com/zendesk/maxwell/releases/download/v1.39.4/maxwell-1.39.4.tar.gz"
+            "type": "zip",
+            "url": "https://github.com/indi-engine/bridge/releases/download/latest/bridge.zip"
           }
         }
       },

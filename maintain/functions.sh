@@ -194,7 +194,7 @@ mysql_import() {
       import_possibly_chunked_dump "$file"
     done
 
-    # Run maxwell-specific sql
+    # Run debezium-specific sql
     prepare_privileges
 
   # Else if at least one dump file is missing
@@ -232,7 +232,7 @@ mysql_import() {
       download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
       import_possibly_chunked_dump "dump.sql.gz"
 
-      # Run maxwell-specific sql
+      # Run debezium-specific sql
       prepare_privileges
     fi
 
@@ -253,18 +253,17 @@ mysql_import() {
 # Prepare Change Data Capture / CDC privileges, and amend MYSQL_USER host
 prepare_privileges() {
   sync_host_for_MYSQL_USER
-  prepare_maxwell
+  prepare_debezium
 }
 
-# Run maxwell-specific sql
-prepare_maxwell() {
+# Run debezium-specific sql
+prepare_debezium() {
 
   # Get subnet as host
   local MYSQL_USER_host="$(get_mysql_host_prefix)"
 
-  # Grant privileges needed for maxwell
+  # Grant privileges needed for debezium
   export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
-  mysql -h mysql -u root -e "GRANT ALL ON "'`maxwell`'".* TO '$MYSQL_USER'@'$MYSQL_USER_host';"
   mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'$MYSQL_USER_host';"
   unset MYSQL_PWD
 }
@@ -1038,17 +1037,17 @@ restore_dump_from_local() {
   local prepend="${2:-}"
   local step="${3:-}"
 
-  # Global variables needed by (stop|start)_maxwell_and_closetab_if_need functions
+  # Global variables needed by (stop|start)_debezium_and_closetab_if_need functions
   declare -g closetab=false
-  declare -g maxwell=false
+  declare -g debezium=false
 
   # Shortcuts
-  fn1='stop_maxwell_and_closetab_if_need'
+  fn1='stop_debezium_and_closetab_if_need'
   fn2='reset_mysql'
   fn3='prepare_privileges'
-  fn4='start_maxwell_and_closetab_if_need'
+  fn4='start_debezium_and_closetab_if_need'
 
-  # Stop maxwell and/or closetab php processes if any running
+  # Stop debezium and/or closetab php processes if any running
   # Shut down mysql server, clean it's data/ dir and start back
   if [[ $step != "init" ]]; then
     if [[ $prepend != "" ]]; then
@@ -1065,10 +1064,10 @@ restore_dump_from_local() {
   done
   [[ "$prepend" != "" ]] && echo -ne "${d}"
 
-  # Run maxwell-specific sql
+  # Run debezium-specific sql
   if [[ "$prepend" != "" ]]; then $fn3 2>&1 | prepend "» "; else $fn3; fi
 
-  # If maxwell and/or closetab php processes were running - enable back
+  # If debezium and/or closetab php processes were running - enable back
   if [[ $step != "init" ]]; then
     if [[ "$prepend" != "" ]]; then $fn4 2>&1 | prepend "» "; else $fn4; fi
   fi
@@ -1191,22 +1190,22 @@ download_possibly_chunked_file() {
   fi
 }
 
-# Stop maxwell and/or closetab php processes if any running
-stop_maxwell_and_closetab_if_need() {
+# Stop debezium and/or closetab php processes if any running
+stop_debezium_and_closetab_if_need() {
 
-  # Get maxwell and closetab status
-  maxwell=false;  if curl http://apache/realtime/status/ 2>&1 | grep -q maxwell;  then maxwell=true; fi
+  # Get debezium and closetab status
+  debezium=false;  if curl http://apache/realtime/status/ 2>&1 | grep -q debezium;  then debezium=true; fi
   closetab=false; if curl http://apache/realtime/status/ 2>&1 | grep -q closetab; then closetab=true; fi
 
   # If disable each, if needed
-  if [[ $maxwell = true ]];  then curl http://apache/realtime/maxwell/disable/ > /dev/null 2>&1; fi
+  if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/disable/ > /dev/null 2>&1; fi
   if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/        > /dev/null 2>&1; fi
 }
 
-# If maxwell and/or closetab php processes were running - enable back
-start_maxwell_and_closetab_if_need() {
+# If debezium and/or closetab php processes were running - enable back
+start_debezium_and_closetab_if_need() {
   if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/ > /dev/null 2>&1; fi
-  if [[ $maxwell = true ]];  then curl http://apache/realtime/maxwell/enable/ > /dev/null 2>&1; fi
+  if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/enable/ > /dev/null 2>&1; fi
 }
 
 # Shut down mysql server, clean it's data/ dir and start back
@@ -2905,9 +2904,9 @@ restart_if_need() {
     if [[ "$scenario" == 1 ]]; then docker compose build --pull;  echo 3 > "$artifact"; scenario=3; fi
     if [[ "$scenario" == 2 ]]; then docker compose build;         echo 3 > "$artifact"; scenario=3; fi
 
-    # Stop maxwell and closetab, if need
+    # Stop debezium and closetab, if need
     if [ -n "$(docker compose ps -q wrapper)" ]; then
-      docker compose exec -it wrapper bash -c "source maintain/functions.sh; stop_maxwell_and_closetab_if_need"
+      docker compose exec -it wrapper bash -c "source maintain/functions.sh; stop_debezium_and_closetab_if_need"
     fi
 
     # Act further according to current restart level
@@ -3094,11 +3093,11 @@ migrate_if_need() {
       echo -ne "${d}"
 
     # Else restore database from pre-migrate backup:
-    # 1.Stop maxwell and/or closetab php processes if any running
+    # 1.Stop debezium and/or closetab php processes if any running
     # 2.Shut down mysql server, clean it's data/ dir and start back
     # 3.Import each (possibly chunked) dump
-    # 4.Run maxwell-specific sql
-    # 5.If maxwell and/or closetab php processes were running - enable back
+    # 4.Run debezium-specific sql
+    # 5.If debezium and/or closetab php processes were running - enable back
     else
       echo -e "Restoring database from pre-migrate backup:"
       restore_dump_from_local "data/before" "» "
@@ -3382,7 +3381,7 @@ composer_install() {
 
   # Stop php and java background processes, if any running within apache-container,
   # as their source code might be affected by 'composer install' command
-  stop_maxwell_and_closetab_if_need
+  stop_debezium_and_closetab_if_need
 
   # Print title, if given
   [[ "$title" != "" ]] && echo "$title"
@@ -3391,7 +3390,7 @@ composer_install() {
   composer -d custom/public install -n --no-ansi 2>&1 | grep -v " fund" | prepend "» "
 
   # Start php and java background processes back, if need
-  start_maxwell_and_closetab_if_need
+  start_debezium_and_closetab_if_need
 }
 
 # Check if apache is ready

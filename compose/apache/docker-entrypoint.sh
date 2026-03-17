@@ -165,7 +165,7 @@ fi
 
 # Start php background processes
 $run 'php indi -d realtime/closetab'
-$run 'php indi realtime/maxwell/enable'
+$run 'php indi realtime/debezium/enable'
 
 # Run original entrypoint script provided by base image
 echo "Apache started" && source /usr/local/bin/docker-php-entrypoint "apache2-foreground"

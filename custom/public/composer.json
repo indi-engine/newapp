@@ -11,9 +11,10 @@
         "type": "package",
         "package": {
           "name": "indi-engine/bridge",
+          "version": "v0.0.0",
           "dist": {
             "type": "zip",
-            "url": "https://github.com/indi-engine/bridge/releases/download/latest/bridge.zip"
+            "url": "https://github.com/indi-engine/bridge/releases/latest/download/bridge.zip"
           }
         }
       },

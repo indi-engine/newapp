@@ -20,11 +20,11 @@ else
 
   # Shortcuts
   dir="${1:-data}"
-  host="$MYSQL_HOST"
-  user="$MYSQL_USER"
-  pass="$MYSQL_PASSWORD"
-  name="$MYSQL_DATABASE"
-  dump="$dir/$MYSQL_DUMP"
+  host="$DB_HOST"
+  user="$DB_USER"
+  pass="$DB_PASSWORD"
+  name="$DB_NAME"
+  dump="$dir/$DB_DUMP"
   pref="${2:-}"
 
   # Goto project root

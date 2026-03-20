@@ -17,11 +17,11 @@ services:
     restart: unless-stopped
     environment:
       DOC: ${DOC}
-      MYSQL_HOST: mysql
       RABBITMQ_HOST: rabbitmq
-      MYSQL_USER: ${MYSQL_USER:-custom}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
-      MYSQL_NAME: ${MYSQL_DATABASE:-custom}
+      DB_HOST: ${DB_ENGINE}
+      DB_USER: ${DB_USER:-custom}
+      DB_PASSWORD: ${DB_PASSWORD:-custom}
+      DB_NAME: ${DB_NAME:-custom}
       LETS_ENCRYPT_NOTIFY: ${GIT_COMMIT_EMAIL:-}
       APP_ENV: ${APP_ENV}
     working_dir: ${DOC}
@@ -61,10 +61,10 @@ services:
       --default-time-zone='+00:00'
     environment:
       TZ: UTC
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER:-custom}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_USER: ${DB_USER:-custom}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-custom}
+      MYSQL_DATABASE: ${DB_NAME:-custom}
     volumes:
       - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
@@ -105,11 +105,11 @@ services:
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
       GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
-      MYSQL_USER: ${MYSQL_USER:-custom}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-custom}
-      MYSQL_DATABASE: ${MYSQL_DATABASE:-custom}
-      MYSQL_DUMP: ${MYSQL_DUMP}
-      MYSQL_HOST: mysql
+      DB_USER: ${DB_USER:-custom}
+      DB_PASSWORD: ${DB_PASSWORD:-custom}
+      DB_NAME: ${DB_NAME:-custom}
+      DB_DUMP: ${DB_DUMP}
+      DB_HOST: ${DB_ENGINE}
       RABBITMQ_HOST: rabbitmq
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-$LETS_ENCRYPT_DOMAIN}
       BACKUPS: ${BACKUPS:-}

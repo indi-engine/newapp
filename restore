@@ -83,7 +83,7 @@ else
 
       # If first arg is 'cancel' - cancel restore for source code, database and uploads, i.e. revert all to the state
       # before restore. We don't have something like 'cancel_restore_dump', because dump.sql.gz will be moved into
-      # data/ from data/before/ and then will be picked by mysql re-init
+      # data/ from data/before/ and then will be picked by DB re-init
       if [[ "$scenario" = "cancel" ]]; then
         cancel_restore_uploads_and_dump
         echo ""
@@ -239,7 +239,7 @@ else
     # If first argument is NOT given or is given as "dump"
     if [[ "$scenario" = "full" || "$scenario" = "dump" ]]; then
 
-      # Download dump, stop MySQL, purge MySQL data, and wait for mysql re-init
+      # Download dump, stop DB, purge DB data, and wait for DB re-init
       restore_dump "$selected" "$from_repo"
 
       # If $tag is given - print a new line

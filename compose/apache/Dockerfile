@@ -14,6 +14,5 @@ RUN sed -Ei 's~\t(filemode|pushurl)\s*=\s*.*~~I' vendor/indi-engine/client/.git/
   rm /usr/local/bin/composer
 ## </Composer> ##
 
-
 # Use custom entrypoint
 ENTRYPOINT ["bash", "custom-entrypoint.sh"]

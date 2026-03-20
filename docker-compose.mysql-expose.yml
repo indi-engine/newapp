@@ -1,4 +1,4 @@
 services:
   mysql:
     ports:
-      - "${MYSQL_EXPOSE_PORT}:3306"
+      - "${DB_EXPOSE_PORT}:3306"

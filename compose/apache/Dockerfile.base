@@ -33,9 +33,9 @@ RUN bash -c "DEBIAN_FRONTEND=noninteractive apt install -y postfix <<< $'2' && a
 
 ## <PHP extensions> ##
 RUN apt-get update && \
-    apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev && \
+    apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev libpq-dev && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
-    docker-php-ext-install -j$(nproc) gd zip pdo_mysql shmop intl sockets && \
+    docker-php-ext-install -j$(nproc) gd zip pdo_mysql pdo_pgsql shmop intl sockets && \
     apt-get install -y libmagickwand-dev imagemagick && pecl install imagick && docker-php-ext-enable imagick
 ## </PHP extensions> ##
 

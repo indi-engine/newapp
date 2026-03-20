@@ -112,7 +112,7 @@ if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 fi
 
 # Setup crontab
-env | grep -E "TERM|(MYSQL|RABBITMQ)_HOST|DOC" >> /etc/environment
+env | grep -E "TERM|(DB|RABBITMQ)_HOST|DOC" >> /etc/environment
 sed "s~\$DOC~$DOC~" '/var/www/crontab' | crontab -u www-data -
 service cron start
 
@@ -143,8 +143,8 @@ if [ -d "$DOC/data/upload" ]; then chmod +x "$DOC/data/upload"; fi
 # Command prefix to run something on behalf on www-data user
 run='/sbin/runuser '$user' -s /bin/bash -c'
 
-# Wait while mysql import is ready
-wait="Waiting for mysql import..."; test="curl -fs http://wrapper/import/done"
+# Wait while database import is ready
+wait="Waiting for database import..."; test="curl -fs http://wrapper/import/done"
 if ! $test; then
   while ! curl -fs http://wrapper/import/done; do
     [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."

@@ -1,6 +1,6 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql, os, shlex
+import subprocess, pika, json, pexpect, re, pymysql, psycopg2, os, shlex
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app
@@ -50,7 +50,7 @@ def get_dot_env(name):
     return ''
 
 # Send websocket message to open xterm in Indi Engine UI
-def ws(to, data, mq, mysql):
+def ws(to, data, mq, db):
 
     # Queue name prefix
     prefix = 'indi-engine.custom.opentab--'
@@ -64,7 +64,7 @@ def ws(to, data, mq, mysql):
         exists, mq = queue_exists(mq, prefix + to['token'])
         refresh = not exists
         if refresh:
-            mysql.execute("DELETE FROM `realtime` WHERE `type` = 'channel' AND `token` = %s", (to['token']))
+            db.execute("DELETE FROM `realtime` WHERE `type` = 'channel' AND `token` = %s", (to['token']))
     else:
         refresh = True
 
@@ -72,14 +72,14 @@ def ws(to, data, mq, mysql):
     if refresh:
 
         # Get browser tab, if any opened by the user that can be identified by that pair
-        mysql.execute(
+        db.execute(
             "SELECT `token` FROM `realtime` WHERE `type` = 'channel' AND `roleId` = %s AND `adminId` = %s",
             (to['roleId'], to['adminId'])
         )
 
         # If at least one found - refresh token
-        if mysql.rowcount:
-            to['token'] = mysql.fetchone()['token']
+        if db.rowcount:
+            to['token'] = db.fetchone()['token']
 
     # Append title
     if 'title' not in data:
@@ -104,9 +104,12 @@ def bash_stream(
     nn = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
     mq = nn.channel()
 
-    # Instantiate mysql connection with db cursor
-    mysql_conn = pymysql.connect(host='mysql', user='custom', password='custom', database='custom', autocommit=True)
-    mysql = mysql_conn.cursor(pymysql.cursors.DictCursor)
+    # Get DB_ENGINE from .env
+    engine = get_dot_env('DB_ENGINE')
+
+    # Instantiate connection with db cursor
+    db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
+    db = db_conn.cursor(pymysql.cursors.DictCursor)
 
     # Start bash script in a pseudo-terminal
     child = pexpect.spawn('bash -c "' + command + '"', encoding='utf-8')
@@ -115,7 +118,7 @@ def bash_stream(
     to=data.get('to')
 
     # Send websocket message to open xterm in Indi Engine UI
-    mq = ws(to, data, mq, mysql)
+    mq = ws(to, data, mq, db)
 
     # While script is running
     while True:
@@ -135,7 +138,7 @@ def bash_stream(
                 'type': data.get('type'),
                 'id': data.get('id'),
                 'bytes': bytes
-            }, mq, mysql)
+            }, mq, db)
 
         # If pexpect is SURE the script is done and the PTY is closed - break the loop
         except pexpect.EOF:
@@ -166,7 +169,7 @@ def bash_stream(
         'id': data.get('id'),
         'bytes': bytes,
         'closable': True
-    }, mq, mysql)
+    }, mq, db)
 
     # If it's a restore-command that affected database state - send ws-message to reload windows and menu
     if (
@@ -174,14 +177,14 @@ def bash_stream(
         and child.exitstatus == 0 and child.signalstatus is None
         and data.get('scenario') in ['full', 'dump', 'cancel']
     ):
-        mq = ws(to, {'type': 'restored'}, mq, mysql)
+        mq = ws(to, {'type': 'restored'}, mq, db)
 
     # Clone rabbitmq connection
     nn.close()
 
-    # Close mysql cursor and connection
-    mysql.close()
-    mysql_conn.close()
+    # Close db cursor and connection
+    db.close()
+    db_conn.close()
 
     # Return
     return 'Executed', 200
@@ -348,7 +351,7 @@ def commit_identity():
         'GIT_COMMIT_EMAIL': get_dot_env('GIT_COMMIT_EMAIL')
     }), 200
 
-# Get mysql import status
+# Get db import status
 @app.route('/import/done', methods=['GET'])
 def import_done():
     return '', 200 if os.path.exists('/var/lib/mysql/import.done') else 404

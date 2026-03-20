@@ -32,8 +32,8 @@ getup() {
     source ~/.indi/pre-getup
   fi
 
-  # Import files mentioned in MYSQL_DUMP with preliminary download, if need
-  mysql_import
+  # Import files mentioned in DB_DUMP with preliminary download, if need
+  db_import
 
   # Pick LETS_ENCRYPT_DOMAIN and EMAIL_SENDER_DOMAIN from .env file, if possible
   LETS_ENCRYPT_DOMAIN="$(get_env "LETS_ENCRYPT_DOMAIN")"
@@ -152,11 +152,11 @@ getup() {
 }
 
 # shellcheck disable=SC2120
-mysql_import() {
+db_import() {
 
-  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  # If docker is installed - call db_import function within the wrapper-container environment and return 0
   if command -v docker >/dev/null 2>&1; then
-    docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; mysql_import"
+    docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; db_import"
     return 0
   fi
 
@@ -174,7 +174,7 @@ mysql_import() {
 
   # Collect missing dump files
   missing=""
-  for dump in $MYSQL_DUMP; do
+  for dump in $DB_DUMP; do
     local="data/$dump"
     shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
     if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
@@ -190,7 +190,7 @@ mysql_import() {
   if [[ "$missing" = "" ]]; then
 
     # Import the dump files that we have
-    for file in $MYSQL_DUMP; do
+    for file in $DB_DUMP; do
       import_possibly_chunked_dump "$file"
     done
 
@@ -250,9 +250,9 @@ mysql_import() {
   touch "$done"
 }
 
-# Prepare Change Data Capture / CDC privileges, and amend MYSQL_USER host
+# Prepare Change Data Capture / CDC privileges, and amend DB_USER host
 prepare_privileges() {
-  sync_host_for_MYSQL_USER
+  sync_host_for_DB_USER
   prepare_debezium
 }
 
@@ -260,31 +260,31 @@ prepare_privileges() {
 prepare_debezium() {
 
   # Get subnet as host
-  local MYSQL_USER_host="$(get_mysql_host_prefix)"
+  local DB_USER_host="$(get_db_host_prefix)"
 
   # Grant privileges needed for debezium
-  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
-  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$MYSQL_USER'@'$MYSQL_USER_host';"
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
   unset MYSQL_PWD
 }
 
-# Get subnet for current container and use it as a host for MYSQL_USER
-# so that the connections on behalf of MYSQL_USER to NOT be possible
+# Get subnet for current container and use it as a host for DB_USER
+# so that the connections on behalf of DB_USER to NOT be possible
 # from outside of the Indi Engine's Docker Compose project
-sync_host_for_MYSQL_USER() {
+sync_host_for_DB_USER() {
 
   # Get subnet as host
-  local MYSQL_USER_host="$(get_mysql_host_prefix)"
+  local DB_USER_host="$(get_db_host_prefix)"
 
-  # Update host for MYSQL_USER
-  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
-  mysql -h mysql -u root mysql -e "UPDATE user SET host = '$MYSQL_USER_host' WHERE user = '$MYSQL_USER';"
+  # Update host for DB_USER
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+  mysql -h mysql -u root mysql -e "UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
   mysql -h mysql -u root mysql -e "FLUSH PRIVILEGES;"
   unset MYSQL_PWD
 }
 
-# Get the current Docker Compose project's subnet in a format usable as Host for MYSQL_USER
-get_mysql_host_prefix() {
+# Get the current Docker Compose project's subnet in a format usable as Host for DB_USER
+get_db_host_prefix() {
 
   # Get IP address
   local ip="$(hostname -i)"
@@ -844,7 +844,7 @@ backup_prepared_assets() {
   fi
 
   # Backup dump
-  upload_asset "$dir/$MYSQL_DUMP" "$tag" "» "
+  upload_asset "$dir/$DB_DUMP" "$tag" "» "
 }
 
 # Backup current database dump on github into given release assets of current repo
@@ -1020,7 +1020,7 @@ restore_dump() {
 
   # If $release arg is given - download each (possibly chunked) dump file
   if [[ "$release" != "" ]]; then
-    for file in $MYSQL_DUMP; do
+    for file in $DB_DUMP; do
       download_possibly_chunked_file "$repo" "$release" "$file"
     done
   fi
@@ -1043,12 +1043,12 @@ restore_dump_from_local() {
 
   # Shortcuts
   fn1='stop_debezium_and_closetab_if_need'
-  fn2='reset_mysql'
+  fn2='reset_db'
   fn3='prepare_privileges'
   fn4='start_debezium_and_closetab_if_need'
 
   # Stop debezium and/or closetab php processes if any running
-  # Shut down mysql server, clean it's data/ dir and start back
+  # Shut down db server, clean it's data/ dir and start back
   if [[ $step != "init" ]]; then
     if [[ $prepend != "" ]]; then
       $fn1 2>&1 | prepend "$prepend"; $fn2 2>&1 | prepend "$prepend"
@@ -1059,7 +1059,7 @@ restore_dump_from_local() {
 
   # Import each (possibly chunked) dump
   [[ "$prepend" != "" ]] && echo -ne "${gray}"
-  for file in $MYSQL_DUMP; do
+  for file in $DB_DUMP; do
     import_possibly_chunked_dump "$file" "$dir" "$prepend"
   done
   [[ "$prepend" != "" ]] && echo -ne "${d}"
@@ -1087,10 +1087,10 @@ import_possibly_chunked_dump() {
   # Shortcuts
   local path="$dir/$dump"
   local msg="${prepend}Importing $dump"
-  local run="mysql -h mysql -u $MYSQL_USER $MYSQL_DATABASE"
+  local run="mysql -h mysql -u $DB_USER $DB_NAME"
 
   # Prevent warning
-  export MYSQL_PWD=$MYSQL_PASSWORD
+  export MYSQL_PWD="$DB_PASSWORD"
 
   # If dump file exists in data/ directory - import
   if [[ -f "$path" ]]; then
@@ -1208,11 +1208,11 @@ start_debezium_and_closetab_if_need() {
   if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/enable/ > /dev/null 2>&1; fi
 }
 
-# Shut down mysql server, clean it's data/ dir and start back
-reset_mysql() {
+# Shut down db server, clean it's data/ dir and start back
+reset_db() {
 
   # Shut down mysql
-  export MYSQL_PWD="$(get_env "MYSQL_ROOT_PASSWORD")"
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
   local msg="Shutting down MySQL server..." && echo "$msg"
   mysql -h mysql -u root -e "SHUTDOWN"
   unset MYSQL_PWD
@@ -1257,7 +1257,7 @@ reset_mysql() {
         exit 1
       fi
 
-      # If mysql re-init is done: if we need to wait a bit more - do wait, else break
+      # If db re-init is done: if we need to wait a bit more - do wait, else break
       if [ -f "$done" ]; then
         if [[ "$waitTimeout" != "0" ]]; then waitTimeout=$((waitTimeout - 1)); else break; fi
       fi
@@ -1456,8 +1456,8 @@ prepare_env() {
   mv $PROD .env
 }
 
-# Check if MYSQL_ROOT_PASSWORD is left empty, and if yes - generate a random value
-env_validate_MYSQL_ROOT_PASSWORD() {
+# Check if DB_ROOT_PASSWORD is left empty, and if yes - generate a random value
+env_validate_DB_ROOT_PASSWORD() {
   if [[ "$INPUT_VALUE" = "" ]]; then
     # Excluded chars #$<>&|\;()! to prevent problems on CLI
     INPUT_VALUE="$(echo "$(LC_ALL=C tr -dc 'A-Za-z0-9@%^*\-_=+[\]{}:,.?' < /dev/urandom | head -c32)")"
@@ -1592,15 +1592,15 @@ env_GIT_COMMIT_EMAIL() {
   fi
 }
 
-# Amend COMPOSE_FILE for cases when mysql needs to be exposed
+# Amend COMPOSE_FILE for cases when db needs to be exposed
 env_COMPOSE_FILE() {
 
   # Variables
-  local MYSQL_EXPOSE_PORT="$(grep "^MYSQL_EXPOSE_PORT=" .env.prod | cut -d '=' -f 2-)"
+  local DB_EXPOSE_PORT="$(grep "^DB_EXPOSE_PORT=" .env.prod | cut -d '=' -f 2-)"
   local insert="docker-compose.mysql-expose.yml"
 
-  # If mysql expose is not yet in the list - add it right after default YAML
-  if [[ "$MYSQL_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$insert"* ]]; then
+  # If db expose is not yet in the list - add it right after default YAML
+  if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$insert"* ]]; then
     DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/docker-compose.yml:${insert}}"
   fi
 
@@ -1762,7 +1762,7 @@ ghcli_install() {
 # Make sure 'custom/public/data/upload' dir is created and filled, if does not exist
 init_uploads_if_need() {
 
-  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  # If docker is installed - call db_import function within the wrapper-container environment and return 0
   if command -v docker >/dev/null 2>&1; then
     docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; init_uploads_if_need"
     return 0
@@ -1836,7 +1836,7 @@ init_uploads_if_need() {
 # so that any further deployments won't rely on parent repo releases anymore
 make_very_first_release_if_need() {
 
-  # If docker is installed - call mysql_import function within the wrapper-container environment and return 0
+  # If docker is installed - call db_import function within the wrapper-container environment and return 0
   if command -v docker >/dev/null 2>&1; then
     docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; make_very_first_release_if_need"
     return 0
@@ -2253,7 +2253,7 @@ cancel_restore_source() {
 cancel_restore_uploads_and_dump() {
 
   # Move uploads.zip and dump.sql.gz files from data/before/ to data/
-  # for those to be further picked by restore_uploads() call and mysql re-init
+  # for those to be further picked by restore_uploads() call and db re-init
   src="data/before" && trg="data"
   echo -n "Moving uploads.zip and dump.sql.gz from $src/ into $trg/..."
   if [ -d $src ]; then
@@ -2467,7 +2467,7 @@ mysql_entrypoint() {
   # Call the original entrypoint script
   /usr/local/bin/docker-entrypoint.sh "$@"
 
-  # If we reached this line, it means mysql was shut down
+  # If we reached this line, it means db was shut down
   echo "MySQL Server has been shut down"
 
   # Create a file within data-dir to indicate shutdown is completed
@@ -2692,7 +2692,7 @@ wrapper_entrypoint() {
   [[ ! -z $GH_TOKEN_CUSTOM_RW ]] && export GH_TOKEN="${GH_TOKEN_CUSTOM_RW:-}"
 
   # Setup crontab
-  export TERM=xterm && env | grep -E "MYSQL|GIT|GH|DOC|EMAIL|TERM|BACKUPS|APP_ENV" >> /etc/environment
+  export TERM=xterm && env | grep -E "DB|GIT|GH|DOC|EMAIL|TERM|BACKUPS|APP_ENV" >> /etc/environment
   sed "s~\$DOC~$DOC~" 'compose/wrapper/crontab' | crontab -
   service cron start
 
@@ -2701,8 +2701,8 @@ wrapper_entrypoint() {
     gh repo set-default "$(get_current_repo)"
   fi
 
-  # Sync MYSQL_USER host
-  sync_host_for_MYSQL_USER
+  # Sync DB_USER host
+  sync_host_for_DB_USER
 
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
@@ -2944,13 +2944,13 @@ get_migration_commit() {
   # Arguments
   local fraction="${1:-}"
 
-  # Add mysql password to env
-  export MYSQL_PWD="$MYSQL_PASSWORD"
+  # Add db password to env
+  export MYSQL_PWD="$DB_PASSWORD"
 
   # Get commit
-  mysql -u "$MYSQL_USER" -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
+  mysql -u "$DB_USER" -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
 
-  # Remove mysql password from env
+  # Remove db password from env
   unset MYSQL_PWD
 }
 
@@ -2961,13 +2961,13 @@ set_migration_commit() {
   local fraction=$1
   local commit=$2
 
-  # Add mysql password to env
-  export MYSQL_PWD="$MYSQL_PASSWORD"
+  # Add db password to env
+  export MYSQL_PWD="$DB_PASSWORD"
 
   # Get commit
-  mysql -u "$MYSQL_USER" -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
+  mysql -u "$DB_USER" -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
 
-  # Remove mysql password from env
+  # Remove db password from env
   unset MYSQL_PWD
 }
 
@@ -3094,7 +3094,7 @@ migrate_if_need() {
 
     # Else restore database from pre-migrate backup:
     # 1.Stop debezium and/or closetab php processes if any running
-    # 2.Shut down mysql server, clean it's data/ dir and start back
+    # 2.Shut down db server, clean it's data/ dir and start back
     # 3.Import each (possibly chunked) dump
     # 4.Run debezium-specific sql
     # 5.If debezium and/or closetab php processes were running - enable back

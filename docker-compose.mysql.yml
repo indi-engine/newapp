@@ -38,6 +38,10 @@ services:
       - SYS_NICE
     entrypoint: ["bash", "custom-entrypoint.sh"]
   wrapper:
+    depends_on:
+      mysql:
+        condition: service_healthy
+        restart: true
     volumes:
       - mysql_server_data:/var/lib/db_engine
       - mysql_client_binaries:/usr/bin/db_engine_client_binaries

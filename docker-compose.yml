@@ -78,10 +78,6 @@ services:
       APP_ENV: ${APP_ENV}
       PYTHONUNBUFFERED: 1
     working_dir: ${DOC}
-    depends_on:
-      mysql:
-        condition: service_healthy
-        restart: true
     healthcheck:
       test: ["CMD-SHELL", "timeout 1 bash -c '</dev/tcp/localhost/80' || exit 1"]
       interval: 5s

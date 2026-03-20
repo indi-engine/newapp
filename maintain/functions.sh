@@ -167,7 +167,7 @@ db_import() {
   set -eu -o pipefail
 
   # Path to a file to be created once import is done
-  local done=/var/lib/mysql/import.done;
+  local done=/var/lib/db_engine/import.done;
 
   # If import is done - do nothing
   if [[ -f "$done" ]]; then return 0; fi
@@ -1073,7 +1073,7 @@ restore_dump_from_local() {
   fi
 
   # Create a file indicating that import is done
-  touch "/var/lib/mysql/import.done"
+  touch "/var/lib/db_engine/import.done"
 }
 
 # Import dump with a given filename, or count
@@ -1211,7 +1211,7 @@ start_debezium_and_closetab_if_need() {
 # Shut down db server, clean it's data/ dir and start back
 reset_db() {
 
-  # Shut down mysql
+  # Shut down db server
   export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
   local msg="Shutting down MySQL server..." && echo "$msg"
   mysql -h mysql -u root -e "SHUTDOWN"
@@ -1220,7 +1220,7 @@ reset_db() {
   # Wait until shutdown is really completed
   local timeout=60
   local elapsed=0
-  local done="/var/lib/mysql/shutdown.done"
+  local done="/var/lib/db_engine/shutdown.done"
   while :; do
     clear_last_lines 1
     echo "$msg waiting for completion ($elapsed s)"
@@ -1229,20 +1229,20 @@ reset_db() {
     if [ -f "$done" ] || [ $elapsed -ge $timeout ]; then break; fi
   done
 
-  # If shutdown file was created by mysql-container custom-entrypoint.sh script
+  # If shutdown file was created by db container's custom-entrypoint.sh script
   if [ -f "$done" ]; then
 
     # It means mysqld process exited gracefully, i.e. shutdown is really completed
     clear_last_lines 1
     echo "$msg Done"
 
-    # Empty mysql_server_data volume
-    echo -n "Removing all data from MySQL server..." && rm -rf /var/lib/mysql/* && echo -e " Done"
+    # Empty *_server_data volume
+    echo -n "Removing all data from MySQL server..." && rm -rf /var/lib/db_engine/* && echo -e " Done"
 
     # Wait until re-init is really completed
     local msg="Starting up MySQL server back..." && echo "$msg"
     local elapsed=0
-    local done="/var/lib/mysql/init.done"
+    local done="/var/lib/db_engine/init.done"
     local initTimeout=60
     local waitTimeout=2
     while :; do
@@ -1597,11 +1597,18 @@ env_COMPOSE_FILE() {
 
   # Variables
   local DB_EXPOSE_PORT="$(grep "^DB_EXPOSE_PORT=" .env.prod | cut -d '=' -f 2-)"
-  local insert="docker-compose.mysql-expose.yml"
+  local DB_ENGINE="$(grep "^DB_ENGINE=" .env.prod | cut -d '=' -f 2-)"
+  local db_engine_yml="docker-compose.$DB_ENGINE.yml"
+  local db_engine_expose_yml="docker-compose.$DB_ENGINE-expose.yml"
+
+  # If db_engine_yml is not yet in the list - add it right after default YAML
+  if [[ "$DEFAULT_VALUE" != *"$db_engine_yml"* ]]; then
+    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/&:${db_engine_yml}}"
+  fi
 
   # If db expose is not yet in the list - add it right after default YAML
-  if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$insert"* ]]; then
-    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/docker-compose.yml:${insert}}"
+  if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$db_engine_expose_yml"* ]]; then
+    DEFAULT_VALUE="${DEFAULT_VALUE/${db_engine_yml}/&:${db_engine_expose_yml}}"
   fi
 
   # If we're on windows - spoof colon with semi-colon
@@ -2608,8 +2615,8 @@ wrapper_entrypoint() {
   # Setup git filemode
   git config --global core.filemode false
 
-  # Copy 'mysql' and 'mysqldump' binaries to /usr/bin, to make it possible to restore/backup the whole database as sql-file
-  cp /usr/bin/mysql_client_binaries/* /usr/bin/
+  # Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
+  cp /usr/bin/db_engine_client_binaries/* /usr/bin/
 
   # Logs dir
   logs="$DOC/var/log/compose/wrapper"

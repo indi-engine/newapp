@@ -354,7 +354,7 @@ def commit_identity():
 # Get db import status
 @app.route('/import/done', methods=['GET'])
 def import_done():
-    return '', 200 if os.path.exists('/var/lib/mysql/import.done') else 404
+    return '', 200 if os.path.exists('/var/lib/db_engine/import.done') else 404
 
 # Update and migrate, if need
 @app.route('/update', methods=['POST'])

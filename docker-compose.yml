@@ -43,44 +43,6 @@ services:
       - ./var/log/custom:/var/log/custom
       - ./var/tmp/:/var/www/tmp
 
-  mysql:
-    image: mysql:8.0.36-debian
-    restart: unless-stopped
-    command:
-      --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
-      --character-set-server=utf8mb4
-      --collation-server=utf8mb4_unicode_ci
-      --innodb_buffer_pool_size=4294967296
-      --wait_timeout=31536000
-      --slow_query_log=ON
-      --general-log=OFF
-      --general-log-file=/var/log/mysql/general.log
-      --slow-query-log-file=/var/log/mysql/slow.log
-      --binlog_expire_logs_seconds=86400
-      --log-bin
-      --default-time-zone='+00:00'
-    environment:
-      TZ: UTC
-      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_USER: ${DB_USER:-custom}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-custom}
-      MYSQL_DATABASE: ${DB_NAME:-custom}
-    volumes:
-      - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
-      - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
-      - mysql_server_data:/var/lib/mysql
-      - mysql_client_binaries:/usr/bin/volumed
-      - ./var/log/compose/mysql:/var/log/mysql
-    healthcheck:
-      test: mysqladmin ping && [ -f /var/lib/mysql/init.done ]
-      start_period: 3m
-      interval: 5s
-    security_opt:
-      - no-new-privileges:true
-    cap_add:
-      - SYS_NICE
-    entrypoint: ["bash", "custom-entrypoint.sh"]
-
   rabbitmq:
     image: rabbitmq:3.10-management-alpine
     restart: unless-stopped
@@ -130,13 +92,9 @@ services:
       - ./:${DOC}/
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
-      - mysql_server_data:/var/lib/mysql
-      - mysql_client_binaries:/usr/bin/mysql_client_binaries
       - ./var/log/custom:/var/log/custom
 
 volumes:
-  mysql_server_data:
-  mysql_client_binaries:
   rabbitmq:
   letsencrypt:
   opendkim:

@@ -3055,14 +3055,37 @@ get_migration_commit() {
   # Arguments
   local fraction="${1:-}"
 
-  # Add db password to env
-  export MYSQL_PWD="$DB_PASSWORD"
+  # Run query
+  db_query "SELECT \`defaultValue\` FROM \`field\` WHERE \`alias\` = 'migration-commit-$fraction'"
+}
 
-  # Get commit
-  mysql -u "$DB_USER" -D custom -N -e 'SELECT `defaultValue` FROM `field` WHERE `alias` = "migration-commit-'"$fraction"'"'
+# Run sql query
+db_query() {
 
-  # Remove db password from env
-  unset MYSQL_PWD
+  # Argument
+  local sql="$1"
+  local sql="$1"
+
+  # Shortcut
+  local engine="$(get_env "DB_ENGINE")"
+  local host="$engine"
+  local user="$DB_USER"
+  local pass="$DB_PASSWORD"
+  local name="$DB_NAME"
+
+  # Run engine-specific query
+  if [[ "$engine" == "mysql" ]]; then
+
+    export MYSQL_PWD="$pass"
+    mysql -h "$host" -u "$user" -D "$name" -N -e "$sql"
+    unset MYSQL_PWD
+
+  elif [[ "$engine" == "postgres" ]]; then
+
+    export PGPASSWORD="$pass"
+    psql -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
+    unset PGPASSWORD
+  fi
 }
 
 # Set hash of the commit up to which the db migrations are executed
@@ -3072,14 +3095,8 @@ set_migration_commit() {
   local fraction=$1
   local commit=$2
 
-  # Add db password to env
-  export MYSQL_PWD="$DB_PASSWORD"
-
-  # Get commit
-  mysql -u "$DB_USER" -D custom -N -e 'UPDATE `field` SET `defaultValue` = "'"$commit"'" WHERE `alias` = "migration-commit-'"$fraction"'"'
-
-  # Remove db password from env
-  unset MYSQL_PWD
+  # Run query
+  db_query "UPDATE \`field\` SET \`defaultValue\` = '$commit' WHERE \`alias\` = 'migration-commit-$fraction'"
 }
 
 # Run database migrations, if any new ones detected for system and/or custom fractions

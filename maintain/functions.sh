@@ -189,6 +189,9 @@ db_import() {
   # If no expected dump files are missing
   if [[ "$missing" = "" ]]; then
 
+    # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+    create_DB_USER_if_need
+
     # Import the dump files that we have
     for file in $DB_DUMP; do
       import_possibly_chunked_dump "$file"
@@ -250,6 +253,33 @@ db_import() {
   touch "$done"
 }
 
+# Create $DB_USER - needed if $DB_ENGINE is 'postgres',
+# as only root user is created by default out of-the-box
+create_DB_USER_if_need() {
+
+  # If we're on Postgres
+  if [[ "$(get_env "DB_ENGINE")" == "postgres" ]]; then
+
+    # Set password to be picked by postgres CLI
+    export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+
+    # Prepare sql to create user with basic rights
+    sql="
+      DO \$\$ BEGIN CREATE USER \"${DB_USER}\" WITH PASSWORD '${DB_PASSWORD}';
+      EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
+      GRANT CONNECT ON DATABASE \"${DB_NAME}\" TO \"${DB_USER}\";
+      GRANT CREATE ON SCHEMA public TO \"${DB_USER}\";
+      GRANT USAGE ON SCHEMA public TO \"${DB_USER}\";
+    "
+
+    # Run sql
+    echo "$sql" | psql -h postgres -U "${DB_ROOT_USER:-postgres}" -d "${DB_NAME}" -q -v ON_ERROR_STOP=1
+
+    # Unset password
+    unset PGPASSWORD
+  fi
+}
+
 # Prepare Change Data Capture / CDC privileges, and amend DB_USER host
 prepare_privileges() {
   sync_host_for_DB_USER
@@ -261,11 +291,14 @@ prepare_debezium() {
 
   # Get subnet as host
   local DB_USER_host="$(get_db_host_prefix)"
+  local engine="$(get_env "DB_ENGINE")"
 
-  # Grant privileges needed for debezium
-  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-  mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
-  unset MYSQL_PWD
+  if [[ "$engine" == "mysql" ]]; then
+    # Grant privileges needed for debezium
+    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
+    unset MYSQL_PWD
+  fi
 }
 
 # Get subnet for current container and use it as a host for DB_USER
@@ -275,12 +308,15 @@ sync_host_for_DB_USER() {
 
   # Get subnet as host
   local DB_USER_host="$(get_db_host_prefix)"
+  local engine="$(get_env "DB_ENGINE")"
 
-  # Update host for DB_USER
-  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-  mysql -h mysql -u root mysql -e "UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
-  mysql -h mysql -u root mysql -e "FLUSH PRIVILEGES;"
-  unset MYSQL_PWD
+  if [[ "$engine" == "mysql" ]]; then
+    # Update host for DB_USER
+    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    mysql -h mysql -u root mysql -e "UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
+    mysql -h mysql -u root mysql -e "FLUSH PRIVILEGES;"
+    unset MYSQL_PWD
+  fi
 }
 
 # Get the current Docker Compose project's subnet in a format usable as Host for DB_USER
@@ -1059,6 +1095,10 @@ restore_dump_from_local() {
 
   # Import each (possibly chunked) dump
   [[ "$prepend" != "" ]] && echo -ne "${gray}"
+
+  # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+  create_DB_USER_if_need
+
   for file in $DB_DUMP; do
     import_possibly_chunked_dump "$file" "$dir" "$prepend"
   done
@@ -1087,10 +1127,18 @@ import_possibly_chunked_dump() {
   # Shortcuts
   local path="$dir/$dump"
   local msg="${prepend}Importing $dump"
-  local run="mysql -h mysql -u $DB_USER $DB_NAME"
+  local engine="$(get_env "DB_ENGINE")"
+
+  if [[ "$engine" == "mysql" ]]; then
+    local run="mysql -h mysql -u $DB_USER $DB_NAME"
+    local passenv=MYSQL_PWD
+  elif [[ "$engine" == "postgres" ]]; then
+    local run="psql -h postgres -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
+    local passenv=PGPASSWORD
+  fi
 
   # Prevent warning
-  export MYSQL_PWD="$DB_PASSWORD"
+  export "${passenv}=${DB_PASSWORD}"
 
   # If dump file exists in data/ directory - import
   if [[ -f "$path" ]]; then
@@ -1121,7 +1169,7 @@ import_possibly_chunked_dump() {
   fi
 
   # Unset back
-  unset MYSQL_PWD
+  unset "$passenv"
 }
 
 # Download possibly chunked file from github, based on glob pattern
@@ -2435,7 +2483,8 @@ backup_before_restore() {
 mysql_entrypoint() {
 
   # Path to a file to be created once init is done
-  done=/var/lib/mysql/init.done;
+  local data="/var/lib/mysql"
+  local done="$data/init.done"
 
   # Path where mysql binaries should be copied
   vmd="/usr/bin/volumed"
@@ -2444,7 +2493,7 @@ mysql_entrypoint() {
   if [[ ! -f "$vmd/mysql" ]]; then
 
     # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
-    # those two binaries with apache-container to be able to export/import sql-files
+    # those two binaries with wrapper-container to be able to export/import sql-files
     src="/usr/bin"
     cp "$src/mysql"     "$vmd/mysql"
     cp "$src/mysqldump" "$vmd/mysqldump"
@@ -2467,7 +2516,7 @@ mysql_entrypoint() {
     if ! grep -q "init.done" $native; then
 
       # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
-      sed -i 's~Ready for start up."~&\n\t\t\ttouch /var/lib/mysql/init.done~' $native
+      sed -i 's~Ready for start up."~&\n\t\t\ttouch '$done'~' $native
     fi
   fi
 
@@ -2478,12 +2527,11 @@ mysql_entrypoint() {
   echo "MySQL Server has been shut down"
 
   # Create a file within data-dir to indicate shutdown is completed
-  touch /var/lib/mysql/shutdown.done
+  touch "$data/shutdown.done"
 
   # Wait until shutdown is really completed
   local timeout=5
   local elapsed=0
-  local data="/var/lib/mysql"
   while [ ! -z "$(ls -A $data)" ] && [ $elapsed -lt $timeout ]; do
     echo "Waiting for data-directory to be emptied... ($elapsed s)"
     sleep 1
@@ -2498,6 +2546,62 @@ mysql_entrypoint() {
 
     # Re-init
     mysql_entrypoint "$@"
+  fi
+}
+
+postgres_entrypoint() {
+
+  # Path to a file to be created once init is done
+  local data="/var/lib/postgresql/data"
+  local done="$data/init.done"
+
+  # If init is not done
+  if [[ ! -f "$done" ]]; then
+
+    # Change dir
+    cd /docker-entrypoint-initdb.d
+
+    # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
+    # that are recognized by mysql entrypoint as importable/executable ones
+    rm -f ./*.sh ./*.sql ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
+
+    # Shortcut to native entrypoint
+    native="/usr/local/bin/docker-entrypoint.sh"
+
+    # If 'init.done' file creation code was not yet added to native entrypoint script
+    if ! grep -q "init.done" $native; then
+
+      # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
+      sed -i 's~unset PGPASSWORD~&\n\t\t\ttouch '$done'~' $native
+    fi
+  fi
+
+  # Call the original entrypoint script
+  /usr/local/bin/docker-entrypoint.sh "$@"
+
+  # If we reached this line, it means db was shut down
+  echo "Postgres has been shut down"
+
+  # Create a file within data-dir to indicate shutdown is completed
+  touch "$data/shutdown.done"
+
+  # Wait until shutdown is really completed
+  local timeout=5
+  local elapsed=0
+  while [ ! -z "$(ls -A $data)" ] && [ $elapsed -lt $timeout ]; do
+    echo "Waiting for data-directory to be emptied... ($elapsed s)"
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  # If data-directory was emptied
+  if [ -z "$(ls -A $data)" ]; then
+
+    # We assume it was done for restore
+    echo "Postgres data-directory has been emptied, so initiating the restore..."
+
+    # Re-init
+    postgres_entrypoint "$@"
   fi
 }
 
@@ -2616,7 +2720,7 @@ wrapper_entrypoint() {
   git config --global core.filemode false
 
   # Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
-  cp /usr/bin/db_engine_client_binaries/* /usr/bin/
+  [[ -d /usr/bin/db_engine_client_binaries ]] && cp /usr/bin/db_engine_client_binaries/* /usr/bin/
 
   # Logs dir
   logs="$DOC/var/log/compose/wrapper"

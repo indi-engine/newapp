@@ -1,0 +1,49 @@
+services:
+
+  postgres:
+    image: postgres:16-bookworm
+    restart: unless-stopped
+    command: >
+      postgres
+      -c client_encoding=UTF8
+      -c shared_buffers=4GB
+      -c work_mem=64MB
+      -c logging_collector=on
+      -c log_statement=none
+      -c log_min_duration_statement=10000
+      -c log_rotation_age=1440
+      -c log_directory=/var/log/postgresql
+      -c log_filename=postgresql.log
+      -c wal_keep_size=1GB
+      -c wal_level=replica
+      -c timezone=UTC
+    environment:
+      TZ: UTC
+      POSTGRES_PASSWORD: ${DB_ROOT_PASSWORD}
+      POSTGRES_USER: ${DB_ROOT_USER:-postgres}
+      POSTGRES_DB: ${DB_NAME:-custom}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=en_US.UTF-8 --lc-ctype=en_US.UTF-8"
+    volumes:
+      - ./compose/postgres/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
+      - postgres_server_data:/var/lib/postgresql/data
+      - ./var/log/compose/postgres:/var/log/postgresql
+    healthcheck:
+      test: pg_isready -U ${DB_USER:-custom} -d ${DB_NAME:-custom} && [ -f /var/lib/postgresql/data/init.done ]
+      start_period: 3m
+      interval: 5s
+    security_opt:
+      - no-new-privileges:true
+    entrypoint: ["bash", "custom-entrypoint.sh"]
+
+  wrapper:
+    depends_on:
+      postgres:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - postgres_server_data:/var/lib/db_engine
+
+volumes:
+  postgres_server_data:
+  postgres_client_binaries:

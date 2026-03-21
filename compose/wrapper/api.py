@@ -1,6 +1,6 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql, psycopg2, os, shlex
+import subprocess, pika, json, pexpect, re, pymysql, os, shlex
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app

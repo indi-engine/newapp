@@ -37,6 +37,7 @@ services:
     cap_add:
       - SYS_NICE
     entrypoint: ["bash", "custom-entrypoint.sh"]
+
   wrapper:
     depends_on:
       mysql:

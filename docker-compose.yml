@@ -18,7 +18,7 @@ services:
     environment:
       DOC: ${DOC}
       RABBITMQ_HOST: rabbitmq
-      DB_HOST: ${DB_ENGINE}
+      DB_ENGINE: ${DB_ENGINE}
       DB_USER: ${DB_USER:-custom}
       DB_PASSWORD: ${DB_PASSWORD:-custom}
       DB_NAME: ${DB_NAME:-custom}

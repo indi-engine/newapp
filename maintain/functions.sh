@@ -293,11 +293,31 @@ prepare_debezium() {
   local DB_USER_host="$(get_db_host_prefix)"
   local engine="$(get_env "DB_ENGINE")"
 
+  # Remove debezium offsets and schema history files
+  rm -f var/tmp/debezium-offsets.dat
+  rm -f var/tmp/debezium-history.dat
+
+  # Grant privileges needed for debezium
   if [[ "$engine" == "mysql" ]]; then
-    # Grant privileges needed for debezium
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
     unset MYSQL_PWD
+
+  elif [[ $engine == "postgres" ]]; then
+    export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    psql -h postgres -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
+    psql -h postgres -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
+		psql -h postgres -t -q -U postgres --no-align -d custom <<-'PGSQL'
+			DO $$
+			DECLARE t text;
+			BEGIN
+					FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+					LOOP
+							EXECUTE 'ALTER TABLE ' || quote_ident(t) || ' REPLICA IDENTITY FULL';
+					END LOOP;
+			END $$;
+		PGSQL
+		unset PGPASSWORD
   fi
 }
 

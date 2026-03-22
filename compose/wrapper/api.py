@@ -1,6 +1,6 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql, os, shlex
+import subprocess, pika, json, pexpect, re, pymysql, psycopg2, psycopg2.extras, os, shlex
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app
@@ -49,6 +49,9 @@ def get_dot_env(name):
                 return value
     return ''
 
+# Get DB_ENGINE from .env
+engine = get_dot_env('DB_ENGINE')
+
 # Send websocket message to open xterm in Indi Engine UI
 def ws(to, data, mq, db):
 
@@ -64,7 +67,9 @@ def ws(to, data, mq, db):
         exists, mq = queue_exists(mq, prefix + to['token'])
         refresh = not exists
         if refresh:
-            db.execute("DELETE FROM `realtime` WHERE `type` = 'channel' AND `token` = %s", (to['token']))
+            query = 'DELETE FROM `realtime` WHERE `type` = %s AND `token` = %s'
+            if engine == 'postgres': query = query.replace('`', '"')
+            db.execute(query, ('channel', to['token']))
     else:
         refresh = True
 
@@ -72,10 +77,9 @@ def ws(to, data, mq, db):
     if refresh:
 
         # Get browser tab, if any opened by the user that can be identified by that pair
-        db.execute(
-            "SELECT `token` FROM `realtime` WHERE `type` = 'channel' AND `roleId` = %s AND `adminId` = %s",
-            (to['roleId'], to['adminId'])
-        )
+        query = "SELECT `token` FROM `realtime` WHERE `type` = %s AND `roleId` = %s AND `adminId` = %s"
+        if engine == 'postgres': query = query.replace('`', '"')
+        db.execute(query, ('channel', to['roleId'], to['adminId']))
 
         # If at least one found - refresh token
         if db.rowcount:
@@ -104,12 +108,14 @@ def bash_stream(
     nn = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
     mq = nn.channel()
 
-    # Get DB_ENGINE from .env
-    engine = get_dot_env('DB_ENGINE')
-
     # Instantiate connection with db cursor
-    db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
-    db = db_conn.cursor(pymysql.cursors.DictCursor)
+    if engine == 'mysql':
+        db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
+        db = db_conn.cursor(pymysql.cursors.DictCursor)
+    elif engine == 'postgres':
+        db_conn = psycopg2.connect(host=engine, user='custom', password='custom', dbname='custom')
+        db_conn.autocommit = True
+        db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
     # Start bash script in a pseudo-terminal
     child = pexpect.spawn('bash -c "' + command + '"', encoding='utf-8')

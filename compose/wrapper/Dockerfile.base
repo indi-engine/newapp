@@ -1,15 +1,24 @@
 FROM php:8.3-cli-bookworm
 
 ## <Misc> ##
-RUN apt-get update && apt-get install -fy mc curl wget lsb-release cron bsdextrautils zip unzip jq postgresql-client python3-flask python3-pika python3-pexpect python3-pymysql python3-psycopg2 p7zip-full pv procps
+RUN apt-get update && apt-get install -fy mc curl wget lsb-release ca-certificates gnupg cron bsdextrautils zip unzip \
+  jq python3-flask python3-pika python3-pexpect python3-pymysql p7zip-full pv procps
 ## </Misc> ##
 
-## <GitHub CLI>
+## <Postgres client> ##
+RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor -o /usr/share/keyrings/postgresql-keyring.gpg \
+ && echo "deb [signed-by=/usr/share/keyrings/postgresql-keyring.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" > /etc/apt/sources.list.d/pgdg.list \
+ && apt-get update \
+ && apt-get install -y postgresql-client python3-psycopg2 \
+ && rm -rf /var/lib/apt/lists/*
+## </Postgres client> ##
+
+## <GitHub CLI> ##
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | tee /etc/apt/sources.list.d/github-cli.list > /dev/null && \
     apt update && apt install gh -y
-## </GitHub CLI>
+## </GitHub CLI> ##
 
 ## <Sendmail> ##
 RUN bash -c "DEBIAN_FRONTEND=noninteractive apt install -y postfix <<< $'2' && apt install -y opendkim opendkim-tools"
@@ -27,7 +36,7 @@ RUN apt-get update && \
 RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" \
  && php composer-setup.php --install-dir=/usr/local/bin --filename=composer \
  && php -r "unlink('composer-setup.php');"
-## <Composer> ##
+## </Composer> ##
 
 ## Setup entrypoint ##
 ENTRYPOINT ["bash", "-c", "source $DOC/compose/wrapper/docker-entrypoint.sh"]

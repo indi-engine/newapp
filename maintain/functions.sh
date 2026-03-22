@@ -2552,7 +2552,7 @@ mysql_entrypoint() {
 postgres_entrypoint() {
 
   # Path to a file to be created once init is done
-  local data="/var/lib/postgresql/data"
+  local data="/var/lib/postgresql"
   local done="$data/init.done"
 
   # If init is not done

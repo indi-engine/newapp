@@ -1,7 +1,7 @@
 services:
 
   postgres:
-    image: postgres:16-bookworm
+    image: postgres:18-bookworm
     restart: unless-stopped
     command: >
       postgres
@@ -26,10 +26,10 @@ services:
     volumes:
       - ./compose/postgres/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
-      - postgres_server_data:/var/lib/postgresql/data
+      - postgres_server_data:/var/lib/postgresql
       - ./var/log/compose/postgres:/var/log/postgresql
     healthcheck:
-      test: pg_isready -U ${DB_USER:-custom} -d ${DB_NAME:-custom} && [ -f /var/lib/postgresql/data/init.done ]
+      test: pg_isready -U ${DB_USER:-custom} -d ${DB_NAME:-custom} && [ -f /var/lib/postgresql/init.done ]
       start_period: 3m
       interval: 5s
     security_opt:

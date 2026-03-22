@@ -1256,14 +1256,62 @@ start_debezium_and_closetab_if_need() {
   if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/enable/ > /dev/null 2>&1; fi
 }
 
+# Shut down db server
+db_shutdown() {
+  case "$(get_env "DB_ENGINE")" in
+    mysql)     db_shutdown_mysql ;;
+    postgres)  db_shutdown_postgres ;;
+    sqlserver) db_shutdown_sqlserver ;;
+    oracle)    db_shutdown_oracle ;;
+  esac
+}
+
+db_shutdown_mysql() {
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+  mysql -h mysql -u root -e "SHUTDOWN"
+  unset MYSQL_PWD
+}
+
+# Shut down db server
+db_shutdown_postgres() {
+
+  # Set CLI password
+  export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+
+  # Shortcuts
+  local query="psql -h postgres -t -q -U "${DB_ROOT_USER:-postgres}" -d postgres --no-align -c"
+  local ver="$($query "SELECT current_setting('server_version_num')::int / 10000")"
+  local ctl="/usr/lib/postgresql/$ver/bin/pg_ctl"
+  local dir="/var/lib/postgresql/$ver/docker"
+
+  # Do shutdown
+  output=$($query "COPY (SELECT 1) TO PROGRAM '$ctl stop -D $dir';" 2>&1) || {
+    if ! echo "$output" | grep -q "terminating connection due to administrator command\|server closed the connection"; then
+      echo "$output"
+      exit 1
+    fi
+  }
+
+  # Unset CLI password
+  unset PGPASSWORD
+}
+
+# Get db engine name
+get_engine_name() {
+  case "$(get_env "DB_ENGINE")" in
+    mysql) echo "MySQL" ;;
+    postgres) echo "PostgreSQL" ;;
+    sqlserver) echo "SQL Server" ;;
+    oracle) echo "Oracle" ;;
+  esac
+}
+
 # Shut down db server, clean it's data/ dir and start back
 reset_db() {
 
   # Shut down db server
-  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-  local msg="Shutting down MySQL server..." && echo "$msg"
-  mysql -h mysql -u root -e "SHUTDOWN"
-  unset MYSQL_PWD
+  local msg="Shutting down $(get_engine_name) server..." && echo "$msg"
+  db_shutdown "$(get_env "DB_ENGINE")"
 
   # Wait until shutdown is really completed
   local timeout=60
@@ -1280,15 +1328,15 @@ reset_db() {
   # If shutdown file was created by db container's custom-entrypoint.sh script
   if [ -f "$done" ]; then
 
-    # It means mysqld process exited gracefully, i.e. shutdown is really completed
+    # It means db server process exited gracefully, i.e. shutdown is really completed
     clear_last_lines 1
     echo "$msg Done"
 
     # Empty *_server_data volume
-    echo -n "Removing all data from MySQL server..." && rm -rf /var/lib/db_engine/* && echo -e " Done"
+    echo -n "Removing all data from $(get_engine_name) server..." && rm -rf /var/lib/db_engine/* && echo -e " Done"
 
     # Wait until re-init is really completed
-    local msg="Starting up MySQL server back..." && echo "$msg"
+    local msg="Starting up $(get_engine_name) server back..." && echo "$msg"
     local elapsed=0
     local done="/var/lib/db_engine/init.done"
     local initTimeout=60
@@ -1301,7 +1349,7 @@ reset_db() {
 
       # If init maximum time reached - break
       if [ $elapsed -ge $initTimeout ]; then
-        echo "MySQL empty init timeout reached, something went wrong :("
+        echo "$(get_engine_name) empty init timeout reached, something went wrong :("
         exit 1
       fi
 
@@ -1315,7 +1363,7 @@ reset_db() {
 
   # Else if shutdown is stuck somewhere - print error message and exit
   else
-    echo "MySQL server shutdown timeout reached, something went wrong :("
+    echo "$(get_engine_name) server shutdown timeout reached, something went wrong :("
     exit 1
   fi
 }
@@ -2524,7 +2572,7 @@ mysql_entrypoint() {
   /usr/local/bin/docker-entrypoint.sh "$@"
 
   # If we reached this line, it means db was shut down
-  echo "MySQL Server has been shut down"
+  echo "$(get_engine_name) Server has been shut down"
 
   # Create a file within data-dir to indicate shutdown is completed
   touch "$data/shutdown.done"
@@ -2542,7 +2590,7 @@ mysql_entrypoint() {
   if [ -z "$(ls -A $data)" ]; then
 
     # We assume it was done for restore
-    echo "MySQL data-directory has been emptied, so initiating the restore..."
+    echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
 
     # Re-init
     mysql_entrypoint "$@"
@@ -2580,7 +2628,7 @@ postgres_entrypoint() {
   /usr/local/bin/docker-entrypoint.sh "$@"
 
   # If we reached this line, it means db was shut down
-  echo "Postgres has been shut down"
+  echo "$(get_engine_name) has been shut down"
 
   # Create a file within data-dir to indicate shutdown is completed
   touch "$data/shutdown.done"
@@ -2598,7 +2646,7 @@ postgres_entrypoint() {
   if [ -z "$(ls -A $data)" ]; then
 
     # We assume it was done for restore
-    echo "Postgres data-directory has been emptied, so initiating the restore..."
+    echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
 
     # Re-init
     postgres_entrypoint "$@"

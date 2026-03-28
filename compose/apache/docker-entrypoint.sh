@@ -112,7 +112,7 @@ if [[ ! -z "$EMAIL_SENDER_DOMAIN" ]]; then
 fi
 
 # Setup crontab
-env | grep -E "TERM|(DB|RABBITMQ)_HOST|DOC" >> /etc/environment
+env | grep -E "TERM|DB_ENGINE|RABBITMQ_HOST|DOC" >> /etc/environment
 sed "s~\$DOC~$DOC~" '/var/www/crontab' | crontab -u www-data -
 service cron start
 

@@ -25,6 +25,13 @@ def get_parent_repo():
 def valid_tag(tagName):
     return bool(re.fullmatch(r'[a-zA-Z0-9._-]{1,63}', tagName))
 
+# Get table dump via pg_dump
+def get_table_dump(name):
+    return subprocess.run(
+        f'PGPASSWORD=custom pg_dump -h postgres -U custom -d custom -t \'"{name}"\' --schema-only',
+        shell=True, executable='/bin/bash', capture_output=True, text=True
+    ).stdout.strip()
+
 # Check if given queue exists, i.e. user didn't closed the browser tab yet
 def queue_exists(channel, name):
     try:
@@ -407,3 +414,12 @@ def env():
 
     # Else flush variable's value
     return get_dot_env(name), 200
+
+@app.route('/export/table', methods=['GET'])
+def export_table():
+
+    # Get the name of a table to be exported
+    name = request.args.get('name')
+
+    # Flush pg_dump output for a certain table
+    return get_table_dump(name), 200

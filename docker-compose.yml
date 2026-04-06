@@ -71,7 +71,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-custom}
       DB_NAME: ${DB_NAME:-custom}
       DB_DUMP: ${DB_DUMP}
-      DB_HOST: ${DB_ENGINE}
+      DB_HOST: ${DB_HOST:-$DB_ENGINE}
+      DB_ENGINE: ${DB_ENGINE}
       RABBITMQ_HOST: rabbitmq
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-$LETS_ENCRYPT_DOMAIN}
       BACKUPS: ${BACKUPS:-}

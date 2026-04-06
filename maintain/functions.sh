@@ -1266,14 +1266,14 @@ stop_debezium_and_closetab_if_need() {
   closetab=false; if curl http://apache/realtime/status/ 2>&1 | grep -q closetab; then closetab=true; fi
 
   # If disable each, if needed
-  if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/disable/ > /dev/null 2>&1; fi
   if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/        > /dev/null 2>&1; fi
+  if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/disable/ > /dev/null 2>&1; fi
 }
 
 # If debezium and/or closetab php processes were running - enable back
 start_debezium_and_closetab_if_need() {
-  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/ > /dev/null 2>&1; fi
   if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/enable/ > /dev/null 2>&1; fi
+  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/ > /dev/null 2>&1; fi
 }
 
 # Shut down db server

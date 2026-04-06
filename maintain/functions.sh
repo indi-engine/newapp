@@ -3299,6 +3299,9 @@ migrate_if_need() {
       restore_dump_from_local "data/before" "» "
     fi
 
+    # Stop php processes
+    stop_debezium_and_closetab_if_need
+
     # Foreach fraction
     for fraction in system custom; do
 
@@ -3341,6 +3344,9 @@ migrate_if_need() {
         fi
       done
     done
+
+    # Start php processes back
+    start_debezium_and_closetab_if_need
   fi
 
   # Foreach fraction

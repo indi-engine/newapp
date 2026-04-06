@@ -232,7 +232,7 @@ db_import() {
     else
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
-      download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
+      [[ ! -f "data/dump.sql.gz" ]] && download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
       import_possibly_chunked_dump "dump.sql.gz"
 
       # Run debezium-specific sql

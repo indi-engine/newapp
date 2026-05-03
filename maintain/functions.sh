@@ -1354,9 +1354,10 @@ get_engine_name() {
 
 # Get DB-engine specific release tag name where dump.sql.gz should be downloaded from
 get_engine_init_release() {
-  case "${1:-$(get_env "DB_ENGINE")}" in
+  local engine="${1:-$(get_env "DB_ENGINE")}"
+  case "$engine" in
     mysql|mariadb|percona) echo "default" ;;
-    postgres|sqlserver|oracle) echo "$1" ;;
+    postgres|sqlserver|oracle) echo "$engine" ;;
   esac
 }
 

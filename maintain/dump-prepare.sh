@@ -49,7 +49,7 @@ else
     tables="SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
     recordQty="SELECT reltuples::bigint FROM pg_class WHERE relname = '---'"
     dump_bin="pg_dump"
-    dump_cmd="$dump_bin -h $host -U $user -d $name --no-owner --no-acl --inserts --rows-per-insert=1000"
+    dump_cmd="$dump_bin -h $host -U $user -d $name --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
   fi
 
   # Put password into env

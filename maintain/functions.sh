@@ -232,7 +232,7 @@ db_import() {
     else
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
-      [[ ! -f "data/dump.sql.gz" ]] && download_possibly_chunked_file "indi-engine/system" "default" "dump.sql.gz"
+      [[ ! -f "data/dump.sql.gz" ]] && download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "dump.sql.gz"
       import_possibly_chunked_dump "dump.sql.gz"
 
       # Run debezium-specific sql
@@ -1349,6 +1349,14 @@ get_engine_name() {
     postgres) echo "PostgreSQL" ;;
     sqlserver) echo "SQL Server" ;;
     oracle) echo "Oracle" ;;
+  esac
+}
+
+# Get DB-engine specific release tag name where dump.sql.gz should be downloaded from
+get_engine_init_release() {
+  case "${1:-$(get_env "DB_ENGINE")}" in
+    mysql|mariadb|percona) echo "default" ;;
+    postgres|sqlserver|oracle) echo "$1" ;;
   esac
 }
 

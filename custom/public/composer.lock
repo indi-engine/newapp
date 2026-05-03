@@ -1223,7 +1223,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "636d56d438e0def3541b13dd4db8ba10f0baa989"
+                "reference": "8807b98c0978b5dbaf741d63d5d1bb5b1934bbe2"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1237,7 +1237,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Indi Engine AI system package, should be used as composer dependency only",
-            "time": "2026-05-03T17:50:38+00:00"
+            "time": "2026-05-03T20:05:44+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

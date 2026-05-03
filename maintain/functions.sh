@@ -460,6 +460,23 @@ read_choice_custom() {
     clear_last_lines $((${#choices[@]} + 1))
 }
 
+# Get DB engine's foreground name by background one
+env_DB_ENGINE_choice() {
+  echo "$(get_engine_name "${1:-}")"
+}
+
+# Get DB engine's foreground name by background one
+env_DB_EXPOSE_PORT() {
+
+  # Get selected DB_ENGINE
+  local engine=$(get_env "DB_ENGINE" ".env.prod")
+
+  # If it's postgres - spoof port number mentioned within $TIP
+  if [[ "$engine" == "postgres" ]]; then
+    TIP="${TIP/3306/5432}"
+  fi
+}
+
 # Ask user to make a choice based on choices-array, which must be defined before calling this function
 # Once user do some choice, it's 0-based index is written to the choice_idx-variable which can be evaluated
 # right after this function is completed
@@ -473,7 +490,14 @@ read_choice() {
 
   # Print choices
   for i in "${!choices[@]}"; do
-    if [ $i -eq $now_choice ]; then echo -n "$indent(•)"; else echo -n "$indent( )"; fi && echo " ${choices[$i]}"
+    if [ $i -eq $now_choice ]; then echo -n "$indent(•)"; else echo -n "$indent( )"; fi
+
+    # Check if a function exists for adjusting choice title, and if yes - call it
+    if declare -f "env_${ENV_NAME}_choice" > /dev/null; then
+      echo " "$(env_${ENV_NAME}_choice "${choices[$i]}")
+    else
+      echo " ${choices[$i]}"
+    fi
   done
 
   # Force user to make a choice
@@ -1318,8 +1342,10 @@ db_shutdown_postgres() {
 
 # Get db engine name
 get_engine_name() {
-  case "$(get_env "DB_ENGINE")" in
+  case "${1:-$(get_env "DB_ENGINE")}" in
     mysql) echo "MySQL" ;;
+    mariadb) echo "MariaDB" ;;
+    percona) echo "Percona" ;;
     postgres) echo "PostgreSQL" ;;
     sqlserver) echo "SQL Server" ;;
     oracle) echo "Oracle" ;;
@@ -3379,7 +3405,8 @@ prepended() {
 # Get the value of given variable from .env file
 get_env() {
   local chars=0; [[ "$1" = "GH_TOKEN_SYSTEM_RO" ]] && chars=43;
-  grep "^$1=" .env | cut -d '=' -f 2- | sed 's/^"//; s/"$//' | trim "$chars"
+  local fname="${2:-.env}"
+  grep "^$1=" "$fname" | cut -d '=' -f 2- | sed 's/^"//; s/"$//' | trim "$chars"
 }
 
 # Search .env file for a given variable and update it's value with  a given one

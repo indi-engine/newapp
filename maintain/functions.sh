@@ -3415,12 +3415,13 @@ set_env() {
   # Arguments
   local name="$1"
   local value="$2"
+  local file="${3:-.env}"
 
   # Do update in .env file
   if [[ "$value" =~ [[:space:]] ]]; then
-    sed -i 's~^'"$name"'=.*$~'"$name"'="'"$value"'"~' .env
+    sed -i 's~^'"$name"'=.*$~'"$name"'="'"$value"'"~' "$file"
   else
-    sed -i 's~^'"$name"'=.*$~'"$name"'='"$value"'~' .env
+    sed -i 's~^'"$name"'=.*$~'"$name"'='"$value"'~' "$file"
   fi
 
   # Replace in current bash environment

@@ -14,8 +14,13 @@ if [[ "${1:-}" == logs ]]; then
 
 # Else cleanup containers, volumes and logs
 elif [[ "${1:-}" == cvl ]]; then
+
+  # Get current dir name
+  dir=$(basename "$PWD")
+
+  # Do cleanup
   docker compose down
-  docker volume rm $(docker volume ls -q | grep newapp | xargs)
+  docker volume rm $(docker volume ls -q | grep "${dir}_" | xargs)
   source cleanup logs
 
 # Else cleanup the whole app instance

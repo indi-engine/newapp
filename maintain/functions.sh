@@ -1657,8 +1657,8 @@ env_GH_TOKEN_CUSTOM_RW() {
 # Make the URL (where token can be obtained at) to be green
 env_GH_TOKEN_SYSTEM_RO() {
   repo="${g}$(get_current_repo)${gray}"
-  TIP=${TIP/https/${g}&}
-  TIP=${TIP/\/token/&${gray}}
+  TIP=${TIP/https/${g}https}
+  TIP=${TIP/\/token/\/token${gray}}
 }
 
 # Spoof TIP and make GH_TOKEN_PARENT_RO required if parent repo exists and is private

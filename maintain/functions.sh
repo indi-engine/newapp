@@ -311,12 +311,7 @@ prepare_debezium() {
   rm -f var/tmp/debezium-history.dat
 
   # Grant privileges needed for debezium
-  if [[ "$engine" == "mysql" ]]; then
-    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
-    unset MYSQL_PWD
-
-  elif [[ $engine == "postgres" ]]; then
+  if [[ $engine == "postgres" ]]; then
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
     psql -h postgres -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
     psql -h postgres -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
@@ -331,6 +326,10 @@ prepare_debezium() {
 			END $$;
 		PGSQL
 		unset PGPASSWORD
+  else
+    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
+    unset MYSQL_PWD
   fi
 }
 
@@ -343,7 +342,7 @@ sync_host_for_DB_USER() {
   local DB_USER_host="$(get_db_host_prefix)"
   local engine="$(get_env "DB_ENGINE")"
 
-  if [[ "$engine" == "mysql" ]]; then
+  if [[ "$engine" != "postgres" ]]; then
     # Update host for DB_USER
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     mysql -h mysql -u root mysql -e "UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
@@ -1186,12 +1185,12 @@ import_possibly_chunked_dump() {
   local msg="${prepend}Importing $dump"
   local engine="$(get_env "DB_ENGINE")"
 
-  if [[ "$engine" == "mysql" ]]; then
-    local run="mysql -h mysql -u $DB_USER $DB_NAME"
-    local passenv=MYSQL_PWD
-  elif [[ "$engine" == "postgres" ]]; then
+  if [[ "$engine" == "postgres" ]]; then
     local run="psql -h postgres -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
+  else
+    local run="mysql -h mysql -u $DB_USER $DB_NAME"
+    local passenv=MYSQL_PWD
   fi
 
   # Prevent warning
@@ -3190,17 +3189,14 @@ db_query() {
   local name="$DB_NAME"
 
   # Run engine-specific query
-  if [[ "$engine" == "mysql" ]]; then
-
-    export MYSQL_PWD="$pass"
-    mysql -h "$host" -u "$user" -D "$name" -N -e "$sql"
-    unset MYSQL_PWD
-
-  elif [[ "$engine" == "postgres" ]]; then
-
+  if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$pass"
     psql -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
     unset PGPASSWORD
+  else
+    export MYSQL_PWD="$pass"
+    mysql -h "$host" -u "$user" -D "$name" -N -e "$sql"
+    unset MYSQL_PWD
   fi
 }
 

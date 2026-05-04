@@ -34,7 +34,16 @@ else
   # Trim .gz from dump filename
   sql=$(echo "$dump" | sed 's/\.gz$//')
 
-  if [[ "$engine" == "mysql" ]]; then
+  # Prepare DBE-specific shortcuts
+  if [[ "$engine" == "postgres" ]]; then
+    pwdenv="PGPASSWORD"
+    args="-h $host -U $user -t -q -c"
+    query="psql $args"
+    tables="SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
+    recordQty="SELECT reltuples::bigint FROM pg_class WHERE relname = '---'"
+    dump_bin="pg_dump"
+    dump_cmd="$dump_bin -h $host -U $user -d $name --no-owner --no-acl --inserts --rows-per-insert=1000"
+  else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
     query="mysql $args"
@@ -42,14 +51,6 @@ else
     recordQty="SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$name' AND TABLE_NAME = '---'"
     dump_bin="mysqldump"
     dump_cmd="$dump_bin -h $host -u $user -y $name --single-transaction"
-  elif [[ "$engine" == "postgres" ]]; then
-    pwdenv="PGPASSWORD"
-    args="-h $host -U $user -t -q -c"
-    query="psql $args"
-    tables="SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-    recordQty="SELECT reltuples::bigint FROM pg_class WHERE relname = '---'"
-    dump_bin="pg_dump"
-    dump_cmd="$dump_bin -h $host -U $user -d $name --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
   fi
 
   # Put password into env

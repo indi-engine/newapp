@@ -12,6 +12,12 @@ if [[ "${1:-}" == logs ]]; then
   rm -Rf var/log/custom/*/
   rm -Rf var/log/custom/*.log
 
+# Else cleanup containers, volumes and logs
+elif [[ "${1:-}" == cvl ]]; then
+  docker compose down
+  docker volume rm $(docker volume ls -q | grep newapp | xargs)
+  source cleanup logs
+
 # Else cleanup the whole app instance
 else
 

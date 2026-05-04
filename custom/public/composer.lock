@@ -1201,7 +1201,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "5cf6e035bb7c0ebd0be28dcf01819ded23dadd8c"
+                "reference": "27c5820da24947c611be01705481a93d923b3a30"
             },
             "require": {
                 "npm-asset/inputmask": "^5.0",
@@ -1215,7 +1215,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine",
-            "time": "2026-05-02T17:34:27+00:00"
+            "time": "2026-05-04T09:17:27+00:00"
         },
         {
             "name": "indi-engine/system",
@@ -1223,7 +1223,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "8807b98c0978b5dbaf741d63d5d1bb5b1934bbe2"
+                "reference": "de93b1bccb6597191c4d0f6f59b2d43f447bb319"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1237,7 +1237,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Indi Engine AI system package, should be used as composer dependency only",
-            "time": "2026-05-03T20:05:44+00:00"
+            "time": "2026-05-04T13:37:52+00:00"
         },
         {
             "name": "laminas/laminas-escaper",

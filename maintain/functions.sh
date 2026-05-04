@@ -1766,12 +1766,12 @@ env_COMPOSE_FILE() {
 
   # If db_engine_yml is not yet in the list - add it right after default YAML
   if [[ "$DEFAULT_VALUE" != *"$db_engine_yml"* ]]; then
-    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/&:${db_engine_yml}}"
+    DEFAULT_VALUE="${DEFAULT_VALUE/docker-compose.yml/docker-compose.yml:${db_engine_yml}}"
   fi
 
   # If db expose is not yet in the list - add it right after default YAML
   if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$db_engine_expose_yml"* ]]; then
-    DEFAULT_VALUE="${DEFAULT_VALUE/${db_engine_yml}/&:${db_engine_expose_yml}}"
+    DEFAULT_VALUE="${DEFAULT_VALUE/${db_engine_yml}/${db_engine_yml}:${db_engine_expose_yml}}"
   fi
 
   # If we're on windows - spoof colon with semi-colon

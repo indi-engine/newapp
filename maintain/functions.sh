@@ -230,9 +230,22 @@ db_import() {
 
     # Else temporary switch to system token to download and import system dump
     else
+
+      # Print where we are
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
+
+      # Switch to system token
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
-      [[ ! -f "data/dump.sql.gz" ]] && download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "dump.sql.gz"
+
+      # Download dump
+      if [[ ! -f "data/dump.sql.gz" ]]; then
+        download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "dump.sql.gz"
+      fi
+
+      # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+      create_DB_USER_if_need
+
+      # Do import
       import_possibly_chunked_dump "dump.sql.gz"
 
       # Run debezium-specific sql

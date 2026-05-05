@@ -3677,7 +3677,7 @@ setup_swap_if_need() {
 
   # If swap already exists - return, but print a warning if it's smaller than needed
   if [[ "${SWAP_NOW:-0}" -gt 0 ]]; then
-    if [[ "${SWAP_NOW:-0}" -lt "${SWAP_SET:-0}" ]]; then
+    if [[ $(( SWAP_NOW / 1024 / 1024 )) -lt $(( SWAP_SET / 1024 / 1024 )) ]]; then
       echo "[WARN] Your current OS swap is $(numfmt --to=iec $SWAP_NOW), but $(numfmt --to=iec $SWAP_SET) is needed"
     fi
     return 0

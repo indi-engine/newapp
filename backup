@@ -81,7 +81,7 @@ else
     # Remember DB_ENGINE choice in .env.dist
     set_env "DB_ENGINE" "$(get_env "DB_ENGINE")" ".env.dist"
     git add ".env.dist"
-    git commit -m "DB_ENGINE choice saved to .env.dist"
+    git commit -m "DB_ENGINE choice saved to .env.dist" --author="$(git log -1 --format='%an <%ae>')"
 
     # Push cloned repo to github
     echo "Pushing cloned repo to github:"

@@ -20,8 +20,17 @@ elif [[ "${1:-}" == cvl ]]; then
 
   # Do cleanup
   docker compose down
-  docker volume rm $(docker volume ls -q | grep "${dir}_" | xargs)
+  docker volume ls -q | grep "^${dir}_" | xargs -r docker volume rm
   source cleanup logs
+
+# Else cleanup swap
+elif [[ "${1:-}" == swap ]]; then
+  SWAPFILE="/swapfile-indi-engine"
+  if [[ -f "$SWAPFILE" ]]; then
+    swapoff "$SWAPFILE"
+    rm "$SWAPFILE"
+    sed -i "/^$SWAPFILE/d" /etc/fstab
+  fi
 
 # Else cleanup the whole app instance
 else
@@ -31,6 +40,9 @@ else
   docker volume prune -af
   docker system prune -af
 
+  # Cleanup swap
+  source cleanup swap
+
   # Get current dir name
   dir=$(basename "$PWD")
 
@@ -39,5 +51,5 @@ else
 
   # Remove current dir
   cd ../
-  rm -R $dir
+  rm -R "$dir"
 fi

@@ -3659,10 +3659,10 @@ setup_swap_if_need() {
   [[ "$(get_env "DB_ENGINE")" != "postgres" ]] && return 0
 
   # Shortcut
-  local SWAPFILE="/swapfile"
+  local SWAPFILE="/swapfile-indi-engine"
 
-  # If swap already exists - do nothing
-  local SWAP_NOW=$(free -b | awk '/^Swap:/ {print $2}'); [[ "${SWAP_NOW:-0}" -gt 0 ]] && return 0
+  # Get current swap, if any
+  local SWAP_NOW=$(free -b | awk '/^Swap:/ {print $2}');
 
   # Get RAM and free disk space - in bytes
   local RAM=$(free -b | awk '/^Mem:/ {print $2}')
@@ -3675,14 +3675,22 @@ setup_swap_if_need() {
   local DISK_RESERVE=$(( 3 * 1024 * 1024 * 1024 ))
   local DISK_AFTER_SWAP=$(( DISK_FREE - SWAP_SET ))
 
+  # If swap already exists - return, but print a warning if it's smaller than needed
+  if [[ "${SWAP_NOW:-0}" -gt 0 ]]; then
+    if [[ "${SWAP_NOW:-0}" -lt "${SWAP_SET:-0}" ]]; then
+      echo "[WARN] Your current OS swap is $(numfmt --to=iec $SWAP_NOW), but $(numfmt --to=iec $SWAP_SET) is needed"
+    fi
+    return 0
+  fi
+
   # Only use swap if at least 3GB disk is free after allocating it
   if [ "$DISK_AFTER_SWAP" -lt "$DISK_RESERVE" ]; then
-      echo "Warning: Not enough free disk space to safely set up swap."
-      echo "  Free disk:      $(numfmt --to=iec $DISK_FREE)"
-      echo "  Desired swap:   $(numfmt --to=iec $SWAP_SET)"
-      echo "  Would leave:    $(numfmt --to=iec $DISK_AFTER_SWAP) free (need 3GB)"
-      echo "Skipping swap setup."
-      return 0
+    echo "Warning: Not enough free disk space to safely set up swap."
+    echo "  Free disk:      $(numfmt --to=iec $DISK_FREE)"
+    echo "  Desired swap:   $(numfmt --to=iec $SWAP_SET)"
+    echo "  Would leave:    $(numfmt --to=iec $DISK_AFTER_SWAP) free (need 3GB)"
+    echo "Skipping swap setup."
+    return 0
   fi
 
   #echo "  RAM:            $(numfmt --to=iec $RAM)"

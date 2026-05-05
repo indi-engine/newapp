@@ -3706,6 +3706,7 @@ setup_swap_if_need() {
     chmod 600 "$SWAPFILE"
     mkswap "$SWAPFILE"
     swapon "$SWAPFILE"
+    echo
   fi
 
   # Persist across reboots

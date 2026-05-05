@@ -21,6 +21,9 @@ getup() {
   # Setup GH_TOKEN_SYSTEM_RO
   export GH_TOKEN_SYSTEM_RO="$(get_env "GH_TOKEN_SYSTEM_RO")"
 
+  # Setup swap
+  setup_swap_if_need
+
   # Setup the docker compose project
   set +e; docker compose up -d; exit_code=$?;
 
@@ -3644,4 +3647,61 @@ composer_install() {
 # Check if apache is ready
 apache_ready() {
   docker compose exec apache sh -c "bash -c '</dev/tcp/localhost/80'" &>/dev/null
+}
+
+# Set up swap
+setup_swap_if_need() {
+
+  # If we're on windows - do nothing
+  is_windows && return 0
+
+  # If we're not on postgres - do nothing
+  [[ "$(get_env "DB_ENGINE")" != "postgres" ]] && return 0
+
+  # Shortcut
+  local SWAPFILE="/swapfile"
+
+  # If swap already exists - do nothing
+  local SWAP_NOW=$(free -b | awk '/^Swap:/ {print $2}'); [[ "${SWAP_NOW:-0}" -gt 0 ]] && return 0
+
+  # Get RAM and free disk space - in bytes
+  local RAM=$(free -b | awk '/^Mem:/ {print $2}')
+  local DISK_FREE=$(df -B1 / | awk 'NR==2 {print $4}')
+
+  # Calculate swap to be set: 50% of RAM, minimum 512MB, maximum 2GB
+  local SWAP_SET=$(( RAM / 2 ))
+  local SWAP_MIN=$(( 512 * 1024 * 1024 ));       [ "$SWAP_SET" -lt "$SWAP_MIN" ] && SWAP_SET=$SWAP_MIN
+  local SWAP_MAX=$(( 2 * 1024 * 1024 * 1024 ));  [ "$SWAP_SET" -gt "$SWAP_MAX" ] && SWAP_SET=$SWAP_MAX
+  local DISK_RESERVE=$(( 3 * 1024 * 1024 * 1024 ))
+  local DISK_AFTER_SWAP=$(( DISK_FREE - SWAP_SET ))
+
+  # Only use swap if at least 3GB disk is free after allocating it
+  if [ "$DISK_AFTER_SWAP" -lt "$DISK_RESERVE" ]; then
+      echo "Warning: Not enough free disk space to safely set up swap."
+      echo "  Free disk:      $(numfmt --to=iec $DISK_FREE)"
+      echo "  Desired swap:   $(numfmt --to=iec $SWAP_SET)"
+      echo "  Would leave:    $(numfmt --to=iec $DISK_AFTER_SWAP) free (need 3GB)"
+      echo "Skipping swap setup."
+      return 0
+  fi
+
+  #echo "  RAM:            $(numfmt --to=iec $RAM)"
+  #echo "  Free disk:      $(numfmt --to=iec $DISK_FREE)"
+  #echo "  Swap to create: $(numfmt --to=iec $SWAP_SET)"
+
+  # If swap file exists - reactivate it
+  if [ -f "$SWAPFILE" ]; then
+    mkswap "$SWAPFILE"
+    swapon "$SWAPFILE"
+  else
+    fallocate -l "$SWAP_SET" "$SWAPFILE" 2> /dev/null || dd if=/dev/zero of="$SWAPFILE" bs=1M count=$(( SWAP_SET / 1024 / 1024 )) status=none
+    chmod 600 "$SWAPFILE"
+    mkswap "$SWAPFILE"
+    swapon "$SWAPFILE"
+  fi
+
+  # Persist across reboots
+  if ! grep -q "^${SWAPFILE}" /etc/fstab; then
+    echo "${SWAPFILE} none swap sw 0 0" >> /etc/fstab
+  fi
 }

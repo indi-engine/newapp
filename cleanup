@@ -47,7 +47,7 @@ else
   dir=$(basename "$PWD")
 
   # Remove cd-command from bashrc
-  sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/c\\" /root/.bashrc
+  sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/d" /root/.bashrc
 
   # Remove current dir
   cd ../

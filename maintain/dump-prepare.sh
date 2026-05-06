@@ -27,6 +27,7 @@ else
   name="$DB_NAME"
   dump="$dir/$DB_DUMP"
   pref="${2:-}"
+  cli="$(get_engine_cli)"
 
   # Goto project root
   cd "$DOC"
@@ -38,7 +39,6 @@ else
   if [[ "$engine" == "postgres" ]]; then
     pwdenv="PGPASSWORD"
     args="-h $host -U $user -t -q -c"
-    query="psql $args"
     tables="SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
     recordQty="SELECT reltuples::bigint FROM pg_class WHERE relname = '---'"
     dump_bin="pg_dump"
@@ -46,7 +46,6 @@ else
   else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
-    query="$engine $args"
     tables='SHOW TABLES FROM `'$name'`'
     recordQty="SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$name' AND TABLE_NAME = '---'"
     case "$engine" in
@@ -55,6 +54,9 @@ else
     esac
     dump_cmd="$dump_bin -h $host -u $user -y $name --single-transaction"
   fi
+
+  # Query shortcut
+  query="$cli $args"
 
   # Put password into env
   export "${pwdenv}=${pass}"

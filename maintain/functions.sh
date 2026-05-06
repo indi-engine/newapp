@@ -118,6 +118,7 @@ getup() {
     done
     [[ -z $wait ]] && echo ""
     clear_last_lines
+    [[ -z "$LETS_ENCRYPT_DOMAIN" ]] && clear_last_lines
     echo
   fi
 
@@ -315,7 +316,7 @@ prepare_debezium() {
   rm -f var/tmp/debezium-history.dat
 
   # Grant privileges needed for debezium
-  if [[ $engine == "postgres" ]]; then
+  if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
     psql -h postgres -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
     psql -h postgres -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
@@ -332,7 +333,7 @@ prepare_debezium() {
 		unset PGPASSWORD
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    mysql -h mysql -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
+    $engine -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
     unset MYSQL_PWD
   fi
 }
@@ -349,8 +350,13 @@ sync_host_for_DB_USER() {
   if [[ "$engine" != "postgres" ]]; then
     # Update host for DB_USER
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    mysql -h mysql -u root mysql -e "UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
-    mysql -h mysql -u root mysql -e "FLUSH PRIVILEGES;"
+    if [[ "$engine" == "mariadb" ]]; then
+      local sql="UPDATE global_priv SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
+    else
+      local sql="UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
+    fi
+    $engine -h "$engine" -u root mysql -e "$sql"
+    $engine -h "$engine" -u root mysql -e "FLUSH PRIVILEGES;"
     unset MYSQL_PWD
   fi
 }
@@ -1190,10 +1196,10 @@ import_possibly_chunked_dump() {
   local engine="$(get_env "DB_ENGINE")"
 
   if [[ "$engine" == "postgres" ]]; then
-    local run="psql -h postgres -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
+    local run="psql -h $engine -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   else
-    local run="mysql -h mysql -u $DB_USER $DB_NAME"
+    local run="$engine -h $engine -u $DB_USER $DB_NAME"
     local passenv=MYSQL_PWD
   fi
 
@@ -1320,6 +1326,7 @@ start_debezium_and_closetab_if_need() {
 db_shutdown() {
   case "$(get_env "DB_ENGINE")" in
     mysql)     db_shutdown_mysql ;;
+    mariadb)   db_shutdown_mariadb ;;
     postgres)  db_shutdown_postgres ;;
     sqlserver) db_shutdown_sqlserver ;;
     oracle)    db_shutdown_oracle ;;
@@ -1329,6 +1336,12 @@ db_shutdown() {
 db_shutdown_mysql() {
   export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
   mysql -h mysql -u root -e "SHUTDOWN"
+  unset MYSQL_PWD
+}
+
+db_shutdown_mariadb() {
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+  mariadb -h mariadb -u root -e "SHUTDOWN"
   unset MYSQL_PWD
 }
 
@@ -2668,6 +2681,75 @@ mysql_entrypoint() {
   fi
 }
 
+mariadb_entrypoint() {
+
+  # Path to a file to be created once init is done
+  local data="/var/lib/mysql"
+  local done="$data/init.done"
+
+  # Path where mariadb binaries should be copied
+  vmd="/usr/bin/volumed"
+
+  # If it does not exist
+  if [[ ! -f "$vmd/mariadb" ]]; then
+
+    # Сopy 'mariadb' and 'mariadb-dump' command-line utilities into it, so that we can share
+    # those two binaries with wrapper-container to be able to export/import sql-files
+    src="/usr/bin"
+    cp "$src/mariadb"      "$vmd/mariadb"
+    cp "$src/mariadb-dump" "$vmd/mariadb-dump"
+  fi
+
+  # If init is not done
+  if [[ ! -f "$done" ]]; then
+
+    # Change dir
+    cd /docker-entrypoint-initdb.d
+
+    # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
+    # that are recognized by mariadb entrypoint as importable/executable ones
+    rm -f ./*.sh ./*.sql ./*.sql.bz2 ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
+
+    # Shortcut to native entrypoint
+    native="/usr/local/bin/docker-entrypoint.sh"
+
+    # If 'init.done' file creation code was not yet added to native entrypoint script
+    if ! grep -q "init.done" $native; then
+
+      # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
+      sed -i 's~Ready for start up."~&\n\t\t\ttouch '$done'~' $native
+    fi
+  fi
+
+  # Call the original entrypoint script
+  /usr/local/bin/docker-entrypoint.sh "$@"
+
+  # If we reached this line, it means db was shut down
+  echo "$(get_engine_name) Server has been shut down"
+
+  # Create a file within data-dir to indicate shutdown is completed
+  touch "$data/shutdown.done"
+
+  # Wait until shutdown is really completed
+  local timeout=5
+  local elapsed=0
+  while [ ! -z "$(ls -A $data)" ] && [ $elapsed -lt $timeout ]; do
+    echo "Waiting for data-directory to be emptied... ($elapsed s)"
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  # If data-directory was emptied
+  if [ -z "$(ls -A $data)" ]; then
+
+    # We assume it was done for restore
+    echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
+
+    # Re-init
+    mysql_entrypoint "$@"
+  fi
+}
+
 postgres_entrypoint() {
 
   # Path to a file to be created once init is done
@@ -2681,7 +2763,7 @@ postgres_entrypoint() {
     cd /docker-entrypoint-initdb.d
 
     # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
-    # that are recognized by mysql entrypoint as importable/executable ones
+    # that are recognized by postgres entrypoint as importable/executable ones
     rm -f ./*.sh ./*.sql ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
 
     # Shortcut to native entrypoint
@@ -2690,7 +2772,7 @@ postgres_entrypoint() {
     # If 'init.done' file creation code was not yet added to native entrypoint script
     if ! grep -q "init.done" $native; then
 
-      # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
+      # Append touch-command to create an empty '/var/lib/postgresql/init.done'-file after init is done to use in healthcheck
       sed -i 's~unset PGPASSWORD~&\n\t\t\ttouch '$done'~' $native
     fi
   fi
@@ -2838,8 +2920,13 @@ wrapper_entrypoint() {
   # Setup git filemode
   git config --global core.filemode false
 
-  # Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
-  [[ -d /usr/bin/db_engine_client_binaries ]] && cp /usr/bin/db_engine_client_binaries/* /usr/bin/
+  # If we're not on postgres
+  # 1. Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
+  # 2. If we're on mariadb - install libncurses6, as otherwise the copied binaries won't work
+  if [[ "$(get_env "DB_ENGINE")" != "postgres" ]]; then
+    [[ -d /usr/bin/db_engine_client_binaries ]] && cp /usr/bin/db_engine_client_binaries/* /usr/bin/
+    [[ "$(get_env "DB_ENGINE")" == "mariadb" ]] && apt-get install -y libncurses6
+  fi
 
   # Logs dir
   logs="$DOC/var/log/compose/wrapper"
@@ -3199,7 +3286,7 @@ db_query() {
     unset PGPASSWORD
   else
     export MYSQL_PWD="$pass"
-    mysql -h "$host" -u "$user" -D "$name" -N -e "$sql"
+    $engine -h "$host" -u "$user" -D "$name" -N -e "$sql"
     unset MYSQL_PWD
   fi
 }

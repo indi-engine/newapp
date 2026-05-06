@@ -1,0 +1,53 @@
+services:
+
+  mariadb:
+    image: mariadb:10.11-jammy
+    restart: unless-stopped
+    command:
+      --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb_buffer_pool_size=4294967296
+      --wait_timeout=31536000
+      --slow_query_log=ON
+      --general_log=OFF
+      --general_log_file=/var/log/mysql/general.log
+      --slow_query_log_file=/var/log/mysql/slow.log
+      --expire_logs_days=1
+      --log-bin=mysqld-bin
+      --default-time-zone='+00:00'
+      --binlog-format=ROW
+    environment:
+      TZ: UTC
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MARIADB_USER: ${DB_USER:-custom}
+      MARIADB_PASSWORD: ${DB_PASSWORD:-custom}
+      MARIADB_DATABASE: ${DB_NAME:-custom}
+    volumes:
+      - ./compose/mariadb/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
+      - mariadb_server_data:/var/lib/mysql
+      - mariadb_client_binaries:/usr/bin/volumed
+      - ./var/log/compose/mariadb:/var/log/mysql
+    healthcheck:
+      test: mariadb-admin ping -u root --password="$$MARIADB_ROOT_PASSWORD" && [ -f /var/lib/mysql/init.done ]
+      start_period: 3m
+      interval: 5s
+    security_opt:
+      - no-new-privileges:true
+    cap_add:
+      - SYS_NICE
+    entrypoint: ["bash", "custom-entrypoint.sh"]
+
+  wrapper:
+    depends_on:
+      mariadb:
+        condition: service_healthy
+        restart: true
+    volumes:
+      - mariadb_server_data:/var/lib/db_engine
+      - mariadb_client_binaries:/usr/bin/db_engine_client_binaries
+
+volumes:
+  mariadb_server_data:
+  mariadb_client_binaries:

@@ -46,10 +46,13 @@ else
   else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
-    query="mysql $args"
+    query="$engine $args"
     tables='SHOW TABLES FROM `'$name'`'
     recordQty="SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$name' AND TABLE_NAME = '---'"
-    dump_bin="mysqldump"
+    case "$engine" in
+      mariadb) dump_bin="mariadb-dump" ;;
+      *)       dump_bin="mysqldump" ;;
+    esac
     dump_cmd="$dump_bin -h $host -u $user -y $name --single-transaction"
   fi
 

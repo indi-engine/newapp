@@ -116,13 +116,13 @@ def bash_stream(
     mq = nn.channel()
 
     # Instantiate connection with db cursor
-    if engine == 'mysql':
-        db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
-        db = db_conn.cursor(pymysql.cursors.DictCursor)
-    elif engine == 'postgres':
+    if engine == 'postgres':
         db_conn = psycopg2.connect(host=engine, user='custom', password='custom', dbname='custom')
         db_conn.autocommit = True
         db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
+        db = db_conn.cursor(pymysql.cursors.DictCursor)
 
     # Start bash script in a pseudo-terminal
     child = pexpect.spawn('bash -c "' + command + '"', encoding='utf-8')

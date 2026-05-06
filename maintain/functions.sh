@@ -1806,8 +1806,8 @@ env_COMPOSE_FILE() {
   # Variables
   local DB_EXPOSE_PORT="$(grep "^DB_EXPOSE_PORT=" .env.prod | cut -d '=' -f 2-)"
   local DB_ENGINE="$(grep "^DB_ENGINE=" .env.prod | cut -d '=' -f 2-)"
-  local db_engine_yml="docker-compose.$DB_ENGINE.yml"
-  local db_engine_expose_yml="docker-compose.$DB_ENGINE-expose.yml"
+  local db_engine_yml="compose/$DB_ENGINE/service.yml"
+  local db_expose_yml="compose/$DB_ENGINE/expose.yml"
 
   # If db_engine_yml is not yet in the list - add it right after default YAML
   if [[ "$DEFAULT_VALUE" != *"$db_engine_yml"* ]]; then
@@ -1815,8 +1815,8 @@ env_COMPOSE_FILE() {
   fi
 
   # If db expose is not yet in the list - add it right after default YAML
-  if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$db_engine_expose_yml"* ]]; then
-    DEFAULT_VALUE="${DEFAULT_VALUE/${db_engine_yml}/${db_engine_yml}:${db_engine_expose_yml}}"
+  if [[ "$DB_EXPOSE_PORT" != "" && "$DEFAULT_VALUE" != *"$db_expose_yml"* ]]; then
+    DEFAULT_VALUE="${DEFAULT_VALUE/${db_engine_yml}/${db_engine_yml}:${db_expose_yml}}"
   fi
 
   # If we're on windows - spoof colon with semi-colon

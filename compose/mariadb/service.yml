@@ -24,7 +24,7 @@ services:
       MARIADB_PASSWORD: ${DB_PASSWORD:-custom}
       MARIADB_DATABASE: ${DB_NAME:-custom}
     volumes:
-      - ./compose/mariadb/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./compose/mariadb/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
       - mariadb_server_data:/var/lib/mysql
       - mariadb_client_binaries:/usr/bin/volumed

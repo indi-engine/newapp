@@ -24,7 +24,7 @@ services:
       MYSQL_DATABASE: ${DB_NAME:-custom}
       PERCONA_TELEMETRY_DISABLE: 1
     volumes:
-      - ./compose/percona/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./compose/percona/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
       - percona_server_data:/var/lib/mysql
       - percona_client_binaries:/usr/bin/volumed

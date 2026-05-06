@@ -23,7 +23,7 @@ services:
       MYSQL_PASSWORD: ${DB_PASSWORD:-custom}
       MYSQL_DATABASE: ${DB_NAME:-custom}
     volumes:
-      - ./compose/mysql/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./compose/mysql/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
       - mysql_server_data:/var/lib/mysql
       - mysql_client_binaries:/usr/bin/volumed

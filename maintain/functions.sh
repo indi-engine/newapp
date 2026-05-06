@@ -116,6 +116,7 @@ getup() {
       [[ -n $wait ]] && echo -n "$wait" && wait="" || echo -n "."
       sleep 3
     done
+    [[ -z $wait ]] && echo ""
     clear_last_lines
     echo
   fi

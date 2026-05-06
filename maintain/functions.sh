@@ -304,12 +304,28 @@ prepare_privileges() {
   prepare_debezium
 }
 
+# Get name of CLI binary for the current DB engine
+get_engine_cli() {
+
+  # Get engine
+  local engine="$(get_env "DB_ENGINE")"
+
+  # Detect CLI binary
+  case "$engine" in
+    mysql|mariadb) echo "$engine" ;;
+    percona)       echo "mysql" ;;
+    postgres)      echo "psql" ;;
+    *)             echo "$engine" ;;
+  esac
+}
+
 # Run debezium-specific sql
 prepare_debezium() {
 
-  # Get subnet as host
+  # Shortcuts
   local DB_USER_host="$(get_db_host_prefix)"
   local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
 
   # Remove debezium offsets and schema history files
   rm -f var/tmp/debezium-offsets.dat
@@ -318,9 +334,9 @@ prepare_debezium() {
   # Grant privileges needed for debezium
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-    psql -h postgres -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
-    psql -h postgres -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
-		psql -h postgres -t -q -U postgres --no-align -d custom <<-'PGSQL'
+    $cli -h $engine -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
+    $cli -h $engine -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
+		$cli -h $engine -t -q -U postgres --no-align -d custom <<-'PGSQL'
 			DO $$
 			DECLARE t text;
 			BEGIN
@@ -333,7 +349,7 @@ prepare_debezium() {
 		unset PGPASSWORD
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    $engine -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
+    $cli -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
     unset MYSQL_PWD
   fi
 }
@@ -343,20 +359,21 @@ prepare_debezium() {
 # from outside of the Indi Engine's Docker Compose project
 sync_host_for_DB_USER() {
 
-  # Get subnet as host
+  # Shortcuts
   local DB_USER_host="$(get_db_host_prefix)"
   local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
 
+  # If we're not on postgres - update host for DB_USER
   if [[ "$engine" != "postgres" ]]; then
-    # Update host for DB_USER
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     if [[ "$engine" == "mariadb" ]]; then
       local sql="UPDATE global_priv SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
     else
       local sql="UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
     fi
-    $engine -h "$engine" -u root mysql -e "$sql"
-    $engine -h "$engine" -u root mysql -e "FLUSH PRIVILEGES;"
+    $cli -h "$engine" -u root mysql -e "$sql"
+    $cli -h "$engine" -u root mysql -e "FLUSH PRIVILEGES;"
     unset MYSQL_PWD
   fi
 }
@@ -1327,25 +1344,35 @@ db_shutdown() {
   case "$(get_env "DB_ENGINE")" in
     mysql)     db_shutdown_mysql ;;
     mariadb)   db_shutdown_mariadb ;;
+    percona)   db_shutdown_percona ;;
     postgres)  db_shutdown_postgres ;;
     sqlserver) db_shutdown_sqlserver ;;
     oracle)    db_shutdown_oracle ;;
   esac
 }
 
+# Shut down mysql
 db_shutdown_mysql() {
   export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
   mysql -h mysql -u root -e "SHUTDOWN"
   unset MYSQL_PWD
 }
 
+# Shut down mariadb
 db_shutdown_mariadb() {
   export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
   mariadb -h mariadb -u root -e "SHUTDOWN"
   unset MYSQL_PWD
 }
 
-# Shut down db server
+# Shut down percona
+db_shutdown_percona() {
+  export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+  mysql -h percona -u root -e "SHUTDOWN"
+  unset MYSQL_PWD
+}
+
+# Shut down postgres
 db_shutdown_postgres() {
 
   # Set CLI password
@@ -2612,6 +2639,10 @@ backup_before_restore() {
   echo ""
 }
 
+percona_entrypoint() {
+  mysql_entrypoint
+}
+
 mysql_entrypoint() {
 
   # Path to a file to be created once init is done
@@ -2677,7 +2708,7 @@ mysql_entrypoint() {
     echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
 
     # Re-init
-    mysql_entrypoint "$@"
+    "$(get_env "DB_ENGINE")_entrypoint" "$@"
   fi
 }
 
@@ -2746,7 +2777,7 @@ mariadb_entrypoint() {
     echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
 
     # Re-init
-    mysql_entrypoint "$@"
+    mariadb_entrypoint "$@"
   fi
 }
 
@@ -3278,15 +3309,16 @@ db_query() {
   local user="$DB_USER"
   local pass="$DB_PASSWORD"
   local name="$DB_NAME"
+  local cli="$(get_engine_cli)"
 
   # Run engine-specific query
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$pass"
-    psql -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
+    $cli -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
     unset PGPASSWORD
   else
     export MYSQL_PWD="$pass"
-    $engine -h "$host" -u "$user" -D "$name" -N -e "$sql"
+    $cli -h "$host" -u "$user" -D "$name" -N -e "$sql"
     unset MYSQL_PWD
   fi
 }

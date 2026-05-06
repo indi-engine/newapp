@@ -1,0 +1,4 @@
+services:
+  percona:
+    ports:
+      - "${DB_EXPOSE_PORT}:3306"

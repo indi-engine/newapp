@@ -1211,12 +1211,13 @@ import_possibly_chunked_dump() {
   local path="$dir/$dump"
   local msg="${prepend}Importing $dump"
   local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
 
   if [[ "$engine" == "postgres" ]]; then
-    local run="psql -h $engine -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
+    local run="$cli -h $engine -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   else
-    local run="$engine -h $engine -u $DB_USER $DB_NAME"
+    local run="$cli -h $engine -u $DB_USER $DB_NAME"
     local passenv=MYSQL_PWD
   fi
 
@@ -2640,7 +2641,71 @@ backup_before_restore() {
 }
 
 percona_entrypoint() {
-  mysql_entrypoint
+
+    # Path to a file to be created once init is done
+    local data="/var/lib/mysql"
+    local done="$data/init.done"
+
+    # Path where mysql binaries should be copied
+    local vmd="/usr/bin/volumed"
+
+    # If it does not exist
+    if [[ ! -f "$vmd/mysql" ]]; then
+
+      # Сopy 'mysql' and 'mysqldump' command-line utilities into it, so that we can share
+      # those two binaries with wrapper-container to be able to export/import sql-files
+      src="/usr/bin"
+      cp "$src/mysql"     "$vmd/mysql"
+      cp "$src/mysqldump" "$vmd/mysqldump"
+    fi
+
+    # Shortcut to native entrypoint
+    native="/docker-entrypoint.sh"
+
+    # If init is not done
+    if [[ ! -f "$done" ]]; then
+
+      # Change dir
+      cd /docker-entrypoint-initdb.d
+
+      # Remove any existing files from current dir (i.e. /docker-entrypoint-initdb.d/)
+      # that are recognized by mysql entrypoint as importable/executable ones
+      rm -f ./*.sh ./*.sql ./*.sql.bz2 ./*.sql.gz ./*.sql.gz[0-9][0-9] ./*.sql.xz ./*.sql.zst
+
+      # If 'init.done' file creation code was not yet added to native entrypoint script
+      # Append touch-command to create an empty '/var/lib/mysql/init.done'-file after init is done to use in healthcheck
+      if ! grep -q "init.done" $native; then
+        sed -i "s~Ready for start up.'~&\n\t\ttouch $done~" $native
+      fi
+    fi
+
+    # Call the original entrypoint script
+    runuser -u mysql -- "$native" "$@"
+
+    # If we reached this line, it means db was shut down
+    echo "$(get_engine_name) Server has been shut down"
+
+    # Create a file within data-dir to indicate shutdown is completed
+    touch "$data/shutdown.done"
+
+    # Wait until shutdown is really completed
+    local timeout=5
+    local elapsed=0
+    while [ ! -z "$(ls -A $data)" ] && [ $elapsed -lt $timeout ]; do
+      echo "Waiting for data-directory to be emptied... ($elapsed s)"
+      sleep 1
+      elapsed=$((elapsed + 1))
+    done
+
+    # If data-directory was emptied
+    if [ -z "$(ls -A $data)" ]; then
+
+      # We assume it was done for restore
+      echo "$(get_engine_name) data-directory has been emptied, so initiating the restore..."
+
+      # Re-init
+      "$(get_env "DB_ENGINE")_entrypoint" "$@"
+    fi
 }
 
 mysql_entrypoint() {
@@ -2953,10 +3018,10 @@ wrapper_entrypoint() {
 
   # If we're not on postgres
   # 1. Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
-  # 2. If we're on mariadb - install libncurses6, as otherwise the copied binaries won't work
+  # 2. If we're on mariadb or percona - install libncurses6, as otherwise the copied binaries won't work
   if [[ "$(get_env "DB_ENGINE")" != "postgres" ]]; then
     [[ -d /usr/bin/db_engine_client_binaries ]] && cp /usr/bin/db_engine_client_binaries/* /usr/bin/
-    [[ "$(get_env "DB_ENGINE")" == "mariadb" ]] && apt-get install -y libncurses6
+    [[ "$(get_env "DB_ENGINE")" != "mysql" ]] && apt-get install -y libncurses6
   fi
 
   # Logs dir

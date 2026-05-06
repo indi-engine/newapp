@@ -1,7 +1,7 @@
 services:
 
   percona:
-    image: percona:8.0-debian
+    image: percona:8.0
     restart: unless-stopped
     command:
       --sql_mode=ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION,STRICT_TRANS_TABLES
@@ -22,6 +22,7 @@ services:
       MYSQL_USER: ${DB_USER:-custom}
       MYSQL_PASSWORD: ${DB_PASSWORD:-custom}
       MYSQL_DATABASE: ${DB_NAME:-custom}
+      PERCONA_TELEMETRY_DISABLE: 1
     volumes:
       - ./compose/percona/docker-entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
@@ -36,6 +37,7 @@ services:
       - no-new-privileges:true
     cap_add:
       - SYS_NICE
+    user: root
     entrypoint: ["bash", "custom-entrypoint.sh"]
 
   wrapper:

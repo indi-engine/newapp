@@ -3743,8 +3743,8 @@ setup_swap_if_need() {
   # If we're on windows - do nothing
   is_windows && return 0
 
-  # If we're not on postgres - do nothing
-  [[ "$(get_env "DB_ENGINE")" != "postgres" ]] && return 0
+  # If we're not on postgres or mariadb - do nothing
+  [[ "$(get_env "DB_ENGINE")" != "postgres" && "$(get_env "DB_ENGINE")" != "mariadb" ]] && return 0
 
   # Shortcut
   local SWAPFILE="/swapfile-indi-engine"

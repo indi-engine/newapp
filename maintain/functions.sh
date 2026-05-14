@@ -288,6 +288,7 @@ create_DB_USER_if_need() {
       GRANT CONNECT ON DATABASE \"${DB_NAME}\" TO \"${DB_USER}\";
       GRANT CREATE ON SCHEMA public TO \"${DB_USER}\";
       GRANT USAGE ON SCHEMA public TO \"${DB_USER}\";
+      GRANT SET ON PARAMETER session_replication_role TO \"${DB_USER}\";
     "
 
     # Run sql

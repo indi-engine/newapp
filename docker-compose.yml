@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
     environment:
       DOC: ${DOC}
+      VDR: vendor/indi-engine
       RABBITMQ_HOST: rabbitmq
       DB_ENGINE: ${DB_ENGINE}
       DB_USER: ${DB_USER:-custom}

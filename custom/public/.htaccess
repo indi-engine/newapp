@@ -12,11 +12,7 @@ RewriteEngine On
 
 # Proxy websockets
 RewriteCond %{HTTP:Sec-WebSocket-Version} 13 [NC]
-RewriteRule ^ - [E=IS_WEBSOCKET:1]
-Header set Connection "Upgrade" env=IS_WEBSOCKET
-Header set Upgrade "websocket" env=IS_WEBSOCKET
-RewriteCond %{ENV:IS_WEBSOCKET} 1
-RewriteRule ^/?(.*) "ws://rabbitmq:15674/ws" [P]
+RewriteRule ^/?(.*) "ws://rabbitmq:15674/ws" [P,L]
 
 # Proxy client app
 RewriteCond %{REQUEST_FILENAME} !-f

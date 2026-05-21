@@ -1,3 +1,3 @@
 <?php
 $GLOBALS['cmsOnlyMode'] = true;
-require_once($_SERVER['VDR'] . '/system/index.php');
+require_once($_ENV['VDR'] . '/system/index.php');

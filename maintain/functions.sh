@@ -899,7 +899,7 @@ get_tag_hash() {
 set_tag_hash() {
 
   # Do set and get result
-  result=$(git tag "$1" "$2" --force)$(git push "https://$GH_TOKEN_CUSTOM_RW@github.com/$repo.git" "$1" --force 2>&1)
+  result=$(git tag "$1" "$2" --force)$(git push "https://github.com/$repo.git" "$1" --force 2>&1)
 
   # Print result
   if echo "$result" | grep -q "forced update" ; then
@@ -2608,11 +2608,9 @@ commit_restore() {
 
   # Push changes to remote repo, and pull back for git log to show last commit in origin/main as well
   echo ""
-  git remote set-url origin https://$GH_TOKEN_CUSTOM_RW@github.com/$(get_current_repo)
+  git remote set-url origin https://github.com/$(get_current_repo)
   git push
   pull=$(git pull) && [[ ! "$pull" = "Already up to date." ]] && echo -e "\n$pull";
-
-  git remote set-url origin https://-@github.com/$(get_current_repo)
 
   # Print restore is now committed
   echo -e "\nRESTORE COMMITTED: ${g}${version}${d}\n"

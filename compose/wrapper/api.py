@@ -25,12 +25,32 @@ def get_parent_repo():
 def valid_tag(tagName):
     return bool(re.fullmatch(r'[a-zA-Z0-9._-]{1,63}', tagName))
 
+# Check validity of Postgres identifier (e.g. table name, column name)
+def valid_pg_identifier(name):
+
+    # If name is not a string - return false
+    if not isinstance(name, str): return False
+
+    # Check allowed characters and length
+    return bool(re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*', name)) and len(name) <= 63
+
 # Get table dump via pg_dump
 def get_table_dump(name):
-    return subprocess.run(
-        f'PGPASSWORD=custom pg_dump -h postgres -U custom -d custom -t \'"{name}"\' --schema-only',
-        shell=True, executable='/bin/bash', capture_output=True, text=True
-    ).stdout.strip()
+
+    # Check table name
+    if not valid_pg_identifier(name): raise ValueError("Invalid table name")
+
+    # Run export
+    result = subprocess.run(
+        ['pg_dump', '-h', 'postgres', '-U', 'custom', '-d', 'custom', '-t', f'"{name}"', '--schema-only'],
+        env={'PGPASSWORD': 'custom'}, shell=False, capture_output=True, text=True
+    )
+
+    # If failed
+    if result.returncode != 0: raise RuntimeError(f"pg_dump failed: {result.stderr}")
+
+    # Else print dump
+    return result.stdout.strip()
 
 # Check if given queue exists, i.e. user didn't closed the browser tab yet
 def queue_exists(channel, name):

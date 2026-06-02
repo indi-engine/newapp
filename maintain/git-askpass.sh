@@ -9,5 +9,5 @@ if env | grep -q GH_TOKEN=; then
 # requires github auth. Anyway, here we use GH_TOKEN_CUSTOM_RW from .env, if given
 else
   token="$(grep -E '^GH_TOKEN_CUSTOM_RW=[^[:space:]]' .env)"
-  if [[ "$token" != "" ]]; then echo "-:${token#*=}"; else exit 1; fi
+  if [[ "$token" != "" ]]; then echo "${token#*=}"; else exit 1; fi
 fi

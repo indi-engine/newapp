@@ -5,7 +5,8 @@ services:
       dockerfile: compose/apache/Dockerfile
       args:
         - DOC=${DOC}
-        - GH_TOKEN_SYSTEM_RO=${GH_TOKEN_SYSTEM_RO}
+      secrets:
+        - github_token
     ports:
       - "80:80"
       - "443:443"
@@ -96,3 +97,7 @@ volumes:
   rabbitmq:
   letsencrypt:
   opendkim:
+
+secrets:
+  github_token:
+    environment: GH_TOKEN_SYSTEM_RO

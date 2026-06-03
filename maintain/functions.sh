@@ -24,6 +24,9 @@ getup() {
   # Setup swap
   setup_swap_if_need
 
+  # Disable hints
+  export DOCKER_CLI_HINTS=false
+
   # Setup the docker compose project
   set +e; docker compose up -d; exit_code=$?;
 
@@ -365,8 +368,33 @@ sync_host_for_DB_USER() {
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
 
-  # If we're not on postgres - update host for DB_USER
-  if [[ "$engine" != "postgres" ]]; then
+  # If we're on postgres - adjust pg_hba.conf
+  if [[ "$engine" == "postgres" ]]; then
+
+    # Shortcuts
+    local hba="/var/lib/db_engine/18/docker/pg_hba.conf"
+    local ipv4_cidr="$(hostname -i | tr ' ' '\n' | grep '^[0-9]\+\.' | head -n1 | awk -F. '{print $1 "." $2 ".0.0/16"}')"
+
+    # Remove old managed block
+    sed -i '/# INDI_ENGINE_CUSTOM_BEGIN/,/# INDI_ENGINE_CUSTOM_END/d' "$hba"
+
+    # Insert new block at top
+    {
+      echo "# INDI_ENGINE_CUSTOM_BEGIN"
+      echo "host    all    custom    $ipv4_cidr    scram-sha-256"
+      echo "host    all    custom    0.0.0.0/0    reject"
+      echo "host    all    custom    ::/0         reject"
+      echo "# INDI_ENGINE_CUSTOM_END"
+      cat "$hba"
+    } > "$hba.tmp" && mv "$hba.tmp" "$hba"
+
+    # Reload postgres conf
+    export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d postgres -c "SELECT pg_reload_conf();" -q -v ON_ERROR_STOP=1 > /dev/null
+    unset PGPASSWORD
+
+  # Else update host for DB_USER
+  else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     if [[ "$engine" == "mariadb" ]]; then
       local sql="UPDATE global_priv SET host = '$DB_USER_host' WHERE user = '$DB_USER';"

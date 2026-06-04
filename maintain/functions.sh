@@ -244,17 +244,18 @@ db_import() {
 
       # Switch to system token
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
+      local DB_DUMP="$(get_env "DB_DUMP")"
 
       # Download dump
-      if [[ ! -f "data/dump.sql.gz" ]]; then
-        download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "dump.sql.gz"
+      if [[ ! -f "data/$DB_DUMP" ]]; then
+        download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "$DB_DUMP"
       fi
 
       # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
       create_DB_APP_USER_if_need
 
       # Do import
-      import_possibly_chunked_dump "dump.sql.gz"
+      import_possibly_chunked_dump "$DB_DUMP"
 
       # Run debezium-specific sql
       prepare_privileges
@@ -2504,11 +2505,12 @@ cancel_restore_source() {
 
 # Cancel uploads restore, i.e. revert uploads to the state which was before restore
 cancel_restore_uploads_and_dump() {
+  local DB_DUMP="$(get_env "DB_DUMP")"
 
   # Move uploads.zip and dump.sql.gz files from data/before/ to data/
   # for those to be further picked by restore_uploads() call and db re-init
   src="data/before" && trg="data"
-  echo -n "Moving uploads.zip and dump.sql.gz from $src/ into $trg/..."
+  echo -n "Moving uploads.zip and $DB_DUMP from $src/ into $trg/..."
   if [ -d $src ]; then
     rm -f data/uploads.z*
     mv -f "$src"/* "$trg"/ && rm -r "$src"
@@ -3547,7 +3549,7 @@ migrate_if_need() {
   if [[ ${#migrate[@]} -gt 0 ]]; then
 
     # Remove local database dump, if any, to prevent duplicate disk space usage
-    rm -f data/dump.sql.gz*
+    rm -f "data/$(get_env "DB_DUMP")"*
 
     # Create pre-migrate database backup, if not yet created
     if [[ ! -d data/before ]]; then

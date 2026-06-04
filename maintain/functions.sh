@@ -197,8 +197,8 @@ db_import() {
   # If no expected dump files are missing
   if [[ "$missing" = "" ]]; then
 
-    # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-    create_DB_USER_if_need
+    # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+    create_DB_APP_USER_if_need
 
     # Import the dump files that we have
     for file in $DB_DUMP; do
@@ -250,8 +250,8 @@ db_import() {
         download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "dump.sql.gz"
       fi
 
-      # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-      create_DB_USER_if_need
+      # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+      create_DB_APP_USER_if_need
 
       # Do import
       import_possibly_chunked_dump "dump.sql.gz"
@@ -274,9 +274,9 @@ db_import() {
   touch "$done"
 }
 
-# Create $DB_USER - needed if $DB_ENGINE is 'postgres',
+# Create $DB_APP_USER - needed if $DB_ENGINE is 'postgres',
 # as only root user is created by default out of-the-box
-create_DB_USER_if_need() {
+create_DB_APP_USER_if_need() {
 
   # If we're on Postgres
   if [[ "$(get_env "DB_ENGINE")" == "postgres" ]]; then
@@ -286,12 +286,12 @@ create_DB_USER_if_need() {
 
     # Prepare sql to create user with basic rights
     sql="
-      DO \$\$ BEGIN CREATE USER \"${DB_USER}\" WITH PASSWORD '${DB_PASSWORD}';
+      DO \$\$ BEGIN CREATE USER \"${DB_APP_USER}\" WITH PASSWORD '${DB_APP_PASSWORD}';
       EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
-      GRANT CONNECT ON DATABASE \"${DB_NAME}\" TO \"${DB_USER}\";
-      GRANT CREATE ON SCHEMA public TO \"${DB_USER}\";
-      GRANT USAGE ON SCHEMA public TO \"${DB_USER}\";
-      GRANT SET ON PARAMETER session_replication_role TO \"${DB_USER}\";
+      GRANT CONNECT ON DATABASE \"${DB_NAME}\" TO \"${DB_APP_USER}\";
+      GRANT CREATE ON SCHEMA public TO \"${DB_APP_USER}\";
+      GRANT USAGE ON SCHEMA public TO \"${DB_APP_USER}\";
+      GRANT SET ON PARAMETER session_replication_role TO \"${DB_APP_USER}\";
     "
 
     # Run sql
@@ -302,9 +302,9 @@ create_DB_USER_if_need() {
   fi
 }
 
-# Prepare Change Data Capture / CDC privileges, and amend DB_USER host
+# Prepare Change Data Capture / CDC privileges, and amend DB_APP_USER host
 prepare_privileges() {
-  sync_host_for_DB_USER
+  sync_host_for_DB_APP_USER
   prepare_debezium
 }
 
@@ -327,7 +327,7 @@ get_engine_cli() {
 prepare_debezium() {
 
   # Shortcuts
-  local DB_USER_host="$(get_db_host_prefix)"
+  local DB_APP_USER_host="$(get_db_host_prefix)"
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
 
@@ -338,9 +338,9 @@ prepare_debezium() {
   # Grant privileges needed for debezium
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-    $cli -h $engine -t -q -U postgres --no-align -c "ALTER USER $DB_USER REPLICATION"
-    $cli -h $engine -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d custom
-		$cli -h $engine -t -q -U postgres --no-align -d custom <<-'PGSQL'
+    $cli -h $engine -t -q -U postgres --no-align -c "ALTER USER $DB_APP_USER REPLICATION"
+    $cli -h $engine -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d $DB_NAME
+		$cli -h $engine -t -q -U postgres --no-align -d $DB_NAME <<-'PGSQL'
 			DO $$
 			DECLARE t text;
 			BEGIN
@@ -353,18 +353,19 @@ prepare_debezium() {
 		unset PGPASSWORD
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    $cli -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_USER'@'$DB_USER_host';"
+    $cli -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_APP_USER'@'$DB_APP_USER_host';"
     unset MYSQL_PWD
   fi
 }
 
-# Get subnet for current container and use it as a host for DB_USER
-# so that the connections on behalf of DB_USER to NOT be possible
+# Get subnet for current container and use it as a host for DB_APP_USER
+# so that the connections on behalf of DB_APP_USER to NOT be possible
 # from outside of the Indi Engine's Docker Compose project
-sync_host_for_DB_USER() {
+sync_host_for_DB_APP_USER() {
 
   # Shortcuts
-  local DB_USER_host="$(get_db_host_prefix)"
+  local DB_APP_USER_host="$(get_db_host_prefix)"
+  local DB_APP_USER="$(get_env "DB_APP_USER")"
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
 
@@ -381,9 +382,9 @@ sync_host_for_DB_USER() {
     # Insert new block at top
     {
       echo "# INDI_ENGINE_CUSTOM_BEGIN"
-      echo "host    all    custom    $ipv4_cidr    scram-sha-256"
-      echo "host    all    custom    0.0.0.0/0    reject"
-      echo "host    all    custom    ::/0         reject"
+      echo "host    all    $DB_APP_USER    $ipv4_cidr    scram-sha-256"
+      echo "host    all    $DB_APP_USER    0.0.0.0/0    reject"
+      echo "host    all    $DB_APP_USER    ::/0         reject"
       echo "# INDI_ENGINE_CUSTOM_END"
       cat "$hba"
     } > "$hba.tmp" && mv "$hba.tmp" "$hba"
@@ -393,13 +394,13 @@ sync_host_for_DB_USER() {
     $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d postgres -c "SELECT pg_reload_conf();" -q -v ON_ERROR_STOP=1 > /dev/null
     unset PGPASSWORD
 
-  # Else update host for DB_USER
+  # Else update host for DB_APP_USER
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     if [[ "$engine" == "mariadb" ]]; then
-      local sql="UPDATE global_priv SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
+      local sql="UPDATE global_priv SET host = '$DB_APP_USER_host' WHERE user = '$DB_APP_USER';"
     else
-      local sql="UPDATE user SET host = '$DB_USER_host' WHERE user = '$DB_USER';"
+      local sql="UPDATE user SET host = '$DB_APP_USER_host' WHERE user = '$DB_APP_USER';"
     fi
     $cli -h "$engine" -u root mysql -e "$sql"
     $cli -h "$engine" -u root mysql -e "FLUSH PRIVILEGES;"
@@ -407,7 +408,7 @@ sync_host_for_DB_USER() {
   fi
 }
 
-# Get the current Docker Compose project's subnet in a format usable as Host for DB_USER
+# Get the current Docker Compose project's subnet in a format usable as Host for DB_APP_USER
 get_db_host_prefix() {
 
   # Get IP address
@@ -1208,8 +1209,8 @@ restore_dump_from_local() {
   # Import each (possibly chunked) dump
   [[ "$prepend" != "" ]] && echo -ne "${gray}"
 
-  # Create $DB_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-  create_DB_USER_if_need
+  # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
+  create_DB_APP_USER_if_need
 
   for file in $DB_DUMP; do
     import_possibly_chunked_dump "$file" "$dir" "$prepend"
@@ -1243,15 +1244,15 @@ import_possibly_chunked_dump() {
   local cli="$(get_engine_cli)"
 
   if [[ "$engine" == "postgres" ]]; then
-    local run="$cli -h $engine -U $DB_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
+    local run="$cli -h $engine -U $DB_APP_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   else
-    local run="$cli -h $engine -u $DB_USER $DB_NAME"
+    local run="$cli -h $engine -u $DB_APP_USER $DB_NAME"
     local passenv=MYSQL_PWD
   fi
 
   # Prevent warning
-  export "${passenv}=${DB_PASSWORD}"
+  export "${passenv}=${DB_APP_PASSWORD}"
 
   # If dump file exists in data/ directory - import
   if [[ -f "$path" ]]; then
@@ -1695,6 +1696,14 @@ prepare_env() {
 
 # Check if DB_ROOT_PASSWORD is left empty, and if yes - generate a random value
 env_validate_DB_ROOT_PASSWORD() {
+  if [[ "$INPUT_VALUE" = "" ]]; then
+    # Excluded chars #$<>&|\;()! to prevent problems on CLI
+    INPUT_VALUE="$(echo "$(LC_ALL=C tr -dc 'A-Za-z0-9@%^*\-_=+[\]{}:,.?' < /dev/urandom | head -c32)")"
+  fi
+}
+
+# Check if DB_APP_PASSWORD is left empty, and if yes - generate a random value
+env_validate_DB_APP_PASSWORD() {
   if [[ "$INPUT_VALUE" = "" ]]; then
     # Excluded chars #$<>&|\;()! to prevent problems on CLI
     INPUT_VALUE="$(echo "$(LC_ALL=C tr -dc 'A-Za-z0-9@%^*\-_=+[\]{}:,.?' < /dev/urandom | head -c32)")"
@@ -3141,8 +3150,8 @@ wrapper_entrypoint() {
     gh repo set-default "$(get_current_repo)"
   fi
 
-  # Sync DB_USER host
-  sync_host_for_DB_USER
+  # Sync DB_APP_USER host
+  sync_host_for_DB_APP_USER
 
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
@@ -3398,8 +3407,8 @@ db_query() {
   # Shortcut
   local engine="$(get_env "DB_ENGINE")"
   local host="$engine"
-  local user="$DB_USER"
-  local pass="$DB_PASSWORD"
+  local user="$DB_APP_USER"
+  local pass="$DB_APP_PASSWORD"
   local name="$DB_NAME"
   local cli="$(get_engine_cli)"
 

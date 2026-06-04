@@ -19,9 +19,9 @@ services:
     environment:
       TZ: UTC
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MYSQL_USER: ${DB_USER:-custom}
-      MYSQL_PASSWORD: ${DB_PASSWORD:-custom}
-      MYSQL_DATABASE: ${DB_NAME:-custom}
+      MYSQL_USER: ${DB_APP_USER}
+      MYSQL_PASSWORD: ${DB_APP_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
       PERCONA_TELEMETRY_DISABLE: 1
     volumes:
       - ./compose/percona/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro

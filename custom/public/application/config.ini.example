@@ -6,13 +6,6 @@ demo = false
 logo.auth = 
 logo.main = 
 
-[db]
-adapter = mysql
-host = localhost
-user = custom
-pass = custom
-name = custom
-
 [lang]
 front = ru
 admin = en

@@ -21,9 +21,9 @@ services:
       VDR: vendor/indi-engine
       RABBITMQ_HOST: rabbitmq
       DB_ENGINE: ${DB_ENGINE}
-      DB_USER: ${DB_USER:-custom}
-      DB_PASSWORD: ${DB_PASSWORD:-custom}
-      DB_NAME: ${DB_NAME:-custom}
+      DB_APP_USER: ${DB_APP_USER}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      DB_NAME: ${DB_NAME}
       LETS_ENCRYPT_NOTIFY: ${GIT_COMMIT_EMAIL:-}
       APP_ENV: ${APP_ENV}
     working_dir: ${DOC}
@@ -67,10 +67,10 @@ services:
       DOC: ${DOC}
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
-      GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE:-}
-      DB_USER: ${DB_USER:-custom}
-      DB_PASSWORD: ${DB_PASSWORD:-custom}
-      DB_NAME: ${DB_NAME:-custom}
+      GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE}
+      DB_APP_USER: ${DB_APP_USER}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD}
+      DB_NAME: ${DB_NAME}
       DB_DUMP: ${DB_DUMP}
       DB_HOST: ${DB_HOST:-$DB_ENGINE}
       DB_ENGINE: ${DB_ENGINE}

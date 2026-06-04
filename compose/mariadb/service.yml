@@ -20,9 +20,9 @@ services:
     environment:
       TZ: UTC
       MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
-      MARIADB_USER: ${DB_USER:-custom}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-custom}
-      MARIADB_DATABASE: ${DB_NAME:-custom}
+      MARIADB_USER: ${DB_APP_USER}
+      MARIADB_PASSWORD: ${DB_APP_PASSWORD}
+      MARIADB_DATABASE: ${DB_NAME}
     volumes:
       - ./compose/mariadb/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro

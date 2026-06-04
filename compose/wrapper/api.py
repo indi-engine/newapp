@@ -34,24 +34,6 @@ def valid_pg_identifier(name):
     # Check allowed characters and length
     return bool(re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*', name)) and len(name) <= 63
 
-# Get table dump via pg_dump
-def get_table_dump(name):
-
-    # Check table name
-    if not valid_pg_identifier(name): raise ValueError("Invalid table name")
-
-    # Run export
-    result = subprocess.run(
-        ['pg_dump', '-h', 'postgres', '-U', 'custom', '-d', 'custom', '-t', f'"{name}"', '--schema-only'],
-        env={'PGPASSWORD': 'custom'}, shell=False, capture_output=True, text=True
-    )
-
-    # If failed
-    if result.returncode != 0: raise RuntimeError(f"pg_dump failed: {result.stderr}")
-
-    # Else print dump
-    return result.stdout.strip()
-
 # Check if given queue exists, i.e. user didn't closed the browser tab yet
 def queue_exists(channel, name):
     try:
@@ -76,14 +58,35 @@ def get_dot_env(name):
                 return value
     return ''
 
-# Get DB_ENGINE from .env
+# Get DB_ENGINE and credentials from .env
 engine = get_dot_env('DB_ENGINE')
+db_user = get_dot_env('DB_APP_USER')
+db_pass = get_dot_env('DB_APP_PASSWORD')
+db_name = get_dot_env('DB_NAME')
+
+# Get table dump via pg_dump
+def get_table_dump(name):
+
+    # Check table name
+    if not valid_pg_identifier(name): raise ValueError("Invalid table name")
+
+    # Run export
+    result = subprocess.run(
+        ['pg_dump', '-h', 'postgres', '-U', db_user, '-d', db_name, '-t', f'"{name}"', '--schema-only'],
+        env={'PGPASSWORD': db_pass}, shell=False, capture_output=True, text=True
+    )
+
+    # If failed
+    if result.returncode != 0: raise RuntimeError(f"pg_dump failed: {result.stderr}")
+
+    # Else print dump
+    return result.stdout.strip()
 
 # Send websocket message to open xterm in Indi Engine UI
 def ws(to, data, mq, db):
 
     # Queue name prefix
-    prefix = 'indi-engine.custom.opentab--'
+    prefix = f'indi-engine.{db_name}.opentab--'
 
     # If title-prop exist in data - save for later reuse
     if 'title' in data:
@@ -137,11 +140,11 @@ def bash_stream(
 
     # Instantiate connection with db cursor
     if engine == 'postgres':
-        db_conn = psycopg2.connect(host=engine, user='custom', password='custom', dbname='custom')
+        db_conn = psycopg2.connect(host=engine, user=db_user, password=db_pass, dbname=db_name)
         db_conn.autocommit = True
         db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     else:
-        db_conn = pymysql.connect(host=engine, user='custom', password='custom', database='custom', autocommit=True)
+        db_conn = pymysql.connect(host=engine, user=db_user, password=db_pass, database=db_name, autocommit=True)
         db = db_conn.cursor(pymysql.cursors.DictCursor)
 
     # Start bash script in a pseudo-terminal

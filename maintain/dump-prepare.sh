@@ -25,34 +25,30 @@ else
   user="$DB_APP_USER"
   pass="$DB_APP_PASSWORD"
   name="$DB_NAME"
-  dump="$dir/$DB_DUMP"
   pref="${2:-}"
   cli="$(get_engine_cli)"
 
   # Goto project root
   cd "$DOC"
 
-  # Trim .gz from dump filename
-  sql=$(echo "$dump" | sed 's/\.gz$//')
-
   # Prepare DBE-specific shortcuts
   if [[ "$engine" == "postgres" ]]; then
     pwdenv="PGPASSWORD"
-    args="-h $host -U $user -t -q -c"
-    tables="SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-    recordQty="SELECT reltuples::bigint FROM pg_class WHERE relname = '---'"
+    args="-h $host -U $user -t -q -d $name -c"
+    schemas="system public"
+    rows="SELECT SUM(c.reltuples::bigint) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname IN ('${schemas/ /"','"}')"
     dump_bin="pg_dump"
-    dump_cmd="$dump_bin -h $host -U $user -d $name --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
+    dump_cmd="$dump_bin -h $host -U $user -d $name -n ~schema~ --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
   else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
-    tables='SHOW TABLES FROM `'$name'`'
-    recordQty="SELECT TABLE_ROWS FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = '$name' AND TABLE_NAME = '---'"
+    schemas="system $name"
+    rows="SELECT SUM(TABLE_ROWS) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA IN ('${schemas/ /"','"}')"
     case "$engine" in
       mariadb) dump_bin="mariadb-dump" ;;
       *)       dump_bin="mysqldump" ;;
     esac
-    dump_cmd="$dump_bin -h $host -u $user -y $name --single-transaction"
+    dump_cmd="$dump_bin -h $host -u $user -y ~schema~ --single-transaction"
   fi
 
   # Query shortcut
@@ -63,62 +59,61 @@ else
 
   # Estimate export as number of records to be dumped
   msg="${pref}Calculating approximate qty of total rows..."; echo $msg
-  total=0; tableQty=0
-  for table in $($query "$tables"); do
-    count="$($query "${recordQty/---/"$table"}")"
-    count=${count//[[:space:]]/}
-    (( total+=count )) || true
-    (( tableQty++ )) || true
-    clear_last_lines 1
-    echo -n "$msg "; printf "%'d" "$total"; echo " in $tableQty tables"
-  done
-
-  # Target gz file path
-  gz="$sql.gz"
-  base=$gz*
-
-  # Remove existing gz file with chunks, if any
-  rm -f $base*
+  qty="$($query "$rows")"; qty=${qty//[[:space:]]/};
+  tbl="$($query "${rows/SUM/COUNT}")"; tbl=${tbl//[[:space:]]/};
+  clear_last_lines 1
+  echo -n "$msg "; printf "%'d" "$qty"; echo " in $tbl tables"
 
   # Pick GH_ASSET_MAX_SIZE from .env
   export GH_ASSET_MAX_SIZE="$(grep "^GH_ASSET_MAX_SIZE=" .env | cut -d '=' -f 2-)"
 
-  # Export dump with printing progress
-  [ -d "$dir" ] || mkdir -p "$dir"
-  msg="${pref}Exporting $(basename "$gz") into $dir/ dir...";
-  $dump_cmd | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$total" -v msg="$msg" '{
-      count += gsub(/\),\(/, "&") + 1
-      percent = int((count / total) * 100)
-      if (percent != last) {
-        printf "\r%s %d / %d (%d%%)", msg, count, total, percent
-        fflush()
-        last = percent
-      }
-    }' >&2) \
-  | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $gz
+  # Foreach schema
+  for schema in $schemas; do
+
+    # Shortcuts
+    dump="$dir/$schema.sql.gz"
+    base=$dump*
+
+    # Remove existing gz file with chunks, if any
+    rm -f $base*
+
+    # Export dump with printing progress
+    [ -d "$dir" ] || mkdir -p "$dir"
+    msg="${pref}Exporting $(basename "$dump") into $dir/ dir...";
+    ${dump_cmd/~schema~/"$schema"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$total" -v msg="$msg" '{
+        count += gsub(/\),\(/, "&") + 1
+        percent = int((count / total) * 100)
+        if (percent != last) {
+          printf "\r%s %d / %d (%d%%)", msg, count, total, percent
+          fflush()
+          last = percent
+        }
+      }' >&2) \
+    | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $dump
+
+    # Exit if above command failed
+    exit_code=${PIPESTATUS[0]}; if [[ $exit_code -ne 0 ]]; then echo "$dump_bin exited with code $exit_code"; exit $exit_code; fi
+
+    echo ""
+    clear_last_lines 1
+    echo -n "$msg Done"
+
+    # Remove suffix from single chunk
+    chunks=($base); if [ "${#chunks[@]}" -eq 1 ]; then mv "${chunks[0]}" $dump; fi
+
+    # Get and print gzipped dump size
+    size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b"
+
+    # Find all chunks
+    chunks=$(ls -1 $base 2> /dev/null | sort -V)
+
+    # Print chunks qty if more than 1
+    qty=$(echo "$chunks" | wc -l); if (( $qty > 1 )); then echo -n " ($qty chunks)"; fi
+
+    # Print newline
+    echo ""
+  done
 
   # Unset from env
   unset "$pwdenv"
-
-  # Exit if above command failed
-  exit_code=${PIPESTATUS[0]}; if [[ $exit_code -ne 0 ]]; then echo "$dump_bin exited with code $exit_code"; exit $exit_code; fi
-
-  echo ""
-  clear_last_lines 1
-  echo -n "$msg Done"
-
-  # Remove suffix from single chunk
-  chunks=($base); if [ "${#chunks[@]}" -eq 1 ]; then mv "${chunks[0]}" $gz; fi
-
-  # Get and print gz size
-  size=$(du -scbh $base 2> /dev/null | awk '/total/ {print $1}' | sed -E 's~^[0-9.]+~& ~'); echo -n ", ${size,,}b"
-
-  # Find all chunks
-  chunks=$(ls -1 $base 2> /dev/null | sort -V)
-
-  # Print chunks qty if more than 1
-  qty=$(echo "$chunks" | wc -l); if (( $qty > 1 )); then echo -n " ($qty chunks)"; fi
-
-  # Print newline
-  echo ""
 fi

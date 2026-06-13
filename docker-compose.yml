@@ -71,7 +71,7 @@ services:
       DB_APP_USER: ${DB_APP_USER}
       DB_APP_PASSWORD: ${DB_APP_PASSWORD}
       DB_NAME: ${DB_NAME}
-      DB_DUMP: ${DB_DUMP}
+      DB_DUMPS: ${DB_DUMPS}
       DB_HOST: ${DB_HOST:-$DB_ENGINE}
       DB_ENGINE: ${DB_ENGINE}
       RABBITMQ_HOST: rabbitmq

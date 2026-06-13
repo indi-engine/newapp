@@ -38,7 +38,7 @@ getup() {
     source ~/.indi/pre-getup
   fi
 
-  # Import files mentioned in DB_DUMP with preliminary download, if need
+  # Import files mentioned in DB_DUMPS with preliminary download, if need
   db_import
 
   # Pick LETS_ENCRYPT_DOMAIN and EMAIL_SENDER_DOMAIN from .env file, if possible
@@ -159,6 +159,54 @@ getup() {
   overlay2
 }
 
+# Get custom schema name where custom dump should be imported
+get_custom_schema() {
+  case "$(get_env "DB_ENGINE")" in
+    postgres) echo "public" ;;
+    *) echo "$(get_env "DB_NAME")" ;;
+  esac
+}
+
+# Spoof '{custom}' in .env's DB_DUMPS with real dump filename
+get_DB_DUMPS() {
+  local dumps="$(get_env "DB_DUMPS")"
+  local custom="$(get_custom_schema)";
+  echo "${dumps/\{custom\}/"$custom"}"
+}
+
+# Setup $DB_APP_USER as subnet-only, setup system schema
+do_missing_db_setup_if_needed() {
+  create_DB_APP_USER_if_need
+  sync_host_for_DB_APP_USER
+  create_system_schema
+}
+
+# Setup system schema and and privileges
+create_system_schema() {
+
+  # Shortcuts
+  local DB_APP_USER_host="$(get_db_host_prefix)"
+  local DB_APP_USER="$(get_env "DB_APP_USER")"
+  local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
+
+  # If we're on postgres - adjust pg_hba.conf
+  if [[ "$engine" == "postgres" ]]; then
+
+    # Reload postgres conf
+    export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d postgres -c "SELECT pg_reload_conf();" -q -v ON_ERROR_STOP=1 > /dev/null
+    unset PGPASSWORD
+
+  # Else update host for DB_APP_USER
+  else
+    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    $cli -h "$engine" -u root mysql -e "CREATE DATABASE IF NOT EXISTS \`system\`"
+    $cli -h "$engine" -u root mysql -e "GRANT ALL ON \`system\`.* TO '$DB_APP_USER'@'$DB_APP_USER_host'"
+    unset MYSQL_PWD
+  fi
+}
+
 # shellcheck disable=SC2120
 db_import() {
 
@@ -167,6 +215,9 @@ db_import() {
     docker compose exec -it -e TERM="$TERM" wrapper bash -ic "source maintain/functions.sh; db_import"
     return 0
   fi
+
+  # Setup $DB_APP_USER as subnet-only, setup system schema
+  do_missing_db_setup_if_needed
 
   # Print newline
   echo
@@ -180,9 +231,12 @@ db_import() {
   # If import is done - do nothing
   if [[ -f "$done" ]]; then return 0; fi
 
+  # Get dumps list
+  local DB_DUMPS="$(get_DB_DUMPS)"
+
   # Collect missing dump files
   missing=""
-  for dump in $DB_DUMP; do
+  for dump in $DB_DUMPS; do
     local="data/$dump"
     shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
     if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
@@ -197,16 +251,13 @@ db_import() {
   # If no expected dump files are missing
   if [[ "$missing" = "" ]]; then
 
-    # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-    create_DB_APP_USER_if_need
-
     # Import the dump files that we have
-    for file in $DB_DUMP; do
+    for file in $DB_DUMPS; do
       import_possibly_chunked_dump "$file"
     done
 
     # Run debezium-specific sql
-    prepare_privileges
+    prepare_debezium
 
   # Else if at least one dump file is missing
   else
@@ -239,26 +290,19 @@ db_import() {
     # Else temporary switch to system token to download and import system dump
     else
 
-      # Print where we are
+      # Print where we are and switch to system token
       echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
-
-      # Switch to system token
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
-      local DB_DUMP="$(get_env "DB_DUMP")"
 
       # Download dump
+      local DB_DUMP="system.sql.gz"
       if [[ ! -f "data/$DB_DUMP" ]]; then
         download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "$DB_DUMP"
       fi
 
-      # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-      create_DB_APP_USER_if_need
-
-      # Do import
+      # Do import, and run debezium-specific sql
       import_possibly_chunked_dump "$DB_DUMP"
-
-      # Run debezium-specific sql
-      prepare_privileges
+      prepare_debezium
     fi
 
     # Restore GH_TOKEN back, as it might have been spoofed with
@@ -301,12 +345,6 @@ create_DB_APP_USER_if_need() {
     # Unset password
     unset PGPASSWORD
   fi
-}
-
-# Prepare Change Data Capture / CDC privileges, and amend DB_APP_USER host
-prepare_privileges() {
-  sync_host_for_DB_APP_USER
-  prepare_debezium
 }
 
 # Get name of CLI binary for the current DB engine
@@ -994,7 +1032,9 @@ backup_prepared_assets() {
   fi
 
   # Backup dump
-  upload_asset "$dir/$DB_DUMP" "$tag" "» "
+  for dump in $(get_DB_DUMPS); do
+    upload_asset "$dir/$dump" "$tag" "» "
+  done
 }
 
 # Backup current database dump on github into given release assets of current repo
@@ -1168,9 +1208,12 @@ restore_dump() {
   local repo="${2:-$(get_current_repo)}"
   local step="${3:-}"
 
+  # Shortcut
+  local DB_DUMPS="$(get_DB_DUMPS)"
+
   # If $release arg is given - download each (possibly chunked) dump file
   if [[ "$release" != "" ]]; then
-    for file in $DB_DUMP; do
+    for file in $DB_DUMPS; do
       download_possibly_chunked_file "$repo" "$release" "$file"
     done
   fi
@@ -1194,7 +1237,7 @@ restore_dump_from_local() {
   # Shortcuts
   fn1='stop_debezium_and_closetab_if_need'
   fn2='reset_db'
-  fn3='prepare_privileges'
+  fn3='prepare_debezium'
   fn4='start_debezium_and_closetab_if_need'
 
   # Stop debezium and/or closetab php processes if any running
@@ -1210,10 +1253,11 @@ restore_dump_from_local() {
   # Import each (possibly chunked) dump
   [[ "$prepend" != "" ]] && echo -ne "${gray}"
 
-  # Create $DB_APP_USER (needed if $DB_ENGINE is 'postgres', as only superuser is created by default out of-the-box)
-  create_DB_APP_USER_if_need
+  # Setup $DB_APP_USER as subnet-only, setup system schema
+  do_missing_db_setup_if_needed
 
-  for file in $DB_DUMP; do
+  # Do import dumps
+  for file in $(get_DB_DUMPS); do
     import_possibly_chunked_dump "$file" "$dir" "$prepend"
   done
   [[ "$prepend" != "" ]] && echo -ne "${d}"
@@ -1234,21 +1278,23 @@ restore_dump_from_local() {
 import_possibly_chunked_dump() {
 
   # Arguments
-  dump="$1"
-  dir="${2:-data}"
-  prepend="${3:-}"
+  local dump="$1"
+  local dir="${2:-data}"
+  local prepend="${3:-}"
 
   # Shortcuts
   local path="$dir/$dump"
   local msg="${prepend}Importing $dump"
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
+  local db_name="$DB_NAME"
 
   if [[ "$engine" == "postgres" ]]; then
-    local run="$cli -h $engine -U $DB_APP_USER -d $DB_NAME -o /dev/null -q -v ON_ERROR_STOP=1"
+    local run="$cli -h $engine -U $DB_APP_USER -d $db_name -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   else
-    local run="$cli -h $engine -u $DB_APP_USER $DB_NAME"
+    [[ "$dump" == "system.sql.gz" ]] && db_name="system"
+    local run="$cli -h $engine -u $DB_APP_USER -D $db_name"
     local passenv=MYSQL_PWD
   fi
 
@@ -2505,14 +2551,13 @@ cancel_restore_source() {
 
 # Cancel uploads restore, i.e. revert uploads to the state which was before restore
 cancel_restore_uploads_and_dump() {
-  local DB_DUMP="$(get_env "DB_DUMP")"
 
   # Move uploads.zip and dump.sql.gz files from data/before/ to data/
   # for those to be further picked by restore_uploads() call and db re-init
   src="data/before" && trg="data"
-  echo -n "Moving uploads.zip and $DB_DUMP from $src/ into $trg/..."
+  echo -n "Moving uploads.zip and sql dumps from $src/ into $trg/..."
   if [ -d $src ]; then
-    rm -f data/uploads.z*
+    rm -f "$trg/uploads.z"*
     mv -f "$src"/* "$trg"/ && rm -r "$src"
   fi
   echo -e " Done\n"
@@ -3152,9 +3197,6 @@ wrapper_entrypoint() {
     gh repo set-default "$(get_current_repo)"
   fi
 
-  # Sync DB_APP_USER host
-  sync_host_for_DB_APP_USER
-
   # Run HTTP api server
   FLASK_APP=compose/wrapper/api.py flask run --host=0.0.0.0 --port=80
 
@@ -3548,8 +3590,10 @@ migrate_if_need() {
   # If at least one system and/or custom migration detected
   if [[ ${#migrate[@]} -gt 0 ]]; then
 
-    # Remove local database dump, if any, to prevent duplicate disk space usage
-    rm -f "data/$(get_env "DB_DUMP")"*
+    # Remove local database dumps, if any, to prevent duplicate disk space usage
+    for file in $(get_DB_DUMPS); do
+      rm -f "data/$file"*
+    done
 
     # Create pre-migrate database backup, if not yet created
     if [[ ! -d data/before ]]; then

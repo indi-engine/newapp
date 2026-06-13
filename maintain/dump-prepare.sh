@@ -80,7 +80,7 @@ else
     # Export dump with printing progress
     [ -d "$dir" ] || mkdir -p "$dir"
     msg="${pref}Exporting $(basename "$dump") into $dir/ dir...";
-    ${dump_cmd/~schema~/"$schema"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$total" -v msg="$msg" '{
+    ${dump_cmd/~schema~/"$schema"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$qty" -v msg="$msg" '{
         count += gsub(/\),\(/, "&") + 1
         percent = int((count / total) * 100)
         if (percent != last) {

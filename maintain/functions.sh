@@ -591,7 +591,8 @@ env_DB_EXPOSE_PORT() {
 read_choice() {
 
   # Variables
-  local indent="" && [[ ! -z ${ENV_NAME:-} ]] && indent="  "
+  local env_name="${ENV_NAME:-}"
+  local indent="" && [[ ! -z "${env_name:-}" ]] && indent="  "
   local now_choice=${1:-0}
   local was_choice=0
   local key="none"
@@ -601,8 +602,8 @@ read_choice() {
     if [ $i -eq $now_choice ]; then echo -n "$indent(•)"; else echo -n "$indent( )"; fi
 
     # Check if a function exists for adjusting choice title, and if yes - call it
-    if declare -f "env_${ENV_NAME}_choice" > /dev/null; then
-      echo " "$(env_${ENV_NAME}_choice "${choices[$i]}")
+    if declare -f "env_${env_name}_choice" > /dev/null; then
+      echo " "$(env_${env_name}_choice "${choices[$i]}")
     else
       echo " ${choices[$i]}"
     fi
@@ -1044,10 +1045,14 @@ backup_dump() {
   release=$1
 
   # Prepare dump
-  source maintain/dump-prepare.sh "" && asset="$dump"
+  source maintain/dump-prepare.sh ""
 
-  # Upload possibly chunked dump.sql.gz to github using glob pattern dump.sql.gz*
-  upload_possibly_chunked_file $release "$asset*"
+  # Upload possibly chunked dumps to github
+  for file in $(get_DB_DUMPS); do
+    upload_possibly_chunked_file "$release" "data/$file*"
+    clear_last_lines
+  done
+  echo
 }
 
 # Load whitespace-separated list of names of assets that are chunks

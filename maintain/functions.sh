@@ -176,33 +176,30 @@ get_DB_DUMPS() {
 
 # Setup $DB_APP_USER as subnet-only, setup system schema
 do_missing_db_setup_if_needed() {
-  create_DB_APP_USER_if_need
-  sync_host_for_DB_APP_USER
   create_system_schema
+  setup_DB_APP_USER_if_need
+  sync_host_for_DB_APP_USER
 }
 
-# Setup system schema and and privileges
+# Create system schema
 create_system_schema() {
 
   # Shortcuts
   local DB_APP_USER_host="$(get_db_host_prefix)"
   local DB_APP_USER="$(get_env "DB_APP_USER")"
+  local DB_NAME="$(get_env "DB_NAME")"
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
 
-  # If we're on postgres - adjust pg_hba.conf
+  # If we're on postgres
   if [[ "$engine" == "postgres" ]]; then
-
-    # Reload postgres conf
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-    $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d postgres -c "SELECT pg_reload_conf();" -q -v ON_ERROR_STOP=1 > /dev/null
+    $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS \"system\"" -q -v ON_ERROR_STOP=1 > /dev/null
     unset PGPASSWORD
-
-  # Else update host for DB_APP_USER
+  # Else
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
-    $cli -h "$engine" -u root mysql -e "CREATE DATABASE IF NOT EXISTS \`system\`"
-    $cli -h "$engine" -u root mysql -e "GRANT ALL ON \`system\`.* TO '$DB_APP_USER'@'$DB_APP_USER_host'"
+    $cli -h "$engine" -u "${DB_ROOT_USER:-root}" -D mysql -e "CREATE DATABASE IF NOT EXISTS \`system\`"
     unset MYSQL_PWD
   fi
 }
@@ -321,10 +318,17 @@ db_import() {
 
 # Create $DB_APP_USER - needed if $DB_ENGINE is 'postgres',
 # as only root user is created by default out of-the-box
-create_DB_APP_USER_if_need() {
+setup_DB_APP_USER_if_need() {
+
+  # Shortcuts
+  local DB_APP_USER_host="$(get_db_host_prefix)"
+  local DB_APP_USER="$(get_env "DB_APP_USER")"
+  local DB_NAME="$(get_env "DB_NAME")"
+  local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
 
   # If we're on Postgres
-  if [[ "$(get_env "DB_ENGINE")" == "postgres" ]]; then
+  if [[ "$engine" == "postgres" ]]; then
 
     # Set password to be picked by postgres CLI
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
@@ -334,16 +338,24 @@ create_DB_APP_USER_if_need() {
       DO \$\$ BEGIN CREATE USER \"${DB_APP_USER}\" WITH PASSWORD '${DB_APP_PASSWORD}';
       EXCEPTION WHEN duplicate_object THEN NULL; END \$\$;
       GRANT CONNECT ON DATABASE \"${DB_NAME}\" TO \"${DB_APP_USER}\";
-      GRANT CREATE ON SCHEMA public TO \"${DB_APP_USER}\";
-      GRANT USAGE ON SCHEMA public TO \"${DB_APP_USER}\";
+      GRANT USAGE, CREATE ON SCHEMA \"system\", \"public\" TO \"${DB_APP_USER}\";
       GRANT SET ON PARAMETER session_replication_role TO \"${DB_APP_USER}\";
     "
 
     # Run sql
-    echo "$sql" | psql -h postgres -U "${DB_ROOT_USER:-postgres}" -d "${DB_NAME}" -q -v ON_ERROR_STOP=1
+    echo "$sql" | $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d "${DB_NAME}" -q -v ON_ERROR_STOP=1
 
     # Unset password
     unset PGPASSWORD
+
+  # Else
+  else
+
+    # Prepare sql to grant right on system-schema
+    sql="GRANT ALL ON \`system\`.* TO '${DB_APP_USER}'@'${DB_APP_USER_host}'"
+
+    # Run sql
+    echo "$sql" | $cli -h "$engine" -u "${DB_ROOT_USER:-root}" -D mysql
   fi
 }
 

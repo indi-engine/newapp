@@ -39,6 +39,7 @@ else
     rows="SELECT SUM(c.reltuples::bigint) FROM pg_catalog.pg_class c JOIN pg_catalog.pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname IN ('${schemas/ /"','"}')"
     dump_bin="pg_dump"
     dump_cmd="$dump_bin -h $host -U $user -d $name -n ~schema~ --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
+    gzip_cmd() { grep -vE "^(CREATE SCHEMA|COMMENT ON SCHEMA)" | gzip; }
   else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
@@ -49,6 +50,7 @@ else
       *)       dump_bin="mysqldump" ;;
     esac
     dump_cmd="$dump_bin -h $host -u $user -y ~schema~ --single-transaction"
+    gzip_cmd() { gzip; }
   fi
 
   # Query shortcut
@@ -89,7 +91,7 @@ else
           last = percent
         }
       }' >&2) \
-    | gzip | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $dump
+    | gzip_cmd | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $dump
 
     # Exit if above command failed
     exit_code=${PIPESTATUS[0]}; if [[ $exit_code -ne 0 ]]; then echo "$dump_bin exited with code $exit_code"; exit $exit_code; fi

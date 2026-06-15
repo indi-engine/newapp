@@ -351,11 +351,11 @@ setup_DB_APP_USER_if_need() {
   # Else
   else
 
-    # Prepare sql to grant right on system-schema
-    sql="GRANT ALL ON \`system\`.* TO '${DB_APP_USER}'@'${DB_APP_USER_host}'"
-
-    # Run sql
+    # Prepare and run sql to grant rights on system-schema
+    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    sql="GRANT ALL ON \`system\`.* TO '${DB_APP_USER}'@'%'"
     echo "$sql" | $cli -h "$engine" -u "${DB_ROOT_USER:-root}" -D mysql
+    unset MYSQL_PWD
   fi
 }
 
@@ -395,7 +395,7 @@ prepare_debezium() {
 			DO $$
 			DECLARE t text;
 			BEGIN
-					FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+					FOR t IN SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname IN ('system', 'public')
 					LOOP
 							EXECUTE 'ALTER TABLE ' || quote_ident(t) || ' REPLICA IDENTITY FULL';
 					END LOOP;

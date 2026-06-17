@@ -393,11 +393,11 @@ prepare_debezium() {
     $cli -h $engine -t -q -U postgres --no-align -c "CREATE PUBLICATION debezium FOR ALL TABLES" -d $DB_NAME
 		$cli -h $engine -t -q -U postgres --no-align -d $DB_NAME <<-'PGSQL'
 			DO $$
-			DECLARE t text;
+			DECLARE s text; t text;
 			BEGIN
-					FOR t IN SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname IN ('system', 'public')
+					FOR s, t IN SELECT schemaname, tablename FROM pg_catalog.pg_tables WHERE schemaname IN ('system', 'public')
 					LOOP
-							EXECUTE 'ALTER TABLE ' || quote_ident(t) || ' REPLICA IDENTITY FULL';
+							EXECUTE 'ALTER TABLE ' || quote_ident(s) || '.' || quote_ident(t) || ' REPLICA IDENTITY FULL';
 					END LOOP;
 			END $$;
 		PGSQL

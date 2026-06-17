@@ -30,5 +30,22 @@
         "post-update-cmd" : "@hook",
         "post-install-cmd": "@hook",
         "hook": "php vendor/indi-engine/system/hook/init"
+    },
+    "autoload": {
+      "classmap": [
+        "vendor/indi-engine/system/application/controllers/",
+        "vendor/indi-engine/system/application/models/",
+        "vendor/indi-engine/system/library/"
+      ],
+      "files": [
+        "vendor/indi-engine/system/library/func.php",
+        "vendor/indi-engine/system/library/Indi.php",
+        "vendor/indi-engine/system/library/Indi/Ai.php",
+        "vendor/indi-engine/system/library/Indi/Ai/Abstract.php",
+        "vendor/indi-engine/system/library/Indi/Ai/Claude.php",
+        "vendor/indi-engine/system/library/Indi/Ai/Gemini.php",
+        "vendor/indi-engine/system/library/Indi/Ai/Grok.php",
+        "vendor/indi-engine/system/library/Indi/Ai/OpenAI.php"
+      ]
     }
 }

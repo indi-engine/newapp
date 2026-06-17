@@ -3463,7 +3463,6 @@ db_query() {
 
   # Argument
   local sql="$1"
-  local sql="$1"
 
   # Shortcut
   local engine="$(get_env "DB_ENGINE")"
@@ -3476,11 +3475,12 @@ db_query() {
   # Run engine-specific query
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$pass"
+    sql="SET search_path=\`system\`;$sql"
     $cli -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
     unset PGPASSWORD
   else
     export MYSQL_PWD="$pass"
-    $cli -h "$host" -u "$user" -D "$name" -N -e "$sql"
+    $cli -h "$host" -u "$user" -D "system" -N -e "$sql"
     unset MYSQL_PWD
   fi
 }

@@ -5,8 +5,6 @@
     "repositories": [
       {"type": "git", "url": "https://github.com/indi-engine/system.git"},
       {"type": "git", "url": "https://github.com/indi-engine/client.git"},
-      {"type": "git", "url": "https://github.com/indi-engine/ckeditor.git"},
-      {"type": "git", "url": "https://github.com/indi-engine/ckfinder.git"},
       {
         "type": "package",
         "package": {
@@ -18,13 +16,22 @@
           }
         }
       },
+      {
+        "type": "package",
+        "package": {
+          "name": "indi-engine/tiptap",
+          "version": "v0.0.0",
+          "dist": {
+            "type": "zip",
+            "url": "https://github.com/indi-engine/tiptap/releases/latest/download/tiptap.zip"
+          }
+        }
+      },
       {"type": "composer", "url": "https://asset-packagist.org"}
     ],
     "require": {
         "indi-engine/system": "dev-master",
-        "indi-engine/client": "dev-master",
-        "indi-engine/ckeditor": "dev-master",
-        "indi-engine/ckfinder": "dev-master"
+        "indi-engine/client": "dev-master"
     },
     "scripts": {    
         "post-update-cmd" : "@hook",

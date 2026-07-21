@@ -64,23 +64,116 @@ db_user = get_dot_env('DB_APP_USER')
 db_pass = get_dot_env('DB_APP_PASSWORD')
 db_name = get_dot_env('DB_NAME')
 
+# Get schema name for a given pdo key.
+def get_schema_name(pdokey: str) -> str:
+    match pdokey:
+        case 'custom':
+            match engine:
+                case 'postgres': return 'public'
+                case _: return db_name
+        case _:
+            return pdokey
+
+# Get DSN-info for connection to a custom schema
+def dsn(source, db):
+
+    # If value for 'database-custom-source' param is empty - return
+    if not source: return None
+
+    # Extract table and record id where database source info is stored
+    try: table, id = source.split('-')
+    except ValueError: raise Exception(f"Invalid database custom source format: {source}")
+
+    # If location is invalid - throw an exception
+    if table not in ['dbconn', 'dbfile']: raise Exception(f"Invalid database custom source: {source}")
+
+    # If nothing found - throw exception
+    query = f"SELECT * FROM `system`.`{table}` WHERE `id` = %s"
+    if engine == 'postgres': query = query.replace('`', '"')
+    db.execute(query, id); info = db.fetchone()
+    if not info: raise Exception(f"Missing database custom source: {source}")
+
+    # Return info
+    return info
+
 # Get table dump via pg_dump
 def get_table_dump(name):
 
+    # Split into pdokey and table
+    if '.' in name:
+        pdokey, table = name.split('.')
+        if pdokey not in ['system', 'custom']: raise ValueError(f"Invalid pdokey name: {pdokey}")
+    else:
+        pdokey = 'custom'
+        table = name
+
     # Check table name
-    if not valid_pg_identifier(name): raise ValueError("Invalid table name")
+    if not valid_pg_identifier(table): raise ValueError(f"Invalid table name: {table}")
+
+    # Get schema name
+    schema = get_schema_name(pdokey)
+
+    # Credentials for making dump
+    dump_db_engine = engine
+    dump_db_host = engine
+    dump_db_user = db_user
+    dump_db_pass = db_pass
+    dump_db_name = db_name
+
+    if pdokey == 'custom':
+
+        # Connect to system db
+        db_conn, db = db_system()
+
+        # Get custom db source, if any
+        query = "SELECT `defaultValue` FROM `system`.`field` WHERE `entityId` IS NULL AND `alias` = 'database-custom-source'"
+        if engine == 'postgres': query = query.replace('`', '"')
+        db.execute(query)
+        info = dsn(db.fetchone()['defaultValue'], db)
+        if dsn:
+            dump_db_engine = info['engine']
+            dump_db_host = info['host']
+            dump_db_user = info['user']
+            dump_db_pass = info['pass']
+            dump_db_name = info['name']
+            schema = info['schema']
+
+        # Close db cursor and connection
+        db.close()
+        db_conn.close()
 
     # Run export
-    result = subprocess.run(
-        ['pg_dump', '-h', 'postgres', '-U', db_user, '-d', db_name, '-t', f'"{name}"', '--schema-only'],
-        env={'PGPASSWORD': db_pass}, shell=False, capture_output=True, text=True
-    )
+    if dump_db_engine == 'postgres':
+        result = subprocess.run(
+            ['pg_dump', '-h', dump_db_host, '-U', dump_db_user, '-d', dump_db_name, '-t', f'"{schema}"."{table}"', '--schema-only'],
+            env={'PGPASSWORD': dump_db_pass}, shell=False, capture_output=True, text=True
+        )
+    else:
+        result = subprocess.run(
+            ['mysqldump', '-h', dump_db_host, '-u', dump_db_user, '-D', dump_db_name, '-t', f'{table}', '--no-data'],
+            env={'MYSQL_PWD': dump_db_pass}, shell=False, capture_output=True, text=True
+        )
 
     # If failed
     if result.returncode != 0: raise RuntimeError(f"pg_dump failed: {result.stderr}")
 
     # Else print dump
     return result.stdout.strip()
+
+# Get connection and cursor for system db
+def db_system():
+
+    # Instantiate connection with db cursor
+    if engine == 'postgres':
+        db_conn = psycopg2.connect(host=engine, user=db_user, password=db_pass, dbname=db_name)
+        db_conn.autocommit = True
+        db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        db_conn = pymysql.connect(host=engine, user=db_user, password=db_pass, database='system', autocommit=True)
+        db = db_conn.cursor(pymysql.cursors.DictCursor)
+
+    # Return
+    return db_conn, db
 
 # Send websocket message to open xterm in Indi Engine UI
 def ws(to, data, mq, db):
@@ -138,14 +231,8 @@ def bash_stream(
     nn = pika.BlockingConnection(pika.ConnectionParameters('rabbitmq'))
     mq = nn.channel()
 
-    # Instantiate connection with db cursor
-    if engine == 'postgres':
-        db_conn = psycopg2.connect(host=engine, user=db_user, password=db_pass, dbname=db_name)
-        db_conn.autocommit = True
-        db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    else:
-        db_conn = pymysql.connect(host=engine, user=db_user, password=db_pass, database=db_name, autocommit=True)
-        db = db_conn.cursor(pymysql.cursors.DictCursor)
+    # Instantiate connection with system db cursor
+    db_conn, db = db_system()
 
     # Start bash script in a pseudo-terminal
     child = pexpect.spawn('bash -c "' + command + '"', encoding='utf-8')

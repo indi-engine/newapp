@@ -164,6 +164,7 @@ if ! $test &> /dev/null; then
 fi
 
 # Start php background processes
+$run 'php indi -d external/proxysql'
 $run 'php indi realtime/debezium/enable'
 $run 'php indi -d realtime/closetab'
 

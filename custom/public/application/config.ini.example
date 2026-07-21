@@ -4,7 +4,11 @@ seoUri = false
 title = false
 demo = false
 logo.auth = 
-logo.main = 
+logo.main =
+
+[log]
+pdo.custom = false
+pdo.system = false
 
 [lang]
 front = ru
@@ -18,14 +22,13 @@ scriptPath = application/views
 [upload]
 path = data/upload
 
-[ckeditor]
-key = 
-uploadPath = fck
+[proxysql]
+enabled = false
 
 [rabbitmq]
 enabled = true
 debezium = true
-host = localhost
+host = rabbitmq
 port = 5672
 user = guest
 pass = guest

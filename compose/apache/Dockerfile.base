@@ -1,15 +1,13 @@
 FROM php:8.3-apache-bookworm
 
-## <Misc> ##
+## Misc ##
 RUN apt-get update && apt-get install -fy certbot cron python3-certbot-apache mc git wget
-## </Misc> ##
 
-## <User> ##
+## User ##
 ENV user=www-data
 RUN usermod -s /bin/bash $user
-## </User> ##
 
-## <Apache> ##
+## Apache ##
 ARG DOC
 ENV DOC=$DOC
 WORKDIR /etc/apache2
@@ -25,25 +23,21 @@ RUN echo "ServerName indi-engine"      >> apache2.conf  && \
     cp mods-available/proxy_wstunnel.load mods-enabled/ && \
     echo "export HOME=/var/www"        >> envvars
 WORKDIR $DOC
-## </Apache> ##
 
-## <Sendmail> ##
+## Sendmail ##
 RUN bash -c "DEBIAN_FRONTEND=noninteractive apt install -y postfix <<< $'2' && apt install -y opendkim opendkim-tools"
-## </Sendmail> ##
 
-## <PHP extensions> ##
+## PHP extensions ##
 RUN apt-get update && \
     apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev libpq-dev && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) gd zip pdo_mysql pdo_pgsql shmop intl sockets && \
     apt-get install -y libmagickwand-dev imagemagick && pecl install imagick && docker-php-ext-enable imagick
-## </PHP extensions> ##
 
-## <JRE> ##
+## Java Runtime Environment ##
 RUN apt-get install -y default-jre
-## </JRE> ##
 
-## <LibreOffice> ##
+## LibreOffice ##
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libreoffice-core \
     libreoffice-common \
@@ -55,7 +49,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     fonts-freefont-ttf \
     python3-uno \
     && rm -rf /var/lib/apt/lists/*
-## </LibreOffice> ##
+
+## ProxySQL ##
+RUN wget -nv -O /etc/apt/trusted.gpg.d/proxysql-3.0.x-keyring.gpg 'https://repo.proxysql.com/ProxySQL/proxysql-3.0.x/repo_pub_key.gpg' && \
+    echo deb https://repo.proxysql.com/ProxySQL/proxysql-3.0.x/$(lsb_release -sc)/ ./ | tee /etc/apt/sources.list.d/proxysql.list && \
+    apt-get update && apt-get install proxysql
 
 # Use custom entrypoint
 ENTRYPOINT ["bash", "custom-entrypoint.sh"]

@@ -126,9 +126,21 @@ def get_pdokey_dsn(pdokey: str):
         db_conn.close()
 
     # Setup dump executable binary name
-    if info['engine'] == 'postgres': info['exec'] = 'pg_dump'
-    elif info['engine'] == 'mariadb': info['exec'] = 'mariadb-dump'
-    else: info['exec'] = 'mysqldump'
+    if info['engine'] == 'postgres':  info['dump'] = 'pg_dump'
+    elif info['engine'] == 'mariadb': info['dump'] = 'mariadb-dump'
+    else:                             info['dump'] = 'mysqldump'
+
+    # Setup primary arguments for binary executable
+    if info['engine'] == 'postgres':
+        info['args'] = ['-h', info['host'], '-U', info['user']]
+        if 'port' in info: info['args'].extend(['-p', f"{info['port']}"])
+    else:
+        info['args'] = ['-h', info['host'], '-u', info['user']]
+        if 'port' in info: info['args'].extend(['-P', f"{info['port']}"])
+
+    # Setup env-arg for subprocess.run()
+    if info['engine'] == 'postgres': info['env'] = {'PGPASSWORD': info['pass']}
+    else:                            info['env'] = {'MYSQL_PWD': info['pass']}
 
     # Return custom or default DSN
     return info
@@ -147,23 +159,42 @@ def get_table_dump(name):
     # Check table name
     if not valid_pg_identifier(table): raise ValueError(f"Invalid table name: {table}")
 
+    # Get dump of a table in pdokey's schema
+    return get_schema_dump(pdokey, table)
+
+# Get table dump via pg_dump
+def get_schema_dump(pdokey, table=None):
+
     # Get DSN for given pdokey
     dsn = get_pdokey_dsn(pdokey)
 
-    # Run export
+    # Shared args for subprocess.run()
+    runArgs = {
+        'shell': False,
+        'capture_output': True,
+        'text': True
+    }
+
+    # Prepare subprocess.run() command
+    cli = [dsn['dump']]
+    cli.extend(dsn['args'])
+
+    # Prepare cli
     if dsn['engine'] == 'postgres':
-        result = subprocess.run(
-            [dsn['exec'], '-h', dsn['host'], '-U', dsn['user'], '-p', f"{dsn['port']}", '-d', dsn['name'], '-t', f'"{dsn["schema"]}"."{table}"', '--schema-only'],
-            env={'PGPASSWORD': dsn['pass']}, shell=False, capture_output=True, text=True
-        )
+        cli.extend(['-d', dsn['name']])
+        if table: cli.extend(['-t', f'"{dsn["schema"]}"."{table}"'])
+        else:     cli.extend(['-t', f'"{dsn["schema"]}".*'])
+        cli.extend(['--schema-only'])
     else:
-        result = subprocess.run(
-            [dsn['exec'], '-h', dsn['host'], '-u', dsn['user'], '-P', f"{dsn['port']}", dsn['name'], table, '--no-data'],
-            env={'MYSQL_PWD': dsn['pass']}, shell=False, capture_output=True, text=True
-        )
+        cli.append(dsn['name'])
+        if table: cli.append(table)
+        cli.extend(['--no-data', '--compact', '--skip-comments'])
+
+    # Run export
+    result = subprocess.run(cli, env=dsn['env'], **runArgs)
 
     # If failed
-    if result.returncode != 0: raise RuntimeError(f"{dsn['exec']} failed: {result.stderr}")
+    if result.returncode != 0: raise RuntimeError(f"{dsn['dump']} failed: {result.stderr}")
 
     # Else print dump
     return result.stdout.strip()
@@ -537,7 +568,16 @@ def env():
 def export_table():
 
     # Get the name of a table to be exported
-    name = request.args.get('name')
+    table = request.args.get('name')
 
     # Flush pg_dump output for a certain table
-    return get_table_dump(name), 200
+    return get_table_dump(table), 200
+
+@app.route('/export/schema', methods=['GET'])
+def export_schema():
+
+    # Get the name of a pdokey whose schema is going to be exported
+    pdokey = request.args.get('pdokey')
+
+    # Flush dump for a schema mapped to a given pdokey
+    return get_schema_dump(pdokey), 200

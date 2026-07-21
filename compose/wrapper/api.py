@@ -74,10 +74,14 @@ def get_schema_name(pdokey: str) -> str:
         case _:
             return pdokey
 
-# Get DSN-info for connection to a custom schema
-def dsn(source, db):
+# Get DSN-info usable for connection to a custom schema
+def get_custom_dsn(db):
 
-    # If value for 'database-custom-source' param is empty - return
+    # Get location of DSN info from 'database-custom-source' param, and return if it's empty
+    query = "SELECT `defaultValue` FROM `system`.`field` WHERE `entityId` IS NULL AND `alias` = 'database-custom-source'"
+    if engine == 'postgres': query = query.replace('`', '"')
+    db.execute(query)
+    source = db.fetchone()['defaultValue']
     if not source: return None
 
     # Extract table and record id where database source info is stored
@@ -87,13 +91,46 @@ def dsn(source, db):
     # If location is invalid - throw an exception
     if table not in ['dbconn', 'dbfile']: raise Exception(f"Invalid database custom source: {source}")
 
-    # If nothing found - throw exception
+    # If nothing found - throw exception, else return DSN-info
     query = f"SELECT * FROM `system`.`{table}` WHERE `id` = %s"
     if engine == 'postgres': query = query.replace('`', '"')
     db.execute(query, id); info = db.fetchone()
     if not info: raise Exception(f"Missing database custom source: {source}")
+    return info
 
-    # Return info
+# Get DSN for given pdokey
+def get_pdokey_dsn(pdokey: str):
+
+    # Default DSN
+    info = {
+        'engine': engine,
+        'host': engine,
+        'user': db_user,
+        'pass': db_pass,
+        'name': db_name,
+        'schema': get_schema_name(pdokey)
+    }
+
+    # If pdokey is custom
+    if pdokey == 'custom':
+
+        # Connect to system db
+        db_conn, db = db_system()
+
+        # Get custom DSN, if not empty
+        if custom_dsn := get_custom_dsn(db):
+            info = custom_dsn
+
+        # Close system db cursor and connection
+        db.close()
+        db_conn.close()
+
+    # Setup dump executable binary name
+    if info['engine'] == 'postgres': info['exec'] = 'pg_dump'
+    elif info['engine'] == 'mariadb': info['exec'] = 'mariadb-dump'
+    else: info['exec'] = 'mysqldump'
+
+    # Return custom or default DSN
     return info
 
 # Get table dump via pg_dump
@@ -110,52 +147,23 @@ def get_table_dump(name):
     # Check table name
     if not valid_pg_identifier(table): raise ValueError(f"Invalid table name: {table}")
 
-    # Get schema name
-    schema = get_schema_name(pdokey)
-
-    # Credentials for making dump
-    dump_db_engine = engine
-    dump_db_host = engine
-    dump_db_user = db_user
-    dump_db_pass = db_pass
-    dump_db_name = db_name
-
-    if pdokey == 'custom':
-
-        # Connect to system db
-        db_conn, db = db_system()
-
-        # Get custom db source, if any
-        query = "SELECT `defaultValue` FROM `system`.`field` WHERE `entityId` IS NULL AND `alias` = 'database-custom-source'"
-        if engine == 'postgres': query = query.replace('`', '"')
-        db.execute(query)
-        info = dsn(db.fetchone()['defaultValue'], db)
-        if dsn:
-            dump_db_engine = info['engine']
-            dump_db_host = info['host']
-            dump_db_user = info['user']
-            dump_db_pass = info['pass']
-            dump_db_name = info['name']
-            schema = info['schema']
-
-        # Close db cursor and connection
-        db.close()
-        db_conn.close()
+    # Get DSN for given pdokey
+    dsn = get_pdokey_dsn(pdokey)
 
     # Run export
-    if dump_db_engine == 'postgres':
+    if dsn['engine'] == 'postgres':
         result = subprocess.run(
-            ['pg_dump', '-h', dump_db_host, '-U', dump_db_user, '-d', dump_db_name, '-t', f'"{schema}"."{table}"', '--schema-only'],
-            env={'PGPASSWORD': dump_db_pass}, shell=False, capture_output=True, text=True
+            [dsn['exec'], '-h', dsn['host'], '-U', dsn['user'], '-p', f"{dsn['port']}", '-d', dsn['name'], '-t', f'"{dsn["schema"]}"."{table}"', '--schema-only'],
+            env={'PGPASSWORD': dsn['pass']}, shell=False, capture_output=True, text=True
         )
     else:
         result = subprocess.run(
-            ['mysqldump', '-h', dump_db_host, '-u', dump_db_user, '-D', dump_db_name, '-t', f'{table}', '--no-data'],
-            env={'MYSQL_PWD': dump_db_pass}, shell=False, capture_output=True, text=True
+            [dsn['exec'], '-h', dsn['host'], '-u', dsn['user'], '-P', f"{dsn['port']}", dsn['name'], table, '--no-data'],
+            env={'MYSQL_PWD': dsn['pass']}, shell=False, capture_output=True, text=True
         )
 
     # If failed
-    if result.returncode != 0: raise RuntimeError(f"pg_dump failed: {result.stderr}")
+    if result.returncode != 0: raise RuntimeError(f"{dsn['exec']} failed: {result.stderr}")
 
     # Else print dump
     return result.stdout.strip()

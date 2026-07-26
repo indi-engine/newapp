@@ -6,6 +6,8 @@ demo = false
 logo.auth = 
 logo.main = 
 
+[db]
+
 [lang]
 front = ru
 admin = en
@@ -25,7 +27,7 @@ uploadPath = fck
 [rabbitmq]
 enabled = true
 debezium = true
-host = localhost
+host = rabbitmq
 port = 5672
 user = guest
 pass = guest

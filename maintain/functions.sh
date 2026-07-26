@@ -6,6 +6,9 @@ declare -gA releaseQty=()
 # Windows: Git Bash specific fix
 GIT_PS1_SHOWCONFLICTSTATE=
 
+# Prevent docker from showing annoying "What's next" stuff
+export DOCKER_CLI_HINTS=false
+
 # Colors
 r="\e[31m" # red
 g="\e[36m" # cyan
@@ -1546,7 +1549,7 @@ reset_db() {
     local elapsed=0
     local done="/var/lib/db_engine/init.done"
     local initTimeout=60
-    local waitTimeout=2
+    local waitTimeout=10
     while :; do
       clear_last_lines 1
       echo "$msg ($elapsed s)"
@@ -3696,6 +3699,7 @@ migrate_if_need() {
         if [[ -n "${washash}" ]]; then
           migration_prepare "git -C $folder checkout $washash"
           migration_prepare "git -C $folder checkout $nowhash -- $detect"
+          tmp_apply_backward_compat
         fi
 
         # Change dir to webroot, run migration action and change dir back
@@ -3704,7 +3708,10 @@ migrate_if_need() {
         cd "../../"
 
         # Checkout all back
-        [[ -n "${washash}" ]] && migration_prepare "git -C $folder checkout $nowhash"
+        if [[ -n "${washash}" ]]; then
+          tmp_unset_backward_compat
+          migration_prepare "git -C $folder checkout $nowhash"
+        fi
 
         # If migration failed
         if [[ $exit_code -ne 0 ]]; then migration_failed $exit_code
@@ -3740,6 +3747,31 @@ migrate_if_need() {
   if [[ ${#migrate[@]} -gt 0 ]]; then
     rm -rf data/before
   fi
+}
+
+# Temporary apply backwards compatibility stuff needed for migration
+tmp_apply_backward_compat() {
+
+  # If we've already migrated from single schema - do nothing
+  [[ $(is_splitdb) != "" ]] && return 0
+
+  # Add into to ini file
+  local ini="custom/public/application/config.ini"
+  echo "[db]" >> "$ini"
+  echo "user = $(get_env DB_APP_USER)" >> "$ini"
+  echo "pass = $(get_env DB_APP_PASSWORD)" >> "$ini"
+  echo "name = $(get_env DB_NAME)" >> "$ini"
+}
+
+# Cleanup backwards compatibility stuff previously applied for migration
+tmp_unset_backward_compat() {
+
+  # If we've already migrated from single schema - do nothing
+  [[ $(is_splitdb) != "" ]] && return 0
+
+  # Cleanup lines added to ini-file
+  local ini="custom/public/application/config.ini"
+  for i in {1..4}; do sed -i '$d' "$ini"; done
 }
 
 # Run migration preparation command and print output on failure

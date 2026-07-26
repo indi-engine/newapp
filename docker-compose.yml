@@ -19,7 +19,6 @@ services:
     environment:
       DOC: ${DOC}
       VDR: vendor/indi-engine
-      RABBITMQ_HOST: rabbitmq
       DB_ENGINE: ${DB_ENGINE}
       DB_APP_USER: ${DB_APP_USER}
       DB_APP_PASSWORD: ${DB_APP_PASSWORD}
@@ -75,7 +74,6 @@ services:
       DB_DUMPS: ${DB_DUMPS}
       DB_HOST: ${DB_HOST:-$DB_ENGINE}
       DB_ENGINE: ${DB_ENGINE}
-      RABBITMQ_HOST: rabbitmq
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-$LETS_ENCRYPT_DOMAIN}
       BACKUPS: ${BACKUPS:-}
       APP_ENV: ${APP_ENV}

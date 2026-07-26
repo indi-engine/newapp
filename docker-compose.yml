@@ -65,6 +65,7 @@ services:
     restart: unless-stopped
     environment:
       DOC: ${DOC}
+      VDR: vendor/indi-engine
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
       GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE}
@@ -91,6 +92,8 @@ services:
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
       - ./var/log/custom:/var/log/custom
+      - ./compose/apache/ioncube.ini:/usr/local/etc/php/conf.d/00-ioncube.ini
+      - ./compose/apache/ioncube.so:/usr/local/lib/php/extensions/ioncube.so
 
 volumes:
   rabbitmq:

@@ -53,8 +53,8 @@ else
   # Global msg
   declare -g stdout
 
-  # Vendor dir
-  VDR="custom/public/vendor/indi-engine"
+  # Vendor dir for usage in bash scripts
+  BVDR="custom/public/$VDR"
 
   # Make sure Composer always have the freshest github oauth token
   composer -d custom/public --global config github-oauth.github.com "$(get_env "GH_TOKEN_SYSTEM_RO")"
@@ -69,7 +69,7 @@ else
   git_askpass "custom"
 
   # Get 'git status' for system repo
-  exec_command "git -C $VDR/system status"
+  exec_command "git -C $BVDR/system status"
 
   # If system package has uncommitted changes - ask user if we should proceed
   if [[ ! "$stdout" =~ "nothing to commit" ]] && [ -z "${FLASK_APP:-}" ]; then

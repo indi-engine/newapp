@@ -425,7 +425,28 @@ sync_host_for_DB_APP_USER() {
 
     # Shortcuts
     local hba="/var/lib/db_engine/18/docker/pg_hba.conf"
-    local ipv4_cidr="$(hostname -i | tr ' ' '\n' | grep '^[0-9]\+\.' | head -n1 | awk -F. '{print $1 "." $2 ".0.0/16"}')"
+
+    # Detect IPv4 subnet from current container address
+    local ipv4_cidr="$(
+      hostname -i \
+        | tr ' ' '\n' \
+        | grep '^[0-9]\+\.' \
+        | head -n1 \
+        | awk -F. '{print $1 "." $2 ".0.0/16"}'
+    )"
+
+    # Detect Docker IPv6 subnet from the directly-connected IPv6 route
+    local ipv6_cidr="$(
+      hostname -i \
+        | tr ' ' '\n' \
+        | grep ':' \
+        | head -n1 \
+        | python3 -c '
+import sys, ipaddress
+ip = sys.stdin.read().strip()
+if ip: print(ipaddress.ip_network(ip + "/64", strict=False))
+'
+    )"
 
     # Remove old managed block
     sed -i '/# INDI_ENGINE_CUSTOM_BEGIN/,/# INDI_ENGINE_CUSTOM_END/d' "$hba"
@@ -433,7 +454,18 @@ sync_host_for_DB_APP_USER() {
     # Insert new block at top
     {
       echo "# INDI_ENGINE_CUSTOM_BEGIN"
-      echo "host    all    $DB_APP_USER    $ipv4_cidr    scram-sha-256"
+
+      # Allow connections from current Docker IPv4 subnet
+      if [[ -n "$ipv4_cidr" ]]; then
+        echo "host    all    $DB_APP_USER    $ipv4_cidr    scram-sha-256"
+      fi
+
+      # Allow connections from current Docker IPv6 subnet
+      if [[ -n "$ipv6_cidr" ]]; then
+        echo "host    all    $DB_APP_USER    $ipv6_cidr    scram-sha-256"
+      fi
+
+      # Reject DB_APP_USER connections from everywhere else
       echo "host    all    $DB_APP_USER    0.0.0.0/0    reject"
       echo "host    all    $DB_APP_USER    ::/0         reject"
       echo "# INDI_ENGINE_CUSTOM_END"

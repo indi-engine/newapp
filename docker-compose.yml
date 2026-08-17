@@ -19,7 +19,6 @@ services:
     environment:
       DOC: ${DOC}
       VDR: vendor/indi-engine
-      RABBITMQ_HOST: rabbitmq
       DB_ENGINE: ${DB_ENGINE}
       DB_APP_USER: ${DB_APP_USER}
       DB_APP_PASSWORD: ${DB_APP_PASSWORD}
@@ -65,6 +64,7 @@ services:
     restart: unless-stopped
     environment:
       DOC: ${DOC}
+      VDR: vendor/indi-engine
       GIT_COMMIT_NAME: ${GIT_COMMIT_NAME:-}
       GIT_COMMIT_EMAIL: ${GIT_COMMIT_EMAIL:-}
       GH_ASSET_MAX_SIZE: ${GH_ASSET_MAX_SIZE}
@@ -74,7 +74,6 @@ services:
       DB_DUMPS: ${DB_DUMPS}
       DB_HOST: ${DB_HOST:-$DB_ENGINE}
       DB_ENGINE: ${DB_ENGINE}
-      RABBITMQ_HOST: rabbitmq
       EMAIL_SENDER_DOMAIN: ${EMAIL_SENDER_DOMAIN:-$LETS_ENCRYPT_DOMAIN}
       BACKUPS: ${BACKUPS:-}
       APP_ENV: ${APP_ENV}
@@ -91,6 +90,8 @@ services:
       - opendkim:/etc/opendkim
       - ./compose/opendkim.conf:/etc/opendkim.conf
       - ./var/log/custom:/var/log/custom
+      - ./compose/apache/ioncube.ini:/usr/local/etc/php/conf.d/00-ioncube.ini
+      - ./compose/apache/ioncube.so:/usr/local/lib/php/extensions/ioncube.so
 
 volumes:
   rabbitmq:

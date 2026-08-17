@@ -45,8 +45,6 @@
         "vendor/indi-engine/system/library/"
       ],
       "files": [
-        "vendor/indi-engine/system/library/func.php",
-        "vendor/indi-engine/system/library/Indi.php",
         "vendor/indi-engine/system/library/Indi/Ai.php",
         "vendor/indi-engine/system/library/Indi/Ai/Abstract.php",
         "vendor/indi-engine/system/library/Indi/Ai/Claude.php",

@@ -10,6 +10,8 @@ logo.main =
 pdo.custom = false
 pdo.system = false
 
+[db]
+
 [lang]
 front = ru
 admin = en

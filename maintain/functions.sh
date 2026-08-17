@@ -6,6 +6,9 @@ declare -gA releaseQty=()
 # Windows: Git Bash specific fix
 GIT_PS1_SHOWCONFLICTSTATE=
 
+# Prevent docker from showing annoying "What's next" stuff
+export DOCKER_CLI_HINTS=false
+
 # Colors
 r="\e[31m" # red
 g="\e[36m" # cyan
@@ -1456,7 +1459,7 @@ stop_debezium_and_closetab_if_need() {
   closetab=false; if curl http://apache/realtime/status/ 2>&1 | grep -q closetab; then closetab=true; fi
 
   # If disable each, if needed
-  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/        > /dev/null 2>&1; fi
+  if [[ $closetab = true ]]; then curl http://apache/realtime/closetab/ > /dev/null 2>&1; fi
   if [[ $debezium = true ]];  then curl http://apache/realtime/debezium/disable/ > /dev/null 2>&1; fi
 }
 
@@ -1578,7 +1581,7 @@ reset_db() {
     local elapsed=0
     local done="/var/lib/db_engine/init.done"
     local initTimeout=60
-    local waitTimeout=2
+    local waitTimeout=10
     while :; do
       clear_last_lines 1
       echo "$msg ($elapsed s)"
@@ -3345,7 +3348,7 @@ is_repo_outdated() {
   else
     url="https://github.com/indi-engine/$repo"
     branch=master
-    dir="$VDR/$repo"
+    dir="$BVDR/$repo"
     git_askpass "system"
   fi
 
@@ -3486,8 +3489,16 @@ get_migration_commit() {
   # Arguments
   local fraction="${1:-}"
 
+  # Get schema
+  local schema="system"; [[ $(is_splitdb) == "" ]] && schema="$(get_custom_schema)"
+
   # Run query
-  db_query "SELECT \`defaultValue\` FROM \`field\` WHERE \`alias\` = 'migration-commit-$fraction'"
+  db_query "SELECT \`defaultValue\` FROM \`$schema\`.\`field\` WHERE \`alias\` = 'migration-commit-$fraction'"
+}
+
+# Check whether app-agnostic tables has been already moved into separate schema
+is_splitdb() {
+  db_query "SELECT 1 FROM information_schema.tables WHERE table_schema = 'system' AND table_type = 'BASE TABLE' LIMIT 1"
 }
 
 # Run sql query
@@ -3524,8 +3535,11 @@ set_migration_commit() {
   local fraction=$1
   local commit=$2
 
+  # Get schema
+  local schema="system"; [[ $(is_splitdb) == "" ]] && schema="$(get_custom_schema)"
+
   # Run query
-  db_query "UPDATE \`field\` SET \`defaultValue\` = '$commit' WHERE \`alias\` = 'migration-commit-$fraction'"
+  db_query "UPDATE \`$schema\`.\`field\` SET \`defaultValue\` = '$commit' WHERE \`alias\` = 'migration-commit-$fraction'"
 }
 
 # Run database migrations, if any new ones detected for system and/or custom fractions
@@ -3542,7 +3556,7 @@ migrate_if_need() {
 
     # Setup a file to detect changes in and fraction folder where it's located
     if [[ "$fraction" == "system" ]]; then
-      folder="$VDR/system"
+      folder="$BVDR/system"
       detect="library/Indi/Controller/Migrate.php"
     else
       folder=""
@@ -3584,10 +3598,10 @@ migrate_if_need() {
       diff="$(git -C "$folder" diff "$commit" -- "$detect")"
 
       # Setup regex to detect added migration actions
-      rex='^\+\s+public function ([a-zA-Z_0-9]+)Action'
+      rex='^\+\s+public function ([a-zA-Z_0-9]+)Action([^#]*)(#\~([a-f0-9]{7,40}))?$'
 
       # Detect migration actions
-      actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1~" | tac)
+      actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1-\4~" | tac)
 
       # If no new migrations detected - print that
       if [[ "$actions" == "" ]]; then
@@ -3595,7 +3609,17 @@ migrate_if_need() {
 
       # Else add to the pending migration list and print status
       else
-        for action in $actions; do migrate["$fraction"]+="migrate/$action "; done
+        for line in $actions; do
+
+          # Split line into action name and explicit hash (if given)
+          action="${line%-*}"; hash="${line#*-}"
+
+          # If explicit hash is not given - detect it from git log
+          if [[ "$hash" == "" ]]; then
+              hash="$(git -C "$folder" log -G "public function ${action}Action" --oneline --format="%H" -- "$detect")"
+          fi
+          migrate["$fraction"]+="migrate/$action@$hash "
+        done
         echo "$(echo "$actions" | wc -l) new migration(s) detected" | prepend "» "
       fi
 
@@ -3673,38 +3697,62 @@ migrate_if_need() {
           continue
       fi
 
+      # Setup a file to keep at latest version and repo to be switched to hash where migration was created
+      if [[ "$fraction" == "system" ]]; then
+        folder="$BVDR/system"
+        detect="library/Indi/Controller/Migrate.php"
+        nowhash=master
+      else
+        folder=""
+        detect="custom/public/application/controllers/admin/MigrateController.php"
+        nowhash=main
+      fi
+
       # Print status
       echo "Running migrations for $fraction fraction:"
 
       # Foreach migration action
-      for action in ${migrate["$fraction"]}; do
+      for _action_ in ${migrate["$fraction"]}; do
 
-        # Prepare and print msg, change dir to webroot, run migration action and change dir back
+        # Extract action and hash from _action_
+        if [[ "$_action_" == *"@"* ]]; then
+          action="${_action_%@*}";
+          washash="${_action_#*@}"
+        else
+          action="$_action_";
+          washash=""
+        fi
+
+        # Prepare and print msg
         local msg=" - ${g}php indi ${action}${d} ..."; echo -e "$msg"
+
+        # Checkout at $washhash except migrations file to keep it to be in the latest version
+        # because some fixes might have been added into the migrations after they were created
+        if [[ -n "${washash}" ]]; then
+          migration_prepare "git -C $folder checkout $washash"
+          migration_prepare "git -C $folder checkout $nowhash -- $detect"
+          tmp_apply_backward_compat
+        fi
+
+        # Change dir to webroot, run migration action and change dir back
         cd "custom/public"
         set +e; php indi $action 2>&1 | prepend "     " true; exit_code=$?; set -e
         cd "../../"
 
+        # Checkout all back
+        if [[ -n "${washash}" ]]; then
+          tmp_unset_backward_compat
+          migration_prepare "git -C $folder checkout $nowhash"
+        fi
+
         # If migration failed
-        if [[ $exit_code -ne 0 ]]; then
+        if [[ $exit_code -ne 0 ]]; then migration_failed $exit_code
 
-          # Return failure exit code
-          echo "Database migration step has failed during update. In this situation you can"
-          echo "either run 'source restore dump before' command to get back to the pre-migration"
-          echo "(i.e. original) database state, or try to re-run the migration step again with"
-          echo "'source update' command - make sense if failure is investigated and fixed."
-          return $exit_code
-
-        # Else is no lines were printed by migration action
-        elif [[ $(prepended) -eq 0 ]]; then
-
-          # Rewrite msg now with trailing 'Done'
-          clear_last_lines 1; echo -e "$msg Done"
+        # Else is no lines were printed by migration action - rewrite msg now with trailing 'Done'
+        elif [[ $(prepended) -eq 0 ]]; then clear_last_lines 1; echo -e "$msg Done"
 
         # Else print Done (with indent) as the next line after the lines printed by migration action
-        else
-          echo "   Done"
-        fi
+        else echo "   Done"; fi
       done
     done
 
@@ -3717,7 +3765,7 @@ migrate_if_need() {
 
     # Setup fraction repo folder
     if [[ "$fraction" == "system" ]]; then
-      folder="$VDR/system"
+      folder="$BVDR/system"
     else
       folder=""
     fi
@@ -3731,6 +3779,46 @@ migrate_if_need() {
   if [[ ${#migrate[@]} -gt 0 ]]; then
     rm -rf data/before
   fi
+}
+
+# Temporary apply backwards compatibility stuff needed for migration
+tmp_apply_backward_compat() {
+
+  # If we've already migrated from single schema - do nothing
+  [[ $(is_splitdb) != "" ]] && return 0
+
+  # Add into to ini file
+  local ini="custom/public/application/config.ini"
+  echo "[db]" >> "$ini"
+  echo "user = $(get_env DB_APP_USER)" >> "$ini"
+  echo "pass = $(get_env DB_APP_PASSWORD)" >> "$ini"
+  echo "name = $(get_env DB_NAME)" >> "$ini"
+}
+
+# Cleanup backwards compatibility stuff previously applied for migration
+tmp_unset_backward_compat() {
+
+  # If we've already migrated from single schema - do nothing
+  [[ $(is_splitdb) != "" ]] && return 0
+
+  # Cleanup lines added to ini-file
+  local ini="custom/public/application/config.ini"
+  for i in {1..4}; do sed -i '$d' "$ini"; done
+}
+
+# Run migration preparation command and print output on failure
+migration_prepare() {
+  local out=""; out=$($1 2>&1) || migration_failed $? "$1: $out";
+}
+
+# Print generic failure message and return given failure exit code
+migration_failed() {
+  [[ "${2:-}" != "" ]] && echo "${2:-}"
+  echo "Database migration step has failed during update. In this situation you can"
+  echo "either run 'source restore dump before' command to get back to the pre-migration"
+  echo "(i.e. original) database state, or try to re-run the migration step again with"
+  echo "'source update' command - make sense if failure is investigated and fixed."
+  return $1
 }
 
 # Print quantity of lines prepended by the last piping of some command's output into prepend() function

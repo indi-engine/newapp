@@ -540,13 +540,18 @@ get_self_host() {
   if [[ ! -z $LETS_ENCRYPT_DOMAIN ]]; then
     host="${LETS_ENCRYPT_DOMAIN%% *}"
   elif [[ $APP_ENV == "production" || $APP_ENV == "staging" ]]; then
-    host="$(curl -sS --fail-with-body http://ipecho.net/plain)"
+    host="$(get_self_ipv4)"
   else
     host="localhost"
   fi
 
   # Print host
   echo "$host"
+}
+
+# Get current instance's ipv4
+get_self_ipv4() {
+  curl -4 -sS --fail-with-body http://ipecho.net/plain
 }
 
 # Clear last X lines
@@ -1416,7 +1421,7 @@ download_possibly_chunked_file() {
     if (( remote_chunks_qty > 1 )); then
 
       # Download one by one
-      echo "Downloading $file from $repo:$release into data/ dir ($remote_chunks_qty chunks):"
+      echo "Downloading $file from $repo:$release into data/ ($remote_chunks_qty chunks):"
       for remote_chunk in $remote_chunks; do
         gh_download "$repo" "$release" "$remote_chunk" "$dir"
         echo "» Downloading $remote_chunk... Done"
@@ -1424,7 +1429,7 @@ download_possibly_chunked_file() {
 
     # Else download the single file, overwriting the existing one, if any
     else
-      local msg="Downloading $file from $repo:$release into data/ dir..." && echo "$msg"
+      local msg="Downloading $file from $repo:$release into data/ ..." && echo "$msg"
       gh_download "$repo" "$release" "$file" "$dir"
       if [[ $- == *i* || -n "${FLASK_APP:-}" ]]; then clear_last_lines 1; fi
       echo "$msg Done"
@@ -1806,6 +1811,14 @@ env_validate_DB_APP_PASSWORD() {
   if [[ "$INPUT_VALUE" = "" ]]; then
     # Excluded chars #$<>&|\;()! to prevent problems on CLI
     INPUT_VALUE="$(echo "$(LC_ALL=C tr -dc 'A-Za-z0-9@%^*\-_=+[\]{}:,.?' < /dev/urandom | head -c32)")"
+  fi
+}
+
+# If value for LETS_ENCRYPT_DOMAIN is given as 'nip' - set it as '<myipv4>.nip.io'
+# to get https for a domain name auto-generated for ip address
+env_validate_LETS_ENCRYPT_DOMAIN() {
+  if [[ "$INPUT_VALUE" = "nip" ]]; then
+    INPUT_VALUE="$(get_self_ipv4).nip.io"
   fi
 }
 

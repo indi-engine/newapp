@@ -494,14 +494,24 @@ if ip: print(ipaddress.ip_network(ip + "/64", strict=False))
   fi
 }
 
-# Get the current Docker Compose project's subnet in a format usable as Host for DB_APP_USER
+# Get the current Docker Compose project's IPv6 subnet in a format usable as Host for DB_APP_USER
 get_db_host_prefix() {
 
-  # Get IP address
-  local ip="$(hostname -i)"
+  # Read all IPs into an array automatically split by whitespace
+  local ips=($(hostname -i))
+  local ipv6=""
 
-  # Cut last numeric value and append '%' char instead
-  echo "${ip%.*}.%"
+  # Loop through each IP to find the IPv6 address (contains colons)
+  for ip in "${ips[@]}"; do
+    if [[ "$ip" == *:* ]]; then
+      ipv6="$ip"
+      break
+    fi
+  done
+
+  # Extract the first 3 blocks (e.g., fded:907:27c2) and append :%
+  local prefix=$(echo "$ipv6" | cut -d':' -f1-3)
+  echo "${prefix}:%"
 }
 
 # Get URL of current instance
@@ -3611,10 +3621,20 @@ migrate_if_need() {
       diff="$(git -C "$folder" diff "$commit" -- "$detect")"
 
       # Setup regex to detect added migration actions
-      rex='^\+\s+public function ([a-zA-Z_0-9]+)Action([^#]*)(#\~([a-f0-9]{7,40}))?$'
+      rex='\s+public function ([a-zA-Z_0-9]+)Action([^#]*)(#\~([a-f0-9]{7,40}))?$'
+      add="^\+$rex"
+      del="^\-$rex"
 
       # Detect migration actions
-      actions=$(echo "$diff" | (grep -P "$rex" || true) | sed -E "s~$rex.*~\1-\4~" | tac)
+      actions=$(echo "$diff" | (grep -P "$add" || true) | sed -E "s~$add.*~\1-\4~" | tac)
+      exclude=$(echo "$diff" | (grep -P "$del" || true) | sed -E "s~$del.*~\1-~" | tac)
+
+      # Exclude actions capture because if action method name line modified
+      if [ -n "$exclude" ]; then
+        for modified in $exclude; do
+          actions="$(echo "$actions" | grep -Ev "^$modified")"
+        done
+      fi
 
       # If no new migrations detected - print that
       if [[ "$actions" == "" ]]; then

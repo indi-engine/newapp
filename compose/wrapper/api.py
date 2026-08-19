@@ -94,7 +94,7 @@ def get_custom_dsn(db):
     # If nothing found - throw exception, else return DSN-info
     query = f"SELECT * FROM `system`.`{table}` WHERE `id` = %s"
     if engine == 'postgres': query = query.replace('`', '"')
-    db.execute(query, id); info = db.fetchone()
+    db.execute(query, (id,)); info = db.fetchone()
     if not info: raise Exception(f"Missing database custom source: {source}")
     return info
 

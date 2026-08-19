@@ -93,6 +93,10 @@ services:
       - ./compose/apache/ioncube.ini:/usr/local/etc/php/conf.d/00-ioncube.ini
       - ./compose/apache/ioncube.so:/usr/local/lib/php/extensions/ioncube.so
 
+networks:
+  default:
+    enable_ipv6: true
+
 volumes:
   rabbitmq:
   letsencrypt:

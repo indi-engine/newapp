@@ -13,6 +13,18 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
  && rm -rf /var/lib/apt/lists/*
 ## </Postgres client> ##
 
+## <SqlPackage> ##
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libunwind8 \
+ && curl -fL https://aka.ms/sqlpackage-linux -o /tmp/sqlpackage.zip \
+ && mkdir -p /opt/sqlpackage \
+ && unzip /tmp/sqlpackage.zip -d /opt/sqlpackage \
+ && chmod +x /opt/sqlpackage/sqlpackage \
+ && ln -s /opt/sqlpackage/sqlpackage /usr/local/bin/sqlpackage \
+ && rm /tmp/sqlpackage.zip \
+ && rm -rf /var/lib/apt/lists/*
+## </SqlPackage> ##
+
 ## <GitHub CLI> ##
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg && \
     chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg && \

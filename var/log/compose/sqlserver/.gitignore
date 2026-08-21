@@ -1,0 +1,6 @@
+*.log
+*.xel
+*.trc
+*.out
+errorlog*
+sqlagent*

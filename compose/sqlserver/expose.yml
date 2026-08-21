@@ -1,0 +1,4 @@
+services:
+  sqlserver:
+    ports:
+      - "${DB_EXPOSE_PORT}:1433"

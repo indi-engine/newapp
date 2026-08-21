@@ -17,11 +17,11 @@ services:
       --log-bin
       --default-time-zone='+00:00'
     environment:
-      TZ: UTC
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_USER: ${DB_APP_USER}
       MYSQL_PASSWORD: ${DB_APP_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
+      TZ: UTC
     volumes:
       - ./compose/mysql/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro

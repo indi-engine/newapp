@@ -177,6 +177,806 @@ get_DB_DUMPS() {
   echo "${dumps/\{custom\}/"$custom"}"
 }
 
+# Remove naming artifacts introduced specifically by SSMA. The operation is a
+# safe no-op for constraints whose names do not start with their owning table$.
+sqlserver_cleanup_SSMA_schema() {
+  local source="${1:?Usage: sqlserver_cleanup_SSMA_schema SOURCE [TARGET]}"
+  local target="${2:-$source}"
+  [[ -f "$source" ]] || { echo "SQL Server dump not found: $source" >&2; return 1; }
+  local target_dir tmp
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir"
+  tmp="$(mktemp "$target_dir/.sqlserver-ssma.XXXXXX")"
+
+  if ! awk '
+    function table_name(name) {
+      sub(/^.*\./, "", name)
+      gsub(/^\[|\]$/, "", name)
+      return name
+    }
+    /^CREATE TABLE[[:space:]]+/ {
+      owner = $0
+      sub(/^CREATE TABLE[[:space:]]+/, "", owner)
+      sub(/[[:space:]]*\(.*/, "", owner)
+      owner = table_name(owner)
+    }
+    /^[[:space:]]*ALTER TABLE[[:space:]]+/ {
+      owner = $0
+      sub(/^[[:space:]]*ALTER TABLE[[:space:]]+/, "", owner)
+      sub(/[[:space:]].*/, "", owner)
+      owner = table_name(owner)
+    }
+    /CONSTRAINT \[[^]]+\][[:space:]]+FOREIGN KEY/ {
+      name = $0
+      sub(/^.*CONSTRAINT \[/, "", name)
+      sub(/\].*$/, "", name)
+      prefix = owner "$"
+      if (owner != "" && substr(name, 1, length(prefix)) == prefix) {
+        replacement = substr(name, length(prefix) + 1)
+        before = $0
+        sub(/CONSTRAINT \[[^]]+\]/, "CONSTRAINT [" replacement "]")
+        trimmed++
+      }
+    }
+    { sub(/\r$/, ""); print }
+    END { print trimmed + 0 " SSMA foreign-key names trimmed" > "/dev/stderr" }
+  ' "$source" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$target"
+}
+
+# Normalize DBeaver INSERT output. Every inserted table is assumed to own an
+# identity column, so schema inspection is deliberately unnecessary.
+sqlserver_cleanup_DBeaver_data() {
+  local source="${1:?Usage: sqlserver_cleanup_DBeaver_data SOURCE [TARGET]}"
+  local target="${2:-$source}"
+  [[ -f "$source" ]] || { echo "SQL Server dump not found: $source" >&2; return 1; }
+  local target_dir tmp
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir"
+  tmp="$(mktemp "$target_dir/.sqlserver-dbeaver.XXXXXX")"
+
+  if ! awk '
+    function emit(line) {
+      sub(/\r$/, "", line)
+      if (line ~ /^[[:space:]]*$/) { blank = 1; return }
+      if (blank && emitted) print ""
+      print line
+      blank = 0
+      emitted = 1
+    }
+    /^SET IDENTITY_INSERT[[:space:]]+.*[[:space:]]+ON;[[:space:]]*$/ {
+      already_wrapped = 1
+      emit($0)
+      next
+    }
+    already_wrapped {
+      emit($0)
+      if ($0 ~ /^SET IDENTITY_INSERT[[:space:]]+.*[[:space:]]+OFF;[[:space:]]*$/) already_wrapped = 0
+      next
+    }
+    /^INSERT INTO[[:space:]]+/ {
+      target = $0
+      sub(/^INSERT INTO[[:space:]]+/, "", target)
+      sub(/[[:space:]]*\(.*/, "", target)
+      emit("")
+      emit("SET IDENTITY_INSERT " target " ON;")
+      emit($0)
+      wrapping = target
+      wrapped++
+      if ($0 ~ /;[[:space:]]*$/) {
+        emit("SET IDENTITY_INSERT " wrapping " OFF;")
+        wrapping = ""
+      }
+      next
+    }
+    wrapping != "" {
+      emit($0)
+      if ($0 ~ /;[[:space:]]*$/) {
+        emit("SET IDENTITY_INSERT " wrapping " OFF;")
+        wrapping = ""
+      }
+      next
+    }
+    { emit($0) }
+    END {
+      if (wrapping != "" || already_wrapped) {
+        print "Unterminated DBeaver INSERT/IDENTITY_INSERT block" > "/dev/stderr"
+        exit 13
+      }
+      print wrapped + 0 " DBeaver INSERT blocks wrapped" > "/dev/stderr"
+    }
+  ' "$source" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  mv -f "$tmp" "$target"
+}
+
+# Normalize a SqlPackage schema with optionally pasted DBeaver data:
+# - remove GO separators, redundant blank lines, NONCLUSTERED keywords, and
+#   parentheses around simple literal DEFAULT values (function calls stay intact);
+# - inline unnamed single-column primary keys and rely on their clustered default;
+# - convert UNIQUE constraints to table-scoped UNIQUE indexes named from their
+#   ordered comma-separated columns, keeping all indexes beside their table;
+# - convert SSMA enum checks from OR chains to IN lists, store enum-like
+#   NVARCHAR(255) columns as VARCHAR(255), and remove their Unicode N prefixes;
+# - defer foreign keys until after all data and rely on ADD CONSTRAINT validation;
+# - alphabetize table/index bundles, INSERT bundles, and deferred foreign keys.
+# The rewrite is atomic and rejects malformed input, duplicate generated names,
+# and overlong generated index names; rerunning it is a safe no-op.
+sqlserver_cleanup_SqlPackage_schema() {
+
+  # Arguments
+  local source="${1:?Usage: sqlserver_cleanup_SqlPackage_schema SOURCE [TARGET]}"
+  local target="${2:-$source}"
+
+  # Validate source
+  if [[ ! -f "$source" ]]; then
+    echo "SQL Server dump not found: $source" >&2
+    return 1
+  fi
+
+  # Do not append the same foreign keys twice
+  if grep -q '^-- Foreign keys deferred by sqlserver_defer_foreign_keys$' "$source"; then
+    if [[ "$target" != "$source" ]]; then
+      cp -f "$source" "$target"
+    fi
+    echo "SqlPackage schema is already normalized: $source" >&2
+    return 0
+  fi
+
+  # Use a temporary file beside the target so the final move is atomic
+  local target_dir
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir"
+  local tmp
+  tmp="$(mktemp "$target_dir/.sqlserver-dump.XXXXXX")"
+
+  # Extract one-line inline FK constraints, repair CREATE TABLE trailing commas,
+  # append the constraints after the DML as validated ALTER TABLE statements,
+  # remove GO batch separators, and collapse consecutive empty lines.
+  if ! awk -v source="$source" '
+    function emit(line,   upper, kind) {
+      sub(/\r$/, "", line)
+      upper = toupper(line)
+
+      # GO is a client-side batch separator and this dump does not need it.
+      if (upper ~ /^[[:space:]]*GO[[:space:]]*$/) return
+
+      # Defer empty-line output until the next content line reveals whether it
+      # separates ordinary statements or consecutive indexes/foreign keys.
+      if (line ~ /^[[:space:]]*$/) {
+        empty = 1
+        return
+      }
+
+      kind = "other"
+      if (upper ~ /^CREATE (UNIQUE )?((NON)?CLUSTERED )?INDEX /) kind = "index"
+      if (upper ~ /^ALTER TABLE .* ADD CONSTRAINT .* FOREIGN KEY /) kind = "foreign_key"
+
+      if (emitted && empty && !(previous_kind == kind && (kind == "index" || kind == "foreign_key"))) print ""
+      print line
+      emitted = 1
+      empty = 0
+      previous_kind = kind
+    }
+
+    function clear_block(   i) {
+      for (i in block) delete block[i]
+      for (i in normalized_block) delete normalized_block[i]
+      for (i in enum_column) delete enum_column[i]
+      for (i in inline_primary_key) delete inline_primary_key[i]
+      block_qty = 0
+      table = ""
+    }
+
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+
+    function table_key(name) {
+      sub(/^.*\./, "", name)
+      gsub(/^\[|\]$/, "", name)
+      return name
+    }
+
+    function normalize_enum_check(line,   marker, start, expression, comma, term_qty, terms, i, term, equals, column, value, values, literal_pattern) {
+      marker = "CHECK ("
+      start = index(line, marker)
+      if (!start || line !~ / OR /) return line
+
+      expression = substr(line, start + length(marker))
+      sub(/\r$/, "", expression)
+      comma = expression ~ /,[[:space:]]*$/ ? "," : ""
+      sub(/,[[:space:]]*$/, "", expression)
+      if (expression !~ /\)[[:space:]]*$/) return line
+      sub(/\)[[:space:]]*$/, "", expression)
+
+      term_qty = split(expression, terms, /[[:space:]]+OR[[:space:]]+/)
+      if (term_qty < 2) return line
+
+      literal_pattern = "^N?\\047([^\\047]|\\047\\047)*\\047$"
+      for (i = 1; i <= term_qty; i++) {
+        term = trim(terms[i])
+        equals = index(term, "=")
+        if (!equals) return line
+
+        if (i == 1) column = trim(substr(term, 1, equals - 1))
+        else if (trim(substr(term, 1, equals - 1)) != column) return line
+
+        if (column !~ /^\[[^]]+\]$/) return line
+        value = trim(substr(term, equals + 1))
+        if (value !~ literal_pattern) return line
+        values = values (i > 1 ? ", " : "") value
+      }
+
+      enum_check_qty++
+      return substr(line, 1, start - 1) marker column " IN (" values "))" comma
+    }
+
+    function normalize_literal_default(line,   marker, start, tail, matched, value, literal_pattern) {
+      marker = "DEFAULT "
+      start = index(line, marker)
+      if (!start) return line
+
+      tail = substr(line, start + length(marker))
+      matched = ""
+      value = ""
+
+      if (match(tail, /^\(\([-+]?[0-9]+([.][0-9]+)?\)\)/)) {
+        matched = substr(tail, 1, RLENGTH)
+        value = substr(matched, 3, length(matched) - 4)
+      } else if (match(tail, /^\([-+]?[0-9]+([.][0-9]+)?\)/)) {
+        matched = substr(tail, 1, RLENGTH)
+        value = substr(matched, 2, length(matched) - 2)
+      } else if (match(tail, /^\(NULL\)/)) {
+        matched = substr(tail, 1, RLENGTH)
+        value = "NULL"
+      } else {
+        literal_pattern = "^\\(N?\\047([^\\047]|\\047\\047)*\\047\\)"
+        if (match(tail, literal_pattern)) {
+          matched = substr(tail, 1, RLENGTH)
+          value = substr(matched, 2, length(matched) - 2)
+        }
+      }
+
+      # Function calls and compound expressions intentionally do not match.
+      if (matched == "") return line
+      literal_default_qty++
+      return substr(line, 1, start - 1) marker value substr(tail, length(matched) + 1)
+    }
+
+    function store_index(statement,   index_table, index_name, collision_key) {
+      # NONCLUSTERED is CREATE INDEXs default; omit the visual noise while
+      # retaining an explicit CLUSTERED keyword where it is semantically needed.
+      sub(/^CREATE UNIQUE NONCLUSTERED INDEX[[:space:]]+/, "CREATE UNIQUE INDEX ", statement)
+      sub(/^CREATE NONCLUSTERED INDEX[[:space:]]+/, "CREATE INDEX ", statement)
+
+      index_table = statement
+      sub(/^.*[[:space:]]ON[[:space:]]+/, "", index_table)
+      sub(/[[:space:]]*\(.*/, "", index_table)
+
+      index_name = statement
+      sub(/^CREATE (UNIQUE )?((NON)?CLUSTERED )?INDEX[[:space:]]+\[/, "", index_name)
+      sub(/\].*$/, "", index_name)
+      collision_key = index_table SUBSEP index_name
+      if (collision_key in index_name_seen) {
+        print "Duplicate index name " index_name " on table " index_table > "/dev/stderr"
+        fatal = 7
+        exit fatal
+      }
+      index_name_seen[collision_key] = 1
+
+      if (!(index_table in index_seen)) {
+        index_seen[index_table] = 1
+        index_order[++index_table_qty] = index_table
+      }
+
+      index_sql[index_table, ++index_qty[index_table]] = statement
+    }
+
+    function store_unique_constraint(line, index_table,   definition, open, columns, column_qty, column_parts, i, column, index_name, index_kind) {
+      definition = line
+      sub(/^[[:space:]]+/, "", definition)
+      sub(/,[[:space:]]*$/, "", definition)
+
+      open = index(definition, "(")
+      if (!open || definition !~ /^CONSTRAINT \[[^]]+\][[:space:]]+UNIQUE[[:space:]]+/) return 0
+
+      columns = substr(definition, open + 1)
+      sub(/\)[[:space:]]*$/, "", columns)
+      column_qty = split(columns, column_parts, /,[[:space:]]*/)
+      index_name = ""
+      for (i = 1; i <= column_qty; i++) {
+        column = trim(column_parts[i])
+        sub(/[[:space:]]+(ASC|DESC)[[:space:]]*$/, "", column)
+        if (column !~ /^\[[^]]+\]$/) {
+          print "Cannot derive UNIQUE index name from: " line > "/dev/stderr"
+          fatal = 8
+          exit fatal
+        }
+        gsub(/^\[|\]$/, "", column)
+        index_name = index_name (i > 1 ? "," : "") column
+      }
+
+      if (length(index_name) > 128) {
+        print "Generated UNIQUE index name exceeds 128 characters on table " index_table ": " index_name > "/dev/stderr"
+        fatal = 9
+        exit fatal
+      }
+
+      index_kind = definition ~ /UNIQUE[[:space:]]+CLUSTERED[[:space:]]+/ ? "CLUSTERED " : ""
+      store_index("CREATE UNIQUE " index_kind "INDEX [" index_name "] ON " index_table "(" columns ");")
+      unique_index_qty++
+      return 1
+    }
+
+    function emit_indexes(index_table,   j) {
+      if (!index_qty[index_table]) return
+      emit("")
+      for (j = 1; j <= index_qty[index_table]; j++) {
+        emit(index_sql[index_table, j])
+      }
+    }
+
+    function flush_table(   i, last, line, clause, constraint_name, constraint_tail, constraint_prefix, check_expression, column, definition, key_columns, key_column, trailing_comma) {
+      last = 0
+
+      # Normalize enum checks first, then use those named constraints to detect
+      # which column declarations should use non-Unicode VARCHAR storage.
+      for (i = 1; i <= block_qty; i++) {
+        normalized_block[i] = normalize_enum_check(block[i])
+        line = normalized_block[i]
+
+        if (line !~ /CONSTRAINT \[[^]]+_enum_[^]]+\][[:space:]]+CHECK \(/ || line !~ / IN \(/) continue
+        check_expression = line
+        sub(/^.*CHECK \(/, "", check_expression)
+        column = check_expression
+        sub(/[[:space:]]+IN \(.*/, "", column)
+        column = trim(column)
+        if (column ~ /^\[[^]]+\]$/) enum_column[column] = 1
+      }
+
+      # A single-column primary key can be expressed directly on its column.
+      # Composite keys deliberately remain table-level constraints.
+      for (i = 1; i <= block_qty; i++) {
+        definition = normalized_block[i]
+        sub(/^[[:space:]]+/, "", definition)
+        sub(/,[[:space:]]*$/, "", definition)
+        if (definition !~ /^CONSTRAINT \[[^]]+\][[:space:]]+PRIMARY KEY([[:space:]]+(NON)?CLUSTERED)?[[:space:]]*\(/) continue
+
+        key_columns = definition
+        sub(/^.*PRIMARY KEY([[:space:]]+(NON)?CLUSTERED)?[[:space:]]*\(/, "", key_columns)
+        sub(/\)[[:space:]]*$/, "", key_columns)
+        if (key_columns ~ /,/) continue
+
+        key_column = trim(key_columns)
+        sub(/[[:space:]]+(ASC|DESC)[[:space:]]*$/, "", key_column)
+        if (key_column !~ /^\[[^]]+\]$/) continue
+
+        inline_primary_key[key_column] = "PRIMARY KEY"
+      }
+
+      for (i = 1; i <= block_qty; i++) {
+        if (normalized_block[i] ~ /[[:space:]]IDENTITY[[:space:]]*\(/) {
+          identity_table[table_key(table)] = 1
+          break
+        }
+      }
+
+      for (i = 1; i <= block_qty; i++) {
+        line = normalized_block[i]
+
+        if (line ~ /^[[:space:]]*CONSTRAINT .* FOREIGN KEY .* REFERENCES /) {
+          clause = line
+          sub(/\r$/, "", clause)
+          sub(/^[[:space:]]*/, "", clause)
+          sub(/,[[:space:]]*$/, "", clause)
+
+          # SSMA prepends the owning table and "$" even when the original
+          # MySQL foreign-key name already carries a table prefix.
+          constraint_name = clause
+          sub(/^CONSTRAINT \[/, "", constraint_name)
+          sub(/\].*$/, "", constraint_name)
+          constraint_prefix = table_key(table) "$"
+          if (substr(constraint_name, 1, length(constraint_prefix)) == constraint_prefix) {
+            constraint_name = substr(constraint_name, length(constraint_prefix) + 1)
+            constraint_tail = clause
+            sub(/^CONSTRAINT \[[^]]+\]/, "", constraint_tail)
+            clause = "CONSTRAINT [" constraint_name "]" constraint_tail
+            foreign_key_name_trim_qty++
+          }
+
+          if (constraint_name in foreign_key_name_seen) {
+            print "Duplicate foreign-key constraint name after removing SSMA prefix: " constraint_name > "/dev/stderr"
+            fatal = 10
+            exit fatal
+          }
+          foreign_key_name_seen[constraint_name] = 1
+          fk_table[++fk_qty] = table
+          fk_clause[fk_qty] = clause
+          continue
+        }
+
+        if (line ~ /^[[:space:]]*CONSTRAINT \[[^]]+\][[:space:]]+UNIQUE[[:space:]]+/) {
+          store_unique_constraint(line, table)
+          continue
+        }
+
+        if (line ~ /^[[:space:]]*CONSTRAINT \[[^]]+\][[:space:]]+PRIMARY KEY/ && length(inline_primary_key)) {
+          continue
+        }
+
+        column = line
+        sub(/^[[:space:]]*/, "", column)
+        sub(/[[:space:]].*$/, "", column)
+        if (column in inline_primary_key) {
+          trailing_comma = line ~ /,[[:space:]]*$/ ? "," : ""
+          sub(/,[[:space:]]*$/, "", line)
+          line = line " " inline_primary_key[column] trailing_comma
+          inline_primary_key_qty++
+        }
+        if (column in enum_column) {
+          if (line ~ /NVARCHAR[[:space:]]*\([[:space:]]*255[[:space:]]*\)/) {
+            sub(/NVARCHAR[[:space:]]*\([[:space:]]*255[[:space:]]*\)/, "VARCHAR (255)", line)
+            enum_varchar_qty++
+          }
+          gsub(/\(N\047/, "(\047", line)
+        }
+
+        if (line ~ /CONSTRAINT \[[^]]+_enum_[^]]+\][[:space:]]+CHECK \(/) {
+          gsub(/N\047/, "\047", line)
+        }
+
+        line = normalize_literal_default(line)
+
+        kept[++last] = line
+      }
+
+      # Removing the last constraint can leave a dangling comma before ");".
+      for (i = last - 1; i >= 1; i--) {
+        if (kept[i] !~ /^[[:space:]]*$/) {
+          sub(/,[[:space:]]*\r?$/, "", kept[i])
+          break
+        }
+      }
+
+      for (i = 1; i <= last; i++) {
+        emit(kept[i])
+        delete kept[i]
+      }
+
+      emit_indexes(table)
+      clear_block()
+    }
+
+    BEGIN {
+      # Indexes occur later in SqlPackage output. Scan them up front so each
+      # group can be emitted immediately after its corresponding table block.
+      while ((getline scan_line < source) > 0) {
+        sub(/\r$/, "", scan_line)
+        if (scan_line !~ /^CREATE (UNIQUE )?((NON)?CLUSTERED )?INDEX[[:space:]]+/) continue
+
+        if ((getline scan_on < source) <= 0 || scan_on !~ /^[[:space:]]+ON[[:space:]]+/) {
+          print "Malformed CREATE INDEX statement after: " scan_line > "/dev/stderr"
+          scan_failed = 1
+          break
+        }
+
+        sub(/\r$/, "", scan_on)
+        sub(/^[[:space:]]+/, "", scan_on)
+        store_index(scan_line " " scan_on)
+      }
+      close(source)
+
+      if (scan_failed) exit 4
+    }
+
+    /^CREATE TABLE[[:space:]]+/ {
+      in_table = 1
+      table = $0
+      sub(/^CREATE TABLE[[:space:]]+/, "", table)
+      sub(/[[:space:]]*\(.*/, "", table)
+    }
+
+    in_table {
+      block[++block_qty] = $0
+
+      if ($0 ~ /^\);[[:space:]]*\r?$/) {
+        flush_table()
+        in_table = 0
+      }
+
+      next
+    }
+
+    # Indexes were collected in the preliminary pass and emitted alongside
+    # their tables, so remove their original two-line definitions here.
+    /^CREATE (UNIQUE )?((NON)?CLUSTERED )?INDEX[[:space:]]+/ {
+      skip_index_on = 1
+      next
+    }
+
+    skip_index_on {
+      if ($0 !~ /^[[:space:]]+ON[[:space:]]+/) {
+        print "Malformed CREATE INDEX statement before: " $0 > "/dev/stderr"
+        exit 5
+      }
+      skip_index_on = 0
+      next
+    }
+
+    /^INSERT INTO[[:space:]]+/ {
+      insert_target = $0
+      sub(/^INSERT INTO[[:space:]]+/, "", insert_target)
+      sub(/[[:space:]]*\(.*/, "", insert_target)
+
+      # Separate every DML block from the preceding statement. For identity
+      # tables this blank line must precede the IDENTITY_INSERT wrapper too.
+      emit("")
+
+      emit($0)
+      next
+    }
+
+    { emit($0) }
+
+    END {
+      if (fatal) exit fatal
+
+      if (in_table) {
+        print "Unterminated CREATE TABLE block" > "/dev/stderr"
+        exit 2
+      }
+
+      if (!fk_qty) {
+        print "No inline SQL Server foreign keys found" > "/dev/stderr"
+        exit 3
+      }
+
+      emit("")
+      emit("-- Foreign keys deferred by sqlserver_defer_foreign_keys")
+      for (i = 1; i <= fk_qty; i++) {
+        emit("")
+        emit("ALTER TABLE " fk_table[i] " ADD " fk_clause[i] ";")
+      }
+
+      print fk_qty " foreign keys deferred, " foreign_key_name_trim_qty + 0 " foreign-key names trimmed, " unique_index_qty " UNIQUE constraints converted to indexes, " inline_primary_key_qty " primary keys inlined, " enum_check_qty " enum checks normalized, " enum_varchar_qty " enum columns converted to VARCHAR(255), " literal_default_qty " literal defaults unwrapped" > "/dev/stderr"
+    }
+  ' "$source" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+
+  # Reorder the generated table-oriented sections deterministically. Each
+  # CREATE TABLE remains bundled with its indexes, and each INSERT remains
+  # bundled with its optional IDENTITY_INSERT wrapper.
+  local sorted_tmp
+  sorted_tmp="$(mktemp "$target_dir/.sqlserver-dump-sorted.XXXXXX")"
+  if ! awk '
+    function append(buffer, line) {
+      return buffer (buffer == "" ? "" : "\n") line
+    }
+
+    function bare_table(name) {
+      sub(/^.*\./, "", name)
+      gsub(/^\[|\]$/, "", name)
+      return tolower(name)
+    }
+
+    function finish_table() {
+      if (current_table == "") return
+      sub(/\n+$/, "", table_buffer)
+      table_sql[current_table] = table_buffer
+      table_order[++table_qty] = current_table
+      current_table = ""
+      table_buffer = ""
+    }
+
+    function finish_insert() {
+      if (current_insert == "") return
+      sub(/\n+$/, "", insert_buffer)
+      insert_sql[current_insert, ++insert_qty[current_insert]] = insert_buffer
+      if (!(current_insert in insert_seen)) {
+        insert_seen[current_insert] = 1
+        insert_order[++insert_table_qty] = current_insert
+      }
+      current_insert = ""
+      insert_buffer = ""
+      identity_insert = 0
+    }
+
+    function start_insert(line,   target) {
+      target = line
+      if (line ~ /^SET IDENTITY_INSERT[[:space:]]+/) {
+        sub(/^SET IDENTITY_INSERT[[:space:]]+/, "", target)
+        sub(/[[:space:]]+ON;[[:space:]]*$/, "", target)
+        identity_insert = 1
+      } else {
+        sub(/^INSERT INTO[[:space:]]+/, "", target)
+        sub(/[[:space:]]*\(.*/, "", target)
+        identity_insert = 0
+      }
+      current_insert = target
+      insert_buffer = line
+      if (!identity_insert && line ~ /;[[:space:]]*$/) finish_insert()
+    }
+
+    function sort_names(source, qty, ordered,   i, j, value, value_key) {
+      for (i = 1; i <= qty; i++) ordered[i] = source[i]
+      for (i = 2; i <= qty; i++) {
+        value = ordered[i]
+        value_key = bare_table(value)
+        j = i - 1
+        while (j >= 1 && bare_table(ordered[j]) > value_key) {
+          ordered[j + 1] = ordered[j]
+          j--
+        }
+        ordered[j + 1] = value
+      }
+    }
+
+    function emit_tables(   ordered, i) {
+      sort_names(table_order, table_qty, ordered)
+      for (i = 1; i <= table_qty; i++) {
+        if (i > 1) print ""
+        print table_sql[ordered[i]]
+      }
+    }
+
+    function emit_inserts(   ordered, i, j, table) {
+      sort_names(insert_order, insert_table_qty, ordered)
+      for (i = 1; i <= insert_table_qty; i++) {
+        table = ordered[i]
+        print ""
+        for (j = 1; j <= insert_qty[table]; j++) {
+          if (j > 1) print ""
+          print insert_sql[table, j]
+        }
+      }
+    }
+
+    function emit_foreign_keys(   ordered, i, j, value, value_key) {
+      for (i = 1; i <= fk_qty; i++) ordered[i] = i
+      for (i = 2; i <= fk_qty; i++) {
+        value = ordered[i]
+        value_key = fk_sort_key[value]
+        j = i - 1
+        while (j >= 1 && fk_sort_key[ordered[j]] > value_key) {
+          ordered[j + 1] = ordered[j]
+          j--
+        }
+        ordered[j + 1] = value
+      }
+
+      print ""
+      print "-- Foreign keys deferred by sqlserver_defer_foreign_keys"
+      for (i = 1; i <= fk_qty; i++) print fk_sql[ordered[i]]
+    }
+
+    BEGIN { phase = "tables" }
+
+    phase == "tables" && /^CREATE TABLE[[:space:]]+/ {
+      finish_table()
+      current_table = $0
+      sub(/^CREATE TABLE[[:space:]]+/, "", current_table)
+      sub(/[[:space:]]*\(.*/, "", current_table)
+      table_buffer = $0
+      next
+    }
+
+    phase == "tables" && (/^SET IDENTITY_INSERT[[:space:]]+/ || /^INSERT INTO[[:space:]]+/) {
+      finish_table()
+      phase = "inserts"
+      start_insert($0)
+      next
+    }
+
+    phase == "tables" && /^-- Foreign keys deferred by sqlserver_defer_foreign_keys$/ {
+      finish_table()
+      phase = "foreign_keys"
+      next
+    }
+
+    phase == "tables" {
+      if (current_table != "") table_buffer = append(table_buffer, $0)
+      next
+    }
+
+    phase == "inserts" && /^-- Foreign keys deferred by sqlserver_defer_foreign_keys$/ {
+      finish_insert()
+      phase = "foreign_keys"
+      next
+    }
+
+    phase == "inserts" {
+      if (current_insert == "") {
+        if ($0 ~ /^[[:space:]]*$/) next
+        if ($0 ~ /^SET IDENTITY_INSERT[[:space:]]+/ || $0 ~ /^INSERT INTO[[:space:]]+/) {
+          start_insert($0)
+          next
+        }
+        print "Unexpected content between INSERT blocks: " $0 > "/dev/stderr"
+        fatal = 11
+        exit fatal
+      }
+
+      insert_buffer = append(insert_buffer, $0)
+      if (identity_insert) {
+        if ($0 ~ /^SET IDENTITY_INSERT[[:space:]]+.*[[:space:]]+OFF;[[:space:]]*$/) finish_insert()
+      } else if ($0 ~ /;[[:space:]]*$/) {
+        finish_insert()
+      }
+      next
+    }
+
+    phase == "foreign_keys" && /^ALTER TABLE[[:space:]]+/ {
+      fk_table = $0
+      sub(/^ALTER TABLE[[:space:]]+/, "", fk_table)
+      sub(/[[:space:]]+ADD CONSTRAINT.*/, "", fk_table)
+      fk_constraint = $0
+      sub(/^.*[[:space:]]ADD CONSTRAINT[[:space:]]+\[/, "", fk_constraint)
+      sub(/\].*$/, "", fk_constraint)
+      fk_sql[++fk_qty] = $0
+      fk_sort_key[fk_qty] = bare_table(fk_table) SUBSEP tolower(fk_constraint)
+      next
+    }
+
+    phase == "foreign_keys" && /^[[:space:]]*$/ { next }
+
+    {
+      print "Unexpected content in generated SQL: " $0 > "/dev/stderr"
+      fatal = 12
+      exit fatal
+    }
+
+    END {
+      if (fatal) exit fatal
+      finish_table()
+      finish_insert()
+      emit_tables()
+      emit_inserts()
+      emit_foreign_keys()
+    }
+  ' "$tmp" > "$sorted_tmp"; then
+    rm -f "$tmp" "$sorted_tmp"
+    return 1
+  fi
+
+  rm -f "$tmp"
+
+  # Replace/create target only after successful parsing
+  mv -f "$sorted_tmp" "$target"
+}
+
+# Apply every cleanup stage since the original SSMA migration. Work on one
+# temporary copy so SOURCE and an existing TARGET stay intact if any stage fails.
+sqlserver_clean_since_SSMA() {
+  local source="${1:?Usage: sqlserver_clean_since_SSMA SOURCE [TARGET]}"
+  local target="${2:-$source}"
+  [[ -f "$source" ]] || { echo "SQL Server dump not found: $source" >&2; return 1; }
+
+  local target_dir tmp
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir"
+  tmp="$(mktemp "$target_dir/.sqlserver-clean.XXXXXX")"
+  cp -f "$source" "$tmp"
+
+  if ! sqlserver_cleanup_SSMA_schema "$tmp" \
+    || ! sqlserver_cleanup_SqlPackage_schema "$tmp" \
+    || ! sqlserver_cleanup_DBeaver_data "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+
+  mv -f "$tmp" "$target"
+}
+
 # Setup $DB_APP_USER as subnet-only, setup system schema
 do_missing_db_setup_if_needed() {
   create_system_schema
@@ -3057,6 +3857,67 @@ postgres_entrypoint() {
 
     # Re-init
     postgres_entrypoint "$@"
+  fi
+}
+
+sqlserver_entrypoint() {
+
+  # Path to a file to be created once init is done
+  local data="/var/opt/mssql"
+  local done="$data/init.done"
+
+  # Shortcut to native entrypoint
+  local native="/opt/mssql/bin/launch_sqlservr.sh"
+
+  # If init is not done
+  if [[ ! -f "$done" ]]; then
+
+    # If native setup dir exists
+    if [[ -d /mssql-server-setup-scripts.d ]]; then
+
+      # Change dir
+      cd /mssql-server-setup-scripts.d
+
+      # Remove any existing files from current dir that are recognized by the
+      # SQL Server native entrypoint as executable setup scripts
+      rm -f ./*.sql
+    fi
+
+    # If 'init.done' file creation code was not yet added to native entrypoint
+    if ! grep -q "init.done" "$native"; then
+
+      # Create init.done immediately after native custom setup succeeds and
+      # before the native launcher starts waiting on SQL Server.
+      sed -i '/^wait \$pid$/i touch "'"$done"'"' "$native"
+    fi
+  fi
+
+  # Call the original entrypoint script as the image's standard mssql user
+  runuser -u mssql -- "$native" "$@"
+
+  # If we reached this line, it means db was shut down
+  echo "$(get_engine_name) Server has been shut down"
+
+  # Create a file within data-dir to indicate shutdown is completed
+  touch "$data/shutdown.done"
+
+  # Wait until shutdown is really completed
+  local timeout=5
+  local elapsed=0
+  while [[ -n "$(ls -A "$data")" && $elapsed -lt $timeout ]]; do
+    echo "Waiting for data-directory to be emptied... ($elapsed s)"
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  # If data-directory was emptied
+  if [[ -z "$(ls -A "$data")" ]]; then
+
+    # We assume it was done for restore
+    echo "$(get_engine_name sqlserver) data-directory has been emptied, so initiating the restore..."
+
+    # Re-init
+    "$(get_env "DB_ENGINE")_entrypoint" "$@"
   fi
 }
 

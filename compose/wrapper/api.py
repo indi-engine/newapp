@@ -1,6 +1,6 @@
 # Do imports
 from flask import Flask, request, jsonify
-import subprocess, pika, json, pexpect, re, pymysql, psycopg2, psycopg2.extras, os, shlex
+import subprocess, pika, json, pexpect, re, pymysql, psycopg2, psycopg2.extras, pyodbc, os, shlex
 from pika.exceptions import ChannelClosedByBroker
 
 # Instantiate Flask app
@@ -33,6 +33,16 @@ def valid_pg_identifier(name):
 
     # Check allowed characters and length
     return bool(re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_]*', name)) and len(name) <= 63
+
+# Spoof quotes of identifiers based on DB engine
+def sql_identifiers(query):
+    if engine == 'postgres': return query.replace('`', '"')
+    if engine == 'sqlserver': return re.sub(r'`([^`]*)`', r'[\1]', query)
+    return query
+
+# Spoof query params placeholder characters based on DB engine
+def sql_placeholders(query):
+    return query.replace('%s', '?') if engine == 'sqlserver' else query
 
 # Check if given queue exists, i.e. user didn't closed the browser tab yet
 def queue_exists(channel, name):
@@ -70,6 +80,7 @@ def get_schema_name(pdokey: str) -> str:
         case 'custom':
             match engine:
                 case 'postgres': return 'public'
+                case 'sqlserver': return 'dbo'
                 case _: return db_name
         case _:
             return pdokey
@@ -79,7 +90,7 @@ def get_custom_dsn(db):
 
     # Get location of DSN info from 'database-custom-source' param, and return if it's empty
     query = "SELECT `defaultValue` FROM `system`.`field` WHERE `entityId` IS NULL AND `alias` = 'database-custom-source'"
-    if engine == 'postgres': query = query.replace('`', '"')
+    query = sql_identifiers(query)
     db.execute(query)
     source = db.fetchone()['defaultValue']
     if not source: return None
@@ -93,8 +104,9 @@ def get_custom_dsn(db):
 
     # If nothing found - throw exception, else return DSN-info
     query = f"SELECT * FROM `system`.`{table}` WHERE `id` = %s"
-    if engine == 'postgres': query = query.replace('`', '"')
+    query = sql_placeholders(sql_identifiers(query))
     db.execute(query, (id,)); info = db.fetchone()
+    if engine == 'sqlserver' and info: info = dict(zip([c[0] for c in db.description], info))
     if not info: raise Exception(f"Missing database custom source: {source}")
     return info
 
@@ -126,21 +138,42 @@ def get_pdokey_dsn(pdokey: str):
         db_conn.close()
 
     # Setup dump executable binary name
-    if info['engine'] == 'postgres':  info['dump'] = 'pg_dump'
-    elif info['engine'] == 'mariadb': info['dump'] = 'mariadb-dump'
-    else:                             info['dump'] = 'mysqldump'
+    if info['engine'] == 'postgres':    info['dump'] = 'pg_dump'
+    elif info['engine'] == 'sqlserver': info['dump'] = '/bin/bash'
+    elif info['engine'] == 'mariadb':   info['dump'] = 'mariadb-dump'
+    else:                               info['dump'] = 'mysqldump'
 
     # Setup primary arguments for binary executable
     if info['engine'] == 'postgres':
         info['args'] = ['-h', info['host'], '-U', info['user']]
         if 'port' in info: info['args'].extend(['-p', f"{info['port']}"])
+
+    # For sqlserver, SqlPackage is used through the shared bash function
+    elif info['engine'] == 'sqlserver':
+        info['args'] = ['-c', 'source maintain/functions.sh; sqlserver_schema_dump "$0"']
     else:
         info['args'] = ['-h', info['host'], '-u', info['user']]
         if 'port' in info: info['args'].extend(['-P', f"{info['port']}"])
 
     # Setup env-arg for subprocess.run()
-    if info['engine'] == 'postgres': info['env'] = {'PGPASSWORD': info['pass']}
-    else:                            info['env'] = {'MYSQL_PWD': info['pass']}
+    if info['engine'] == 'postgres':
+        info['env'] = {
+            'PGPASSWORD': info['pass']
+        }
+    elif info['engine'] == 'sqlserver':
+        host = str(info['host'])
+        if info.get('port'): host += f",{info['port']}"
+        info['env'] = {
+            **os.environ,
+            'DB_HOST': host,
+            'DB_NAME': str(info['name']),
+            'DB_APP_USER': str(info['user']),
+            'DB_APP_PASSWORD': str(info['pass'])
+        }
+    else:
+        info['env'] = {
+            'MYSQL_PWD': info['pass']
+        }
 
     # Return custom or default DSN
     return info
@@ -185,6 +218,10 @@ def get_schema_dump(pdokey, table=None):
         if table: cli.extend(['-t', f'"{dsn["schema"]}"."{table}"'])
         else:     cli.extend(['-t', f'"{dsn["schema"]}".*'])
         cli.extend(['--schema-only'])
+    elif dsn['engine'] == 'sqlserver':
+        schema = dsn['schema']
+        target = f'{schema}.{table}' if table else schema
+        cli.append(target)
     else:
         cli.append(dsn['name'])
         if table: cli.append(table)
@@ -207,6 +244,12 @@ def db_system():
         db_conn = psycopg2.connect(host=engine, user=db_user, password=db_pass, dbname=db_name)
         db_conn.autocommit = True
         db = db_conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    elif engine == 'sqlserver':
+        db_conn = pyodbc.connect(
+            f'DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={engine};DATABASE={db_name};UID={db_user};PWD={db_pass};Encrypt=yes;TrustServerCertificate=yes',
+            autocommit=True
+        )
+        db = db_conn.cursor()
     else:
         db_conn = pymysql.connect(host=engine, user=db_user, password=db_pass, database='system', autocommit=True)
         db = db_conn.cursor(pymysql.cursors.DictCursor)
@@ -230,7 +273,7 @@ def ws(to, data, mq, db):
         refresh = not exists
         if refresh:
             query = 'DELETE FROM `realtime` WHERE `type` = %s AND `token` = %s'
-            if engine == 'postgres': query = query.replace('`', '"')
+            query = sql_placeholders(sql_identifiers(query))
             db.execute(query, ('channel', to['token']))
     else:
         refresh = True
@@ -240,7 +283,7 @@ def ws(to, data, mq, db):
 
         # Get browser tab, if any opened by the user that can be identified by that pair
         query = "SELECT `token` FROM `realtime` WHERE `type` = %s AND `roleId` = %s AND `adminId` = %s"
-        if engine == 'postgres': query = query.replace('`', '"')
+        query = sql_placeholders(sql_identifiers(query))
         db.execute(query, ('channel', to['roleId'], to['adminId']))
 
         # If at least one found - refresh token

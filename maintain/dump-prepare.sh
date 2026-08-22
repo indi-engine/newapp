@@ -18,6 +18,9 @@ if command -v docker >/dev/null 2>&1; then
 # Else it means we're in the wrapper-container, so proceed with the restore
 else
 
+  # Pick and shift info flag, if given
+  info=0; if [[ "${1:-}" == "-i" ]]; then info=1; shift; fi
+
   # Shortcuts
   engine="$(get_env "DB_ENGINE")"
   dir="${1:-data}"
@@ -40,6 +43,15 @@ else
     dump_bin="pg_dump"
     dump_cmd="$dump_bin -h $host -U $user -d $name -n ~schema~ --no-owner --no-acl --no-publications --inserts --rows-per-insert=1000"
     gzip_cmd() { grep -vE "^(CREATE SCHEMA|COMMENT ON SCHEMA)" | gzip; }
+  elif [[ "$engine" == "sqlserver" ]]; then
+    pwdenv="SQLCMDPASSWORD"
+    args="-S $host -U $user -P $pass -d $name -C -b -h -1 -W -Q"
+    schemas="system dbo"
+    rows="SET NOCOUNT ON; SELECT SUM(p.rows) FROM sys.tables t JOIN sys.schemas s ON s.schema_id=t.schema_id JOIN sys.partitions p ON p.object_id=t.object_id AND p.index_id IN (0,1) WHERE s.name IN ('${schemas/ /"','"}')"
+    dump_bin="sqlpackage"
+    [[ "$info" == "1" ]] && info_arg="-i " || info_arg=""
+    dump_cmd="sqlserver_dump ${info_arg}~schema~ $dir/~schema~.data.sql"
+    gzip_cmd() { gzip; }
   else
     pwdenv="MYSQL_PWD"
     args="-h $host -u $user -N -e"
@@ -82,7 +94,7 @@ else
     # Export dump with printing progress
     [ -d "$dir" ] || mkdir -p "$dir"
     msg="${pref}Exporting $(basename "$dump") into $dir/ dir...";
-    ${dump_cmd/~schema~/"$schema"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$qty" -v msg="$msg" '{
+    ${dump_cmd//~schema~/"$schema"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$qty" -v msg="$msg" '{
         count += gsub(/\),\(/, "&") + 1
         percent = int((count / total) * 100)
         if (percent != last) {

@@ -228,19 +228,87 @@ sqlserver_cleanup_SSMA_schema() {
   mv -f "$tmp" "$target"
 }
 
-# Normalize DBeaver INSERT output. Every inserted table is assumed to own an
-# identity column, so schema inspection is deliberately unnecessary.
+# Normalize DBeaver INSERT output. Bare JSON arrays/objects are quoted as SQL
+# strings, and every inserted table is assumed to own an identity column.
 sqlserver_cleanup_DBeaver_data() {
   local source="${1:?Usage: sqlserver_cleanup_DBeaver_data SOURCE [TARGET]}"
   local target="${2:-$source}"
+  local info="${3:-0}"
   [[ -f "$source" ]] || { echo "SQL Server dump not found: $source" >&2; return 1; }
   local target_dir tmp
   target_dir="$(dirname "$target")"
   mkdir -p "$target_dir"
   tmp="$(mktemp "$target_dir/.sqlserver-dbeaver.XXXXXX")"
 
-  if ! awk '
+  if ! awk -v info="$info" '
+    function quote_json(line,   out, i, j, k, ch, next_ch, first, json, in_sql, in_double, escaped, square, curly) {
+      for (i = 1; i <= length(line); i++) {
+        ch = substr(line, i, 1)
+
+        # Ignore JSON-looking text already enclosed in a SQL string.
+        if (in_sql) {
+          out = out ch
+          if (ch == "\047") {
+            next_ch = substr(line, i + 1, 1)
+            if (next_ch == "\047") {
+              out = out next_ch
+              i++
+            } else in_sql = 0
+          }
+          continue
+        }
+        if (ch == "\047") {
+          in_sql = 1
+          out = out ch
+          continue
+        }
+
+        # A raw JSON container starts with [" / [] or {" / {}. Bracketed SQL
+        # identifiers therefore do not match and remain untouched.
+        if (ch == "[" || ch == "{") {
+          j = i + 1
+          while (substr(line, j, 1) ~ /[[:space:]]/) j++
+          first = substr(line, j, 1)
+          if ((ch == "[" && first != "\"" && first != "]") ||
+              (ch == "{" && first != "\"" && first != "}")) {
+            out = out ch
+            continue
+          }
+
+          square = 0
+          curly = 0
+          in_double = 0
+          escaped = 0
+          for (k = i; k <= length(line); k++) {
+            next_ch = substr(line, k, 1)
+            if (in_double) {
+              if (escaped) escaped = 0
+              else if (next_ch == "\\") escaped = 1
+              else if (next_ch == "\"") in_double = 0
+            } else if (next_ch == "\"") in_double = 1
+            else if (next_ch == "[") square++
+            else if (next_ch == "]") square--
+            else if (next_ch == "{") curly++
+            else if (next_ch == "}") curly--
+
+            if (!in_double && square == 0 && curly == 0) break
+          }
+          if (k <= length(line)) {
+            json = substr(line, i, k - i + 1)
+            gsub(/\047/, "\047\047", json)
+            out = out "N\047" json "\047"
+            json_qty++
+            i = k
+            continue
+          }
+        }
+
+        out = out ch
+      }
+      return out
+    }
     function emit(line) {
+      line = quote_json(line)
       sub(/\r$/, "", line)
       if (line ~ /^[[:space:]]*$/) { blank = 1; return }
       if (blank && emitted) print ""
@@ -287,7 +355,8 @@ sqlserver_cleanup_DBeaver_data() {
         print "Unterminated DBeaver INSERT/IDENTITY_INSERT block" > "/dev/stderr"
         exit 13
       }
-      print wrapped + 0 " DBeaver INSERT blocks wrapped" > "/dev/stderr"
+      if (info) print wrapped + 0 " DBeaver INSERT blocks wrapped" > "/dev/stderr"
+      if (info) print json_qty + 0 " bare JSON values quoted" > "/dev/stderr"
     }
   ' "$source" > "$tmp"; then
     rm -f "$tmp"
@@ -296,9 +365,114 @@ sqlserver_cleanup_DBeaver_data() {
   mv -f "$tmp" "$target"
 }
 
+# Add a normalized DBeaver data export to a SqlPackage schema. Data is placed
+# before the deferred foreign keys, so rows can be loaded without dependency
+# ordering. Indi seed tables are expected to have identity columns.
+sqlserver_merge_DBeaver_data() {
+  local schema_sql="${1:?Usage: sqlserver_merge_DBeaver_data SCHEMA_SQL DATA_SQL [TARGET] [SCHEMA]}"
+  local data_sql="${2:?Usage: sqlserver_merge_DBeaver_data SCHEMA_SQL DATA_SQL [TARGET] [SCHEMA]}"
+  local target="${3:-$schema_sql}"
+  local schema="${4:-}"
+  local info="${5:-0}"
+  [[ -f "$schema_sql" ]] || { echo "SQL Server schema not found: $schema_sql" >&2; return 1; }
+  [[ -f "$data_sql" ]] || { echo "DBeaver data export not found: $data_sql" >&2; return 1; }
+
+  local target_dir data_tmp target_tmp
+  target_dir="$(dirname "$target")"
+  mkdir -p "$target_dir"
+  data_tmp="$(mktemp "$target_dir/.sqlserver-data.XXXXXX")"
+  target_tmp="$(mktemp "$target_dir/.sqlserver-merged.XXXXXX")"
+  cp -f "$data_sql" "$data_tmp"
+
+  if ! sqlserver_cleanup_DBeaver_data "$data_tmp" "$data_tmp" "$info"; then
+    rm -f "$data_tmp" "$target_tmp"
+    return 1
+  fi
+
+  # Do not silently mix exports from different schemas. Strip an optional
+  # database qualifier, so the finished seed can be loaded into any DB_NAME.
+  local names_tmp; names_tmp="$(mktemp "$target_dir/.sqlserver-names.XXXXXX")"
+  if [[ -n "$schema" ]] && ! awk -v schema="$schema" '
+    function target_of(line, target) {
+      target = line
+      sub(/^(SET IDENTITY_INSERT|INSERT INTO)[[:space:]]+/, "", target)
+      sub(/[[:space:]]+(ON|OFF);[[:space:]]*$/, "", target)
+      sub(/[[:space:]]*\(.*/, "", target)
+      return target
+    }
+    /^(SET IDENTITY_INSERT|INSERT INTO)[[:space:]]+/ {
+      target = target_of($0)
+      plain = target
+      gsub(/[\[\]]/, "", plain)
+      qty = split(plain, part, ".")
+      if (qty < 2 || part[qty - 1] != schema) {
+        print "Unexpected DBeaver target for schema " schema ": " target > "/dev/stderr"
+        bad = 1
+      }
+      normalized = "[" schema "].[" part[qty] "]"
+      at = index($0, target)
+      $0 = substr($0, 1, at - 1) normalized substr($0, at + length(target))
+    }
+    { print }
+    END { exit bad }
+  ' "$data_tmp" > "$names_tmp"; then
+    rm -f "$data_tmp" "$names_tmp" "$target_tmp"
+    return 1
+  fi
+  if [[ -n "$schema" ]]; then mv -f "$names_tmp" "$data_tmp"; else rm -f "$names_tmp"; fi
+
+  # SqlPackage cleanup leaves all foreign keys under this marker. Splice data
+  # immediately before it; if there are no foreign keys, append data at EOF.
+  if ! awk -v data="$data_tmp" '
+    function emit_data(   line) {
+      if (added) return
+      if (NR > 1) print ""
+      while ((getline line < data) > 0) print line
+      close(data)
+      print ""
+      added = 1
+    }
+    /^ALTER TABLE[[:space:]].*ADD CONSTRAINT.*FOREIGN KEY/ { emit_data() }
+    { print }
+    END { if (!added) emit_data() }
+  ' "$schema_sql" > "$target_tmp"; then
+    rm -f "$data_tmp" "$target_tmp"
+    return 1
+  fi
+
+  mv -f "$target_tmp" "$target"
+  rm -f "$data_tmp"
+}
+
+# Export one schema and include data/<schema>.data.sql when that DBeaver export
+# exists. The source export is retained, making the dump reproducible.
+sqlserver_dump() {
+  local info=0
+  if [[ "${1:-}" == "-i" ]]; then info=1; shift; fi
+  local schema="${1:?Usage: sqlserver_dump [-i] SCHEMA [DATA_SQL]}"
+  local data_sql="${2:-}"
+  local tmp; tmp="$(mktemp)"
+  local info_arg=()
+  [[ "$info" == "1" ]] && info_arg=(-i)
+
+  if ! sqlserver_schema_dump "${info_arg[@]}" "$schema" > "$tmp"; then
+    rm -f "$tmp"
+    return 1
+  fi
+  if [[ -n "$data_sql" && -f "$data_sql" ]]; then
+    if ! sqlserver_merge_DBeaver_data "$tmp" "$data_sql" "$tmp" "$schema" "$info"; then
+      rm -f "$tmp"
+      return 1
+    fi
+    [[ "$info" == "1" ]] && echo "Included $data_sql" >&2
+  fi
+  cat "$tmp"
+  rm -f "$tmp"
+}
+
 # Normalize a SqlPackage schema with optionally pasted DBeaver data:
 # - remove GO separators, redundant blank lines, NONCLUSTERED keywords, and
-#   parentheses around simple literal DEFAULT values (function calls stay intact);
+#   names and parentheses around simple DEFAULT values (functions stay intact);
 # - inline unnamed single-column primary keys and rely on their clustered default;
 # - convert UNIQUE constraints to table-scoped UNIQUE indexes named from their
 #   ordered comma-separated columns, keeping all indexes beside their table;
@@ -313,6 +487,7 @@ sqlserver_cleanup_SqlPackage_schema() {
   # Arguments
   local source="${1:?Usage: sqlserver_cleanup_SqlPackage_schema SOURCE [TARGET]}"
   local target="${2:-$source}"
+  local info="${3:-0}"
 
   # Validate source
   if [[ ! -f "$source" ]]; then
@@ -321,11 +496,11 @@ sqlserver_cleanup_SqlPackage_schema() {
   fi
 
   # Do not append the same foreign keys twice
-  if grep -q '^-- Foreign keys deferred by sqlserver_defer_foreign_keys$' "$source"; then
+  if grep -Eq '^ALTER TABLE .+ ADD CONSTRAINT .+ FOREIGN KEY .+;$' "$source"; then
     if [[ "$target" != "$source" ]]; then
       cp -f "$source" "$target"
     fi
-    echo "SqlPackage schema is already normalized: $source" >&2
+    [[ "$info" == "1" ]] && echo "SqlPackage schema is already normalized: $source" >&2
     return 0
   fi
 
@@ -339,7 +514,7 @@ sqlserver_cleanup_SqlPackage_schema() {
   # Extract one-line inline FK constraints, repair CREATE TABLE trailing commas,
   # append the constraints after the DML as validated ALTER TABLE statements,
   # remove GO batch separators, and collapse consecutive empty lines.
-  if ! awk -v source="$source" '
+  if ! awk -v source="$source" -v info="$info" '
     function emit(line,   upper, kind) {
       sub(/\r$/, "", line)
       upper = toupper(line)
@@ -450,6 +625,13 @@ sqlserver_cleanup_SqlPackage_schema() {
       if (matched == "") return line
       literal_default_qty++
       return substr(line, 1, start - 1) marker value substr(tail, length(matched) + 1)
+    }
+
+    function remove_default_constraint_name(line) {
+      if (sub(/CONSTRAINT \[[^]]+\][[:space:]]+DEFAULT/, "DEFAULT", line)) {
+        default_constraint_name_qty++
+      }
+      return line
     }
 
     function store_index(statement,   index_table, index_name, collision_key) {
@@ -634,6 +816,7 @@ sqlserver_cleanup_SqlPackage_schema() {
           gsub(/N\047/, "\047", line)
         }
 
+        line = remove_default_constraint_name(line)
         line = normalize_literal_default(line)
 
         kept[++last] = line
@@ -736,18 +919,24 @@ sqlserver_cleanup_SqlPackage_schema() {
       }
 
       if (!fk_qty) {
-        print "No inline SQL Server foreign keys found" > "/dev/stderr"
-        exit 3
+        if (info) print "No inline SQL Server foreign keys found" > "/dev/stderr"
+      } else {
+        for (i = 1; i <= fk_qty; i++) {
+          emit("")
+          emit("ALTER TABLE " fk_table[i] " ADD " fk_clause[i] ";")
+        }
       }
 
-      emit("")
-      emit("-- Foreign keys deferred by sqlserver_defer_foreign_keys")
-      for (i = 1; i <= fk_qty; i++) {
-        emit("")
-        emit("ALTER TABLE " fk_table[i] " ADD " fk_clause[i] ";")
+      if (info) {
+        print fk_qty + 0 " foreign keys deferred" > "/dev/stderr"
+        print foreign_key_name_trim_qty + 0 " foreign-key names trimmed" > "/dev/stderr"
+        print unique_index_qty + 0 " UNIQUE constraints converted to indexes" > "/dev/stderr"
+        print inline_primary_key_qty + 0 " primary keys inlined" > "/dev/stderr"
+        print enum_check_qty + 0 " enum checks normalized" > "/dev/stderr"
+        print enum_varchar_qty + 0 " enum columns converted to VARCHAR(255)" > "/dev/stderr"
+        print default_constraint_name_qty + 0 " default-constraint names removed" > "/dev/stderr"
+        print literal_default_qty + 0 " literal defaults unwrapped" > "/dev/stderr"
       }
-
-      print fk_qty " foreign keys deferred, " foreign_key_name_trim_qty + 0 " foreign-key names trimmed, " unique_index_qty " UNIQUE constraints converted to indexes, " inline_primary_key_qty " primary keys inlined, " enum_check_qty " enum checks normalized, " enum_varchar_qty " enum columns converted to VARCHAR(255), " literal_default_qty " literal defaults unwrapped" > "/dev/stderr"
     }
   ' "$source" > "$tmp"; then
     rm -f "$tmp"
@@ -843,6 +1032,7 @@ sqlserver_cleanup_SqlPackage_schema() {
     }
 
     function emit_foreign_keys(   ordered, i, j, value, value_key) {
+      if (!fk_qty) return
       for (i = 1; i <= fk_qty; i++) ordered[i] = i
       for (i = 2; i <= fk_qty; i++) {
         value = ordered[i]
@@ -856,7 +1046,6 @@ sqlserver_cleanup_SqlPackage_schema() {
       }
 
       print ""
-      print "-- Foreign keys deferred by sqlserver_defer_foreign_keys"
       for (i = 1; i <= fk_qty; i++) print fk_sql[ordered[i]]
     }
 
@@ -878,10 +1067,9 @@ sqlserver_cleanup_SqlPackage_schema() {
       next
     }
 
-    phase == "tables" && /^-- Foreign keys deferred by sqlserver_defer_foreign_keys$/ {
+    phase == "tables" && /^ALTER TABLE[[:space:]].*ADD CONSTRAINT.*FOREIGN KEY/ {
       finish_table()
       phase = "foreign_keys"
-      next
     }
 
     phase == "tables" {
@@ -889,10 +1077,9 @@ sqlserver_cleanup_SqlPackage_schema() {
       next
     }
 
-    phase == "inserts" && /^-- Foreign keys deferred by sqlserver_defer_foreign_keys$/ {
+    phase == "inserts" && /^ALTER TABLE[[:space:]].*ADD CONSTRAINT.*FOREIGN KEY/ {
       finish_insert()
       phase = "foreign_keys"
-      next
     }
 
     phase == "inserts" {
@@ -982,7 +1169,9 @@ sqlserver_clean_since_SSMA() {
 # ExtractTarget=File exports the complete database model and cannot select a
 # schema or table, so the requested object is separated from the SQL below.
 sqlserver_schema_dump() {
-  local object="${1:?Usage: sqlserver_schema_dump SCHEMA[.TABLE]}"
+  local info=0
+  if [[ "${1:-}" == "-i" ]]; then info=1; shift; fi
+  local object="${1:?Usage: sqlserver_schema_dump [-i] SCHEMA[.TABLE]}"
   local schema="${object%%.*}" table=""
   [[ "$object" == *.* ]] && table="${object#*.}"
   local tmpdir; tmpdir="$(mktemp -d)"
@@ -1003,9 +1192,12 @@ sqlserver_schema_dump() {
       index($0, "CREATE TABLE " o) || index($0, "ALTER TABLE " o) || index($0, " ON " o) { print $0 "\nGO" }
     ' "$raw" > "$script"
   else
-    awk -v s="[$schema]" 'BEGIN{RS="(^|\n)GO\r?\n"} index($0,s){print $0 "\nGO"}' "$raw" > "$script"
+    awk -v s="[$schema]" '
+      BEGIN { RS="(^|\n)GO\r?\n" }
+      index($0, s) && $0 !~ /CREATE SCHEMA[[:space:]]+/ { print $0 "\nGO" }
+    ' "$raw" > "$script"
   fi
-  sqlserver_cleanup_SqlPackage_schema "$script"
+  sqlserver_cleanup_SqlPackage_schema "$script" "$script" "$info"
   cat "$script"
   rm -f "$raw" "$script"; rmdir "$tmpdir"
 }

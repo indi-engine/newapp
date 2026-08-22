@@ -646,8 +646,7 @@ BEGIN
   IF @datetimeDefaultName IS NOT NULL
   BEGIN
     SET @datetimeSql = N'ALTER TABLE ' + QUOTENAME(@datetimeSchemaName) + N'.' + QUOTENAME(@datetimeTableName)
-      + N' ADD CONSTRAINT ' + QUOTENAME(@datetimeDefaultName)
-      + N' DEFAULT ' + @datetimeDefaultDefinition + N' FOR ' + QUOTENAME(@datetimeColumnName) + N';';
+      + N' ADD DEFAULT ' + @datetimeDefaultDefinition + N' FOR ' + QUOTENAME(@datetimeColumnName) + N';';
     EXEC sys.sp_executesql @datetimeSql;
   END;
 

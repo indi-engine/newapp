@@ -1,0 +1,47 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Get current script name
+script_name="${BASH_SOURCE[0]}"
+
+# Print conversion usage
+usage() {
+  echo "Usage: source $script_name TARGET PHASE"
+  echo
+  echo "Targets:"
+  echo "  sqlserver"
+  echo
+  echo "Phases:"
+  echo "  prepare  (1)  Start and validate the MySQL source"
+  echo "  transfer (2)  Prepare and describe the external transfer"
+  echo "  finish   (3)  Post-process and switch to the target"
+}
+
+# Arguments
+target="${1:-}"
+phase="${2:-}"
+
+# Normalize numeric phase aliases
+case "$phase" in
+  prepare|1) phase=prepare ;;
+  transfer|2) phase=transfer ;;
+  finish|3) phase=finish ;;
+  *) usage; return 1 2>/dev/null || exit 1 ;;
+esac
+
+# Run target DB engine-specific conversion phase
+case "$target" in
+  sqlserver)
+    source compose/sqlserver/convert/functions.sh
+    convert_sqlserver "$phase"
+    ;;
+  postgres)
+    echo "The legacy PostgreSQL converter is not yet available via this CLI." >&2
+    return 1 2>/dev/null || exit 1
+    ;;
+  *)
+    usage
+    return 1 2>/dev/null || exit 1
+    ;;
+esac

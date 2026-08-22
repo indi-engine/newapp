@@ -13,6 +13,15 @@ RUN curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmo
  && rm -rf /var/lib/apt/lists/*
 ## </Postgres client> ##
 
+## <SQL Server client and PHP/Python drivers> ##
+RUN curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/microsoft-prod.list \
+ && apt-get update \
+ && ACCEPT_EULA=Y apt-get install -y msodbcsql18 mssql-tools18 unixodbc-dev python3-pyodbc \
+ && ln -s /opt/mssql-tools18/bin/sqlcmd /usr/local/bin/sqlcmd \
+ && rm -rf /var/lib/apt/lists/*
+## </SQL Server client and PHP/Python drivers> ##
+
 ## <SqlPackage> ##
 RUN apt-get update \
  && apt-get install -y --no-install-recommends libunwind8 \
@@ -41,6 +50,7 @@ RUN apt-get update && \
     apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev libpq-dev && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) gd zip pdo_mysql pdo_pgsql shmop intl sockets && \
+    pecl install sqlsrv pdo_sqlsrv && docker-php-ext-enable sqlsrv pdo_sqlsrv && \
     apt-get install -y libmagickwand-dev imagemagick && pecl install imagick && docker-php-ext-enable imagick
 ## </PHP extensions> ##
 

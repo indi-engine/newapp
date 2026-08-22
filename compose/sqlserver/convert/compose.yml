@@ -1,0 +1,8 @@
+# Replace the full volume list during conversion to omit the Windows host
+# log bind; recreating SQL Server while errorlog is active can fail.
+services:
+  sqlserver:
+    volumes: !override
+      - ./compose/sqlserver/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
+      - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
+      - sqlserver_server_data:/var/opt/mssql

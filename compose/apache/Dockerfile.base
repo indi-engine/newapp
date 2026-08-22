@@ -27,11 +27,19 @@ WORKDIR $DOC
 ## Sendmail ##
 RUN bash -c "DEBIAN_FRONTEND=noninteractive apt install -y postfix <<< $'2' && apt install -y opendkim opendkim-tools"
 
+## SQL Server ODBC driver ##
+RUN apt-get update && apt-get install -y curl gnupg unixodbc-dev \
+ && curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor -o /usr/share/keyrings/microsoft-prod.gpg \
+ && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/microsoft-prod.gpg] https://packages.microsoft.com/debian/12/prod bookworm main" > /etc/apt/sources.list.d/microsoft-prod.list \
+ && apt-get update && ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
+ && rm -rf /var/lib/apt/lists/*
+
 ## PHP extensions ##
 RUN apt-get update && \
     apt-get install -y libfreetype-dev libjpeg62-turbo-dev libpng-dev libzip-dev libicu-dev libpq-dev && \
     docker-php-ext-configure gd --with-freetype --with-jpeg && \
     docker-php-ext-install -j$(nproc) gd zip pdo_mysql pdo_pgsql shmop intl sockets && \
+    pecl install sqlsrv pdo_sqlsrv && docker-php-ext-enable sqlsrv pdo_sqlsrv && \
     apt-get install -y libmagickwand-dev imagemagick && pecl install imagick && docker-php-ext-enable imagick
 
 ## Java Runtime Environment ##

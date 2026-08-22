@@ -30,6 +30,9 @@ var/tmp/*
 # Restart scenario
 var/restart
 
+# MySQL-to-SQL Server conversion state
+.convert.sqlserver
+
 # Any stderr files
 *.stderr
 

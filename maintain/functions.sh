@@ -166,6 +166,7 @@ getup() {
 get_custom_schema() {
   case "$(get_env "DB_ENGINE")" in
     postgres) echo "public" ;;
+    sqlserver) echo "dbo" ;;
     *) echo "$(get_env "DB_NAME")" ;;
   esac
 }
@@ -977,6 +978,38 @@ sqlserver_clean_since_SSMA() {
   mv -f "$tmp" "$target"
 }
 
+# Export one database schema, or one table in it, as normalized SQL with SqlPackage.
+# ExtractTarget=File exports the complete database model and cannot select a
+# schema or table, so the requested object is separated from the SQL below.
+sqlserver_schema_dump() {
+  local object="${1:?Usage: sqlserver_schema_dump SCHEMA[.TABLE]}"
+  local schema="${object%%.*}" table=""
+  [[ "$object" == *.* ]] && table="${object#*.}"
+  local tmpdir; tmpdir="$(mktemp -d)"
+  local raw="$tmpdir/all.sql" script="$tmpdir/schema.sql"
+  local conn="Server=${DB_HOST:-sqlserver};Database=$DB_NAME;User ID=$DB_APP_USER;Password=$DB_APP_PASSWORD;Encrypt=True;TrustServerCertificate=True"
+  sqlpackage /Action:Extract \
+    /SourceConnectionString:"$conn" \
+    /TargetFile:"$raw" \
+    /p:ExtractTarget=File \
+    /p:ExtractReferencedServerScopedElements=False \
+    /p:IgnoreUserLoginMappings=True \
+    /p:IgnorePermissions=True >/dev/null
+  # Retain batches belonging to the requested schema or table. Do this before
+  # cleanup, which intentionally removes the GO separators used as boundaries.
+  if [[ -n "$table" ]]; then
+    awk -v o="[$schema].[$table]" '
+      BEGIN { RS="(^|\n)GO\r?\n" }
+      index($0, "CREATE TABLE " o) || index($0, "ALTER TABLE " o) || index($0, " ON " o) { print $0 "\nGO" }
+    ' "$raw" > "$script"
+  else
+    awk -v s="[$schema]" 'BEGIN{RS="(^|\n)GO\r?\n"} index($0,s){print $0 "\nGO"}' "$raw" > "$script"
+  fi
+  sqlserver_cleanup_SqlPackage_schema "$script"
+  cat "$script"
+  rm -f "$raw" "$script"; rmdir "$tmpdir"
+}
+
 # Setup $DB_APP_USER as subnet-only, setup system schema
 do_missing_db_setup_if_needed() {
   create_system_schema
@@ -993,15 +1026,20 @@ create_system_schema() {
   local DB_NAME="$(get_env "DB_NAME")"
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
+  local rpw="$(get_env "DB_ROOT_PASSWORD")"
 
   # If we're on postgres
   if [[ "$engine" == "postgres" ]]; then
-    export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    export PGPASSWORD="$rpw"
     $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d "$DB_NAME" -c "CREATE SCHEMA IF NOT EXISTS \"system\"" -q -v ON_ERROR_STOP=1 > /dev/null
     unset PGPASSWORD
+  elif [[ "$engine" == "sqlserver" ]]; then
+    export SQLCMDPASSWORD="$rpw"
+    $cli -S "$engine" -U "${DB_ROOT_USER:-sa}" -d "$DB_NAME" -C -b -Q "IF SCHEMA_ID(N'system') IS NULL EXEC(N'CREATE SCHEMA [system]')" > /dev/null
+    unset SQLCMDPASSWORD
   # Else
   else
-    export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
+    export MYSQL_PWD="$rpw"
     $cli -h "$engine" -u "${DB_ROOT_USER:-root}" -D mysql -e "CREATE DATABASE IF NOT EXISTS \`system\`"
     unset MYSQL_PWD
   fi
@@ -1151,6 +1189,11 @@ setup_DB_APP_USER_if_need() {
     # Unset password
     unset PGPASSWORD
 
+  # Else if we're on SQL Server - do nothing, as this is handled
+  # sqlserver native entrypoint
+  elif [[ "$engine" == "sqlserver" ]]; then
+    return 0
+
   # Else
   else
 
@@ -1173,6 +1216,7 @@ get_engine_cli() {
     mysql|mariadb) echo "$engine" ;;
     percona)       echo "mysql" ;;
     postgres)      echo "psql" ;;
+    sqlserver)     echo "sqlcmd" ;;
     *)             echo "$engine" ;;
   esac
 }
@@ -1205,6 +1249,46 @@ prepare_debezium() {
 			END $$;
 		PGSQL
 		unset PGPASSWORD
+  elif [[ "$engine" == "sqlserver" ]]; then
+    export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+		$cli -S "$engine" -U sa -b -C -m 1 -d "$DB_NAME" -v DB_APP_USER="$DB_APP_USER" <<-'SQL'
+			SET NOCOUNT ON;
+
+			IF ISNULL(IS_ROLEMEMBER(N'db_owner', N'$(DB_APP_USER)'), 0) = 0
+				ALTER ROLE [db_owner] ADD MEMBER [$(DB_APP_USER)];
+
+  	  IF NOT EXISTS (
+  			SELECT 1
+  			FROM sys.databases
+  			WHERE is_cdc_enabled = 1 AND name = DB_NAME()
+			) EXEC sys.sp_cdc_enable_db;
+
+			DECLARE @schema sysname, @table sysname;
+			DECLARE tables CURSOR LOCAL FAST_FORWARD FOR
+  			SELECT schemas.name, tables.name
+  			FROM sys.tables AS tables
+  				JOIN sys.schemas AS schemas ON schemas.schema_id = tables.schema_id
+  			WHERE schemas.name IN (N'system', N'dbo')
+    			AND tables.is_ms_shipped = 0
+    			AND tables.is_tracked_by_cdc = 0;
+
+			OPEN tables;
+			FETCH NEXT FROM tables INTO @schema, @table;
+
+			WHILE @@FETCH_STATUS = 0
+			BEGIN
+  			EXEC sys.sp_cdc_enable_table
+    			@source_schema = @schema,
+    			@source_name = @table,
+    			@role_name = NULL,
+    			@supports_net_changes = 0;
+  			FETCH NEXT FROM tables INTO @schema, @table;
+			END;
+
+			CLOSE tables;
+			DEALLOCATE tables;
+		SQL
+    unset SQLCMDPASSWORD
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
     $cli -h "$engine" -u root -e "GRANT SELECT, REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO '$DB_APP_USER'@'$DB_APP_USER_host';"
@@ -1279,6 +1363,11 @@ if ip: print(ipaddress.ip_network(ip + "/64", strict=False))
     export PGPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
     $cli -h "$engine" -U "${DB_ROOT_USER:-postgres}" -d postgres -c "SELECT pg_reload_conf();" -q -v ON_ERROR_STOP=1 > /dev/null
     unset PGPASSWORD
+
+  # Else if we're on sqlserver - do nothing
+  # todo: implement that on network/firewall level as it's not possible to implement that on SQL Server level
+  elif [[ "$engine" == "sqlserver" ]]; then
+    return 0
 
   # Else update host for DB_APP_USER
   else
@@ -1444,6 +1533,8 @@ env_DB_EXPOSE_PORT() {
   # If it's postgres - spoof port number mentioned within $TIP
   if [[ "$engine" == "postgres" ]]; then
     TIP="${TIP/3306/5432}"
+  elif [[ "$engine" == "sqlserver" ]]; then
+    TIP="${TIP/3306/1433}"
   fi
 }
 
@@ -2141,6 +2232,11 @@ restore_dump_from_local() {
   touch "/var/lib/db_engine/import.done"
 }
 
+# Prepend the SQL Server session setting that suppresses row-count messages.
+sqlserver_import_stream() {
+  { printf 'SET NOCOUNT ON;\n'; cat; } | sqlcmd "$@"
+}
+
 # Import dump with a given filename, or count
 import_possibly_chunked_dump() {
 
@@ -2159,6 +2255,9 @@ import_possibly_chunked_dump() {
   if [[ "$engine" == "postgres" ]]; then
     local run="$cli -h $engine -U $DB_APP_USER -d $db_name -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
+  elif [[ "$engine" == "sqlserver" ]]; then
+    local run="sqlserver_import_stream -S $engine -U $DB_APP_USER -d $db_name -C -b -m 1 -i /dev/stdin"
+    local passenv=SQLCMDPASSWORD
   else
     [[ "$dump" == "system.sql.gz" ]] && db_name="system"
     local run="$cli -h $engine -u $DB_APP_USER -D $db_name"
@@ -2339,6 +2438,13 @@ db_shutdown_postgres() {
 
   # Unset CLI password
   unset PGPASSWORD
+}
+
+# Shut down sqlserver
+db_shutdown_sqlserver() {
+  export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+  sqlcmd -S sqlserver -U "${DB_ROOT_USER:-sa}" -d master -C -b -Q "SHUTDOWN"
+  unset SQLCMDPASSWORD
 }
 
 # Get db engine name
@@ -4038,7 +4144,7 @@ wrapper_entrypoint() {
   # If we're not on postgres
   # 1. Copy db engine binaries (e.g. 'mysql' and 'mysqldump') to /usr/bin, to make it possible to restore/backup the whole database as sql-file
   # 2. If we're on mariadb or percona - install libncurses6, as otherwise the copied binaries won't work
-  if [[ "$(get_env "DB_ENGINE")" != "postgres" ]]; then
+  if [[ "$(get_env "DB_ENGINE")" =~ ^(mysql|mariadb|percona)$ ]]; then
     [[ -d /usr/bin/db_engine_client_binaries ]] && cp /usr/bin/db_engine_client_binaries/* /usr/bin/
     [[ "$(get_env "DB_ENGINE")" != "mysql" ]] && apt-get install -y libncurses6
   fi
@@ -4405,6 +4511,11 @@ db_query() {
     sql="SET search_path=\`system\`;$sql"
     $cli -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
     unset PGPASSWORD
+  elif [[ "$engine" == "sqlserver" ]]; then
+    export SQLCMDPASSWORD="$pass"
+    sql="$(printf '%s' "$sql" | sed -E 's/`([^`]*)`/[\1]/g')"
+    $cli -S "$host" -U "$user" -d "$name" -C -b -h -1 -W -Q "SET NOCOUNT ON; $sql"
+    unset SQLCMDPASSWORD
   else
     export MYSQL_PWD="$pass"
     $cli -h "$host" -u "$user" -D "system" -N -e "$sql"

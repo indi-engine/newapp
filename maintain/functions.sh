@@ -2635,7 +2635,7 @@ db_shutdown_postgres() {
 # Shut down sqlserver
 db_shutdown_sqlserver() {
   export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-  sqlcmd -S sqlserver -U "${DB_ROOT_USER:-sa}" -d master -C -b -Q "SHUTDOWN"
+  sqlcmd -S sqlserver -U "${DB_ROOT_USER:-sa}" -d master -C -b -Q "SHUTDOWN WITH NOWAIT"
   unset SQLCMDPASSWORD
 }
 
@@ -4796,7 +4796,7 @@ migrate_if_need() {
       # Exclude actions capture because if action method name line modified
       if [ -n "$exclude" ]; then
         for modified in $exclude; do
-          actions="$(echo "$actions" | grep -Ev "^$modified")"
+          actions="$(echo "$actions" | grep -Ev "^$modified" || true)"
         done
       fi
 

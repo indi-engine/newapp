@@ -4697,7 +4697,7 @@ db_query() {
   local name="$DB_NAME"
   local cli="$(get_engine_cli)"
 
-  # Run engine-specific query
+  # Run DBE-specific query
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$pass"
     sql="SET search_path=\`system\`;$sql"

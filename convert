@@ -30,7 +30,7 @@ case "$phase" in
   *) usage; return 1 2>/dev/null || exit 1 ;;
 esac
 
-# Run target DB engine-specific conversion phase
+# Run target DBE-specific conversion phase
 case "$target" in
   sqlserver)
     source compose/sqlserver/convert/functions.sh

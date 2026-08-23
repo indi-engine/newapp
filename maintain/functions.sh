@@ -4700,8 +4700,7 @@ db_query() {
   # Run DBE-specific query
   if [[ "$engine" == "postgres" ]]; then
     export PGPASSWORD="$pass"
-    sql="SET search_path=\`system\`;$sql"
-    $cli -h "$host" -U "$user" -d "$name" -t -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
+    $cli -h "$host" -U "$user" -d "$name" -t -A -q -v ON_ERROR_STOP=1 -c "${sql//\`/\"}"
     unset PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
     export SQLCMDPASSWORD="$pass"

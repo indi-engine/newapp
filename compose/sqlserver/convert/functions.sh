@@ -313,7 +313,7 @@ phase_ms() {
     bash -lc 'touch /var/opt/mssql/import.done'
 
   # Drop temporary MySQL databases
-  mysql_root_query "DROP DATABASE IF EXISTS \`${ssma_system_db}\`; DROP DATABASE IF EXISTS \`${ssma_custom_db}\`;"
+  mysql_root_query "DROP DATABASE IF EXISTS \`${ssma_custom_db}\`; DROP DATABASE IF EXISTS \`${ssma_system_db}\`;"
 
   # Stop dual-engine setup
   COMPOSE_FILE="$dual_compose" DB_EXPOSE_PORT=1433 docker compose down
@@ -325,8 +325,17 @@ phase_ms() {
   export COMPOSE_FILE="docker-compose.yml;compose/sqlserver/service.yml;compose/sqlserver/expose.yml;custom/docker-compose.yml"
   source ./start
 
+  # source/start may be invoked from a shell context where errexit is ignored;
+  # verify the dependency explicitly before reporting conversion success.
+  local sqlserver_container
+  sqlserver_container="$(docker compose ps -q sqlserver)"
+  if [[ -z "$sqlserver_container" || "$(docker inspect -f '{{.State.Health.Status}}' "$sqlserver_container" 2>/dev/null)" != "healthy" ]]; then
+    echo "SQL Server failed to become healthy after switching the setup." >&2
+    return 1
+  fi
+
   # Prepare Debezium
-  docker compose exec -T wrapper bash -lc 'source maintain/functions.sh; prepare_debezium'
+  docker compose exec -T wrapper bash -lc 'source maintain/functions.sh; prepare_debezium' || return 1
 
   # Remove conversion state file
   rm -f "$state_file"

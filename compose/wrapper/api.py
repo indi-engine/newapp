@@ -44,6 +44,12 @@ def sql_identifiers(query):
 def sql_placeholders(query):
     return query.replace('%s', '?') if engine == 'sqlserver' else query
 
+# Convert a database row to a dictionary. MySQL and PostgreSQL cursors are
+# configured to return mappings, whereas pyodbc returns positional rows.
+def row_dict(db, row):
+    if row is None or isinstance(row, dict): return row
+    return dict(zip([column[0] for column in db.description], row))
+
 # Check if given queue exists, i.e. user didn't closed the browser tab yet
 def queue_exists(channel, name):
     try:
@@ -92,7 +98,7 @@ def get_custom_dsn(db):
     query = "SELECT `defaultValue` FROM `system`.`field` WHERE `entityId` IS NULL AND `alias` = 'database-custom-source'"
     query = sql_identifiers(query)
     db.execute(query)
-    source = db.fetchone()['defaultValue']
+    source = row_dict(db, db.fetchone())['defaultValue']
     if not source: return None
 
     # Extract table and record id where database source info is stored
@@ -105,8 +111,7 @@ def get_custom_dsn(db):
     # If nothing found - throw exception, else return DSN-info
     query = f"SELECT * FROM `system`.`{table}` WHERE `id` = %s"
     query = sql_placeholders(sql_identifiers(query))
-    db.execute(query, (id,)); info = db.fetchone()
-    if engine == 'sqlserver' and info: info = dict(zip([c[0] for c in db.description], info))
+    db.execute(query, (id,)); info = row_dict(db, db.fetchone())
     if not info: raise Exception(f"Missing database custom source: {source}")
     return info
 
@@ -288,7 +293,7 @@ def ws(to, data, mq, db):
 
         # If at least one found - refresh token
         if db.rowcount:
-            to['token'] = db.fetchone()['token']
+            to['token'] = row_dict(db, db.fetchone())['token']
 
     # Append title
     if 'title' not in data:

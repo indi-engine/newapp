@@ -4167,6 +4167,12 @@ sqlserver_entrypoint() {
   # Shortcut to native entrypoint
   local native="/opt/mssql/bin/launch_sqlservr.sh"
 
+  # The normal setup bind-mounts the log directory from the host. Make it
+  # writable by the mssql user before dropping the root privileges requested
+  # by service.yml, including on Docker Desktop host binds.
+  chown -R mssql:root "$data/log"
+  chmod -R u+rwX,g+rwX "$data/log"
+
   # If init is not done
   if [[ ! -f "$done" ]]; then
 

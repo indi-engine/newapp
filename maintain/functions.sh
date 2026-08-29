@@ -1227,7 +1227,9 @@ create_system_schema() {
     unset PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
     export SQLCMDPASSWORD="$rpw"
-    $cli -S "$engine" -U "${DB_ROOT_USER:-sa}" -d "$DB_NAME" -C -b -Q "IF SCHEMA_ID(N'system') IS NULL EXEC(N'CREATE SCHEMA [system]')" > /dev/null
+    cli="$cli -S $engine -U sa -C -b -d"
+    $cli master -Q "ALTER DATABASE [$DB_NAME] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE"
+    $cli $DB_NAME -Q "IF SCHEMA_ID(N'system') IS NULL EXEC(N'CREATE SCHEMA [system]')" > /dev/null
     unset SQLCMDPASSWORD
   # Else
   else

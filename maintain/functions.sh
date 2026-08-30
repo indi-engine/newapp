@@ -24,6 +24,9 @@ getup() {
   # Setup GH_TOKEN_SYSTEM_RO
   export GH_TOKEN_SYSTEM_RO="$(get_env "GH_TOKEN_SYSTEM_RO")"
 
+  # Install docker
+  install_docker_if_need
+
   # Setup swap
   setup_swap_if_need
 
@@ -169,6 +172,68 @@ get_custom_schema() {
     sqlserver) echo "dbo" ;;
     *) echo "$(get_env "DB_NAME")" ;;
   esac
+}
+
+# Install Docker Engine and the Compose/Buildx plugins from Docker's official
+# apt repository when any of them is missing.
+install_docker_if_need() {
+
+  # Nothing to do when the complete toolchain is already available
+  if command -v docker >/dev/null 2>&1 \
+    && docker compose version >/dev/null 2>&1 \
+    && docker buildx version >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # This installer is intended for Ubuntu hosts
+  if [[ ! -r /etc/os-release ]]; then
+    echo "Cannot install Docker: /etc/os-release is unavailable." >&2
+    return 1
+  fi
+
+  local os_id ubuntu_codename architecture privilege=""
+  os_id="$(. /etc/os-release && echo "$ID")"
+  ubuntu_codename="$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")"
+  architecture="$(dpkg --print-architecture)"
+
+  if [[ "$os_id" != "ubuntu" || -z "$ubuntu_codename" ]]; then
+    echo "Cannot install Docker: only Ubuntu is supported by this installer." >&2
+    return 1
+  fi
+
+  # Use sudo outside a root shell
+  if [[ $EUID -ne 0 ]]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      echo "Cannot install Docker: run as root or install sudo." >&2
+      return 1
+    fi
+    privilege="sudo"
+  fi
+
+  echo "Installing Docker Engine, Compose, and Buildx..."
+  $privilege apt-get update
+  $privilege apt-get install -y ca-certificates curl
+  $privilege install -m 0755 -d /etc/apt/keyrings
+  $privilege curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  $privilege chmod a+r /etc/apt/keyrings/docker.asc
+
+  printf '%s\n' \
+    'Types: deb' \
+    'URIs: https://download.docker.com/linux/ubuntu' \
+    "Suites: $ubuntu_codename" \
+    'Components: stable' \
+    "Architectures: $architecture" \
+    'Signed-By: /etc/apt/keyrings/docker.asc' \
+    | $privilege tee /etc/apt/sources.list.d/docker.sources >/dev/null
+
+  $privilege apt-get update
+  $privilege apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+  # Verify all commands required by this project
+  docker --version \
+    && docker compose version \
+    && docker buildx version \
+    && $privilege systemctl is-active --quiet docker
 }
 
 # Spoof '{custom}' in .env's DB_DUMPS with real dump filename
@@ -5268,8 +5333,11 @@ setup_swap_if_need() {
   # If we're on windows - do nothing
   is_windows && return 0
 
-  # If we're not on postgres or mariadb - do nothing
-  [[ "$(get_env "DB_ENGINE")" != "postgres" && "$(get_env "DB_ENGINE")" != "mariadb" ]] && return 0
+  # Set up swap only for specific engines
+  case "$(get_env "DB_ENGINE")" in
+    postgres|mariadb|sqlserver) ;;
+    *) return 0 ;;
+  esac
 
   # Shortcut
   local SWAPFILE="/swapfile-indi-engine"

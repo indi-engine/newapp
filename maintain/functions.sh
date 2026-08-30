@@ -1457,6 +1457,11 @@ prepare_debezium() {
   			WHERE is_cdc_enabled = 1 AND name = DB_NAME()
 			) EXEC sys.sp_cdc_enable_db;
 
+			EXEC sys.sp_cdc_add_job
+				@job_type = N'capture',
+				@continuous = 1,
+				@pollinginterval = 0;
+
 			DECLARE @schema sysname, @table sysname;
 			DECLARE tables CURSOR LOCAL FAST_FORWARD FOR
   			SELECT schemas.name, tables.name

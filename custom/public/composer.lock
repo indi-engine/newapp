@@ -1184,7 +1184,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "bd5cf75c36f91e83ee7e2e6bf6e3e1c6b658f8c0"
+                "reference": "206cc19f68b07eca06b3cf121d5a90d7149c6c58"
             },
             "require": {
                 "indi-engine/tiptap": "*",
@@ -1199,7 +1199,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine AI",
-            "time": "2026-08-29T21:49:21+00:00"
+            "time": "2026-08-30T21:19:35+00:00"
         },
         {
             "name": "indi-engine/system",
@@ -1207,7 +1207,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "335fb5d61ac3daba3e81475aadfa766235c31aac"
+                "reference": "86b7fdc8c381855e4a552017d2809d338ee5038f"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1221,7 +1221,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Indi Engine AI system package, should be used as composer dependency only",
-            "time": "2026-08-29T21:42:11+00:00"
+            "time": "2026-08-30T21:24:40+00:00"
         },
         {
             "name": "indi-engine/tiptap",

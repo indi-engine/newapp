@@ -1207,7 +1207,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/system.git",
-                "reference": "3e3f9543a6d47789113c878cf95e4533df1b2d48"
+                "reference": "689530889dd9eac189983cd4b09857d4171ebdd2"
             },
             "require": {
                 "doctrine/inflector": "^2.0",
@@ -1221,7 +1221,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Indi Engine AI system package, should be used as composer dependency only",
-            "time": "2026-08-31T21:08:57+00:00"
+            "time": "2026-09-02T10:10:38+00:00"
         },
         {
             "name": "indi-engine/tiptap",

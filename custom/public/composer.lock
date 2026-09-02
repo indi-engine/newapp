@@ -1184,7 +1184,7 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/indi-engine/client.git",
-                "reference": "f5389314769184fd6570864facaf457144e8c35e"
+                "reference": "1aece93cbff2b39e088b95a6097eec6c5f5c6c6a"
             },
             "require": {
                 "indi-engine/tiptap": "*",
@@ -1199,7 +1199,7 @@
             "default-branch": true,
             "type": "library",
             "description": "Client app for Indi Engine AI",
-            "time": "2026-09-02T12:53:15+00:00"
+            "time": "2026-09-02T17:27:45+00:00"
         },
         {
             "name": "indi-engine/system",

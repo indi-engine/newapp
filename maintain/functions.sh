@@ -1294,7 +1294,8 @@ create_system_schema() {
     export SQLCMDPASSWORD="$rpw"
     cli="$cli -S $engine -U sa -C -b -d"
     $cli master -Q "ALTER DATABASE [$DB_NAME] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE"
-    $cli $DB_NAME -Q "IF SCHEMA_ID(N'system') IS NULL EXEC(N'CREATE SCHEMA [system]')" > /dev/null
+    $cli master -Q "IF DB_ID(N'system') IS NULL CREATE DATABASE [system]"
+    $cli master -Q "ALTER DATABASE [system] SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE"
     unset SQLCMDPASSWORD
   # Else
   else
@@ -1448,10 +1449,16 @@ setup_DB_APP_USER_if_need() {
     # Unset password
     unset PGPASSWORD
 
-  # Else if we're on SQL Server - do nothing, as this is handled
-  # sqlserver native entrypoint
+  # Else if we're on slqserver
   elif [[ "$engine" == "sqlserver" ]]; then
-    return 0
+
+    # Prepare and run sql to grant rights on system-database
+    export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    $cli -S "$engine" -U sa -C -b -d system <<-SQL
+			CREATE USER [$DB_APP_USER] FOR LOGIN [$DB_APP_USER];
+			ALTER ROLE [db_owner] ADD MEMBER [$DB_APP_USER];
+		SQL
+    unset SQLCMDPASSWORD
 
   # Else
   else
@@ -1510,48 +1517,48 @@ prepare_debezium() {
 		unset PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
     export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-		$cli -S "$engine" -U sa -b -C -m 1 -d "$DB_NAME" -v DB_APP_USER="$DB_APP_USER" <<-'SQL'
-			SET NOCOUNT ON;
+    local database
+    for database in system "$DB_NAME"; do
+		  $cli -S "$engine" -U sa -b -C -m 1 -d "$database" <<-SQL
+				SET NOCOUNT ON;
 
-			IF ISNULL(IS_ROLEMEMBER(N'db_owner', N'$(DB_APP_USER)'), 0) = 0
-				ALTER ROLE [db_owner] ADD MEMBER [$(DB_APP_USER)];
+    	  IF NOT EXISTS (
+    			SELECT 1
+    			FROM sys.databases
+    			WHERE is_cdc_enabled = 1 AND name = DB_NAME()
+				) EXEC sys.sp_cdc_enable_db;
 
-  	  IF NOT EXISTS (
-  			SELECT 1
-  			FROM sys.databases
-  			WHERE is_cdc_enabled = 1 AND name = DB_NAME()
-			) EXEC sys.sp_cdc_enable_db;
+				EXEC sys.sp_cdc_add_job
+					@job_type = N'capture',
+					@continuous = 1,
+					@pollinginterval = 0;
 
-			EXEC sys.sp_cdc_add_job
-				@job_type = N'capture',
-				@continuous = 1,
-				@pollinginterval = 0;
+				DECLARE @schema sysname, @table sysname;
+				DECLARE tables CURSOR LOCAL FAST_FORWARD FOR
+    			SELECT schemas.name, tables.name
+    			FROM sys.tables AS tables
+    				JOIN sys.schemas AS schemas ON schemas.schema_id = tables.schema_id
+					WHERE schemas.name = N'dbo'
+      			AND tables.is_ms_shipped = 0
+      			AND tables.is_tracked_by_cdc = 0;
 
-			DECLARE @schema sysname, @table sysname;
-			DECLARE tables CURSOR LOCAL FAST_FORWARD FOR
-  			SELECT schemas.name, tables.name
-  			FROM sys.tables AS tables
-  				JOIN sys.schemas AS schemas ON schemas.schema_id = tables.schema_id
-  			WHERE schemas.name IN (N'system', N'dbo')
-    			AND tables.is_ms_shipped = 0
-    			AND tables.is_tracked_by_cdc = 0;
+				OPEN tables;
+				FETCH NEXT FROM tables INTO @schema, @table;
 
-			OPEN tables;
-			FETCH NEXT FROM tables INTO @schema, @table;
+				WHILE @@FETCH_STATUS = 0
+				BEGIN
+    			EXEC sys.sp_cdc_enable_table
+      			@source_schema = @schema,
+      			@source_name = @table,
+      			@role_name = NULL,
+      			@supports_net_changes = 0;
+    			FETCH NEXT FROM tables INTO @schema, @table;
+				END;
 
-			WHILE @@FETCH_STATUS = 0
-			BEGIN
-  			EXEC sys.sp_cdc_enable_table
-    			@source_schema = @schema,
-    			@source_name = @table,
-    			@role_name = NULL,
-    			@supports_net_changes = 0;
-  			FETCH NEXT FROM tables INTO @schema, @table;
-			END;
-
-			CLOSE tables;
-			DEALLOCATE tables;
-		SQL
+				CLOSE tables;
+				DEALLOCATE tables;
+			SQL
+    done
     unset SQLCMDPASSWORD
   else
     export MYSQL_PWD="$(get_env "DB_ROOT_PASSWORD")"
@@ -2520,6 +2527,7 @@ import_possibly_chunked_dump() {
     local run="$cli -h $engine -U $DB_APP_USER -d $db_name -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
+    [[ "$dump" == "system.sql.gz" ]] && db_name="system"
     local run="sqlserver_import_stream -S $engine -U $DB_APP_USER -d $db_name -C -b -m 1 -i /dev/stdin"
     local passenv=SQLCMDPASSWORD
   else
@@ -4751,14 +4759,20 @@ get_migration_commit() {
 
   # Get schema
   local schema="system"; [[ $(is_splitdb) == "" ]] && schema="$(get_custom_schema)"
+  [[ "$(get_env "DB_ENGINE")" == "sqlserver" ]] && schema="dbo"
 
   # Run query
   db_query "SELECT \`defaultValue\` FROM \`$schema\`.\`field\` WHERE \`alias\` = 'migration-commit-$fraction'"
 }
 
-# Check whether app-agnostic tables has been already moved into separate schema
+# Check whether app-agnostic tables has been already moved into separate schema.
+# This is a backwards compatibility function, and is applicable only to mysql-based instances.
 is_splitdb() {
-  db_query "SELECT 1 FROM information_schema.tables WHERE table_schema = 'system' AND table_type = 'BASE TABLE' LIMIT 1"
+  if [[ "$(get_env "DB_ENGINE")" == "mysql" ]]; then
+    db_query "SELECT 1 FROM information_schema.tables WHERE table_schema = 'system' AND table_type = 'BASE TABLE' LIMIT 1"
+  else
+    echo 1
+  fi
 }
 
 # Run sql query
@@ -4783,7 +4797,7 @@ db_query() {
   elif [[ "$engine" == "sqlserver" ]]; then
     export SQLCMDPASSWORD="$pass"
     sql="$(printf '%s' "$sql" | sed -E 's/`([^`]*)`/[\1]/g')"
-    $cli -S "$host" -U "$user" -d "$name" -C -b -h -1 -W -Q "SET NOCOUNT ON; $sql"
+    $cli -S "$host" -U "$user" -d "system" -C -b -h -1 -W -Q "SET NOCOUNT ON; $sql"
     unset SQLCMDPASSWORD
   else
     export MYSQL_PWD="$pass"
@@ -4801,6 +4815,7 @@ set_migration_commit() {
 
   # Get schema
   local schema="system"; [[ $(is_splitdb) == "" ]] && schema="$(get_custom_schema)"
+  [[ "$(get_env "DB_ENGINE")" == "sqlserver" ]] && schema="dbo"
 
   # Run query
   db_query "UPDATE \`$schema\`.\`field\` SET \`defaultValue\` = '$commit' WHERE \`alias\` = 'migration-commit-$fraction'"

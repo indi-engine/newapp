@@ -1,55 +1,51 @@
 #!/bin/bash
 
-# If only logs should be cleaned up
-if [[ "${1:-}" == logs ]]; then
+# Get current dir name
+dir=$(basename "$PWD")
 
-  # Cleanup container logs
-  for f in var/log/compose/*/*.log; do
-    : > "$f"
+# Cleanup containers
+[[ "${1:-}" == *c* ]] && docker compose down
+
+# Cleanup volumes
+[[ "${1:-}" == *v* ]] && docker volume ls -q | grep "^${dir}_" | xargs -r docker volume rm
+
+# Cleanup logs
+if [[ "${1:-}" == *l* ]]; then
+
+  # Container logs
+  for f in var/log/compose/*/*; do
+    [[ ! "$f" =~ \.gitignore$ ]] && rm "$f"
   done
 
-  # Remove custom logs
+  # Custom logs
   rm -Rf var/log/custom/*/
   rm -Rf var/log/custom/*.log
+fi
 
-# Else cleanup containers, volumes and logs
-elif [[ "${1:-}" == cvl ]]; then
-
-  # Get current dir name
-  dir=$(basename "$PWD")
-
-  # Do cleanup
-  docker compose down
-  docker volume ls -q | grep "^${dir}_" | xargs -r docker volume rm
-  source cleanup logs
-
-# Else cleanup swap
-elif [[ "${1:-}" == swap ]]; then
+# Cleanup swap
+if [[ "${1:-}" == swap ]]; then
   SWAPFILE="/swapfile-indi-engine"
   if [[ -f "$SWAPFILE" ]]; then
     swapoff "$SWAPFILE"
     rm "$SWAPFILE"
     sed -i "/^$SWAPFILE/d" /etc/fstab
   fi
+fi
 
-# Else cleanup the whole app instance
-else
+# Cleanup the whole app instance
+if [[ "${1:-}" == "" ]]; then
 
   # Cleanup docker stuff
-  docker compose down
-  docker volume prune -af
+  source cleanup cv
   docker system prune -af
 
   # Cleanup swap
   source cleanup swap
-
-  # Get current dir name
-  dir=$(basename "$PWD")
 
   # Remove cd-command from bashrc
   sed -i "/^cd $(echo "$PWD" | sed 's/[\/&]/\\&/g')$/d" /root/.bashrc
 
   # Remove current dir
   cd ../
-  rm -R "$dir"
+  rm -Rf "$dir"
 fi

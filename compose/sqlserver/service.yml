@@ -17,6 +17,7 @@ services:
       - ./compose/sqlserver/entrypoint.sh:/usr/local/bin/custom-entrypoint.sh:ro
       - ./maintain/functions.sh:/usr/local/bin/functions.sh:ro
       - sqlserver_server_data:/var/opt/mssql
+      - ./data:/data
       - ./var/log/compose/sqlserver:/var/opt/mssql/log
     healthcheck:
       test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U \"$$MSSQL_USER\" -P \"$$MSSQL_PASSWORD\" -d \"$$MSSQL_DB\" -C -Q \"SELECT 1\" -b -o /dev/null && test -f /var/opt/mssql/init.done"]

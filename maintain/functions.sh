@@ -1354,6 +1354,9 @@ db_import() {
       import_possibly_chunked_dump "$file"
     done
 
+    # Make sure pre-assigned privs are not overwritten on restore
+    sync_DB_privs_on_physical_restore
+
     # Run debezium-specific sql
     prepare_debezium
 
@@ -1389,17 +1392,22 @@ db_import() {
     else
 
       # Print where we are and switch to system token
-      echo "None of SQL dump file(s) are found, assuming blank Indi Engine instance setup"
+      echo "None of DB backup file(s) are found, assuming blank Indi Engine instance setup"
       export GH_TOKEN="$(get_env "GH_TOKEN_SYSTEM_RO")"
 
       # Download dump
-      local DB_DUMP="system.sql.gz"
+      local DB_DUMP="system.$(get_engine_backup_ext)"
       if [[ ! -f "data/$DB_DUMP" ]]; then
         download_possibly_chunked_file "indi-engine/system" "$(get_engine_init_release)" "$DB_DUMP"
       fi
 
-      # Do import, and run debezium-specific sql
+      # Do import
       import_possibly_chunked_dump "$DB_DUMP"
+
+      # Make sure pre-assigned privs are not overwritten on restore
+      sync_DB_privs_on_physical_restore
+
+      # Run debezium-specific sql
       prepare_debezium
     fi
 
@@ -1415,6 +1423,14 @@ db_import() {
 
   # Create a file indicating that import is done
   touch "$done"
+}
+
+# Get backup file extension for the current (or given) DB engine
+get_engine_backup_ext() {
+  case "${1:-$(get_env "DB_ENGINE")}" in
+    sqlserver) echo "bak" ;;
+    *) echo "sql.gz" ;;
+  esac
 }
 
 # Create $DB_APP_USER - needed if $DB_ENGINE is 'postgres',
@@ -1452,11 +1468,14 @@ setup_DB_APP_USER_if_need() {
   # Else if we're on slqserver
   elif [[ "$engine" == "sqlserver" ]]; then
 
-    # Prepare and run sql to grant rights on system-database
+    # Prepare and run sql to grant rights needed for backup/restore
     export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-    $cli -S "$engine" -U sa -C -b -d system <<-SQL
-			CREATE USER [$DB_APP_USER] FOR LOGIN [$DB_APP_USER];
-			ALTER ROLE [db_owner] ADD MEMBER [$DB_APP_USER];
+    cli="$cli -S "$engine" -U sa -C -b -d"
+    $cli "$DB_NAME" -Q "IF USER_ID(N'$DB_APP_USER') IS NOT NULL DROP USER [$DB_APP_USER]"
+    $cli "master" <<-SQL
+			GRANT CREATE ANY DATABASE TO [$DB_APP_USER];
+			ALTER AUTHORIZATION ON DATABASE::[system] TO [$DB_APP_USER];
+			ALTER AUTHORIZATION ON DATABASE::[$DB_NAME] TO [$DB_APP_USER];
 		SQL
     unset SQLCMDPASSWORD
 
@@ -1468,6 +1487,29 @@ setup_DB_APP_USER_if_need() {
     sql="GRANT ALL ON \`system\`.* TO '${DB_APP_USER}'@'%'"
     echo "$sql" | $cli -h "$engine" -u "${DB_ROOT_USER:-root}" -D mysql
     unset MYSQL_PWD
+  fi
+}
+
+# Make sure pre-assigned privs are not overwritten on restore
+sync_DB_privs_on_physical_restore() {
+
+  # Shortcuts
+  local DB_APP_USER="$(get_env "DB_APP_USER")"
+  local databases="system $(get_env "DB_NAME")"
+  local engine="$(get_env "DB_ENGINE")"
+  local cli="$(get_engine_cli)"
+
+  # If we're on sqlserver
+  if [[ "$engine" == "sqlserver" ]]; then
+
+    # Native restores can bring back users and ownership from another instance.
+    export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
+    local cli="$cli -S "$engine" -U sa -C -b -d"
+    for name in $databases; do
+      $cli "$name"  -Q "IF USER_ID(N'$DB_APP_USER') IS NOT NULL DROP USER [$DB_APP_USER]"
+      $cli "master" -Q "ALTER AUTHORIZATION ON DATABASE::[$name] TO [$DB_APP_USER]"
+    done
+    unset SQLCMDPASSWORD
   fi
 }
 
@@ -2491,6 +2533,9 @@ restore_dump_from_local() {
   done
   [[ "$prepend" != "" ]] && echo -ne "${d}"
 
+  # Make sure pre-assigned privs are not overwritten on restore
+  sync_DB_privs_on_physical_restore
+
   # Run debezium-specific sql
   if [[ "$prepend" != "" ]]; then $fn3 2>&1 | prepend "» "; else $fn3; fi
 
@@ -2522,16 +2567,17 @@ import_possibly_chunked_dump() {
   local engine="$(get_env "DB_ENGINE")"
   local cli="$(get_engine_cli)"
   local db_name="$DB_NAME"
+  local system_dump="system.$(get_engine_backup_ext)"
 
   if [[ "$engine" == "postgres" ]]; then
     local run="$cli -h $engine -U $DB_APP_USER -d $db_name -o /dev/null -q -v ON_ERROR_STOP=1"
     local passenv=PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
-    [[ "$dump" == "system.sql.gz" ]] && db_name="system"
-    local run="sqlserver_import_stream -S $engine -U $DB_APP_USER -d $db_name -C -b -m 1 -i /dev/stdin"
+    [[ "$dump" == "$system_dump" ]] && db_name="system"
+    local run="$cli -S $engine -U $DB_APP_USER -d master -C -b -Q"
     local passenv=SQLCMDPASSWORD
   else
-    [[ "$dump" == "system.sql.gz" ]] && db_name="system"
+    [[ "$dump" == "$system_dump" ]] && db_name="system"
     local run="$cli -h $engine -u $DB_APP_USER -D $db_name"
     local passenv=MYSQL_PWD
   fi
@@ -2542,11 +2588,40 @@ import_possibly_chunked_dump() {
   # If dump file exists in data/ directory - import
   if [[ -f "$path" ]]; then
 
-    # If dump is gzipped - pipe to gunzip
-    if [[ "${dump##*.}" = "gz" ]]; then
-      pv --name "$msg" -pert "$path" | gunzip | $run
+    if [[ "$engine" == "sqlserver" ]]; then
+      size=$(stat -c%s "$path")
+      $run "RESTORE DATABASE [$db_name] FROM DISK = N'/$path' WITH REPLACE, CHECKSUM, STATS = 1" | awk -v msg="$msg" -v size="$size" '
+        function bytes(n, unit) {
+          split("B KiB MiB GiB TiB", unit)
+          for (i = 1; n >= 1024 && i < 5; i++) n /= 1024
+          return sprintf(i == 1 ? "%d%s" : "%.1f%s", n, unit[i])
+        }
+        function timefmt(s) {
+          return sprintf("%d:%02d:%02d", int(s / 3600), int(s % 3600 / 60), s % 60)
+        }
+        /^[0-9]+ percent processed\./ {
+          percent = $1
+          done = int(size * percent / 100)
+          elapsed = systime() - started
+          if (elapsed < 1) elapsed = 1
+          rate = done / elapsed
+          width = 24
+          filled = int(width * percent / 100)
+          bar = ""
+          for (i = 0; i < width; i++) bar = bar (i < filled - 1 ? "=" : (i == filled - 1 && percent <= 100 ? ">" : " "))
+          printf "\r%s: %s [%s/s] [%s] %3d%%", msg, timefmt(elapsed), bytes(rate), bar, percent > "/dev/stderr"
+          fflush("/dev/stderr")
+        }
+        BEGIN { started = systime() }
+      '
+      echo "" >&2
     else
-      pv --name "$msg" -pert "$path" | $run
+      # If dump is gzipped - pipe to gunzip
+      if [[ "${dump##*.}" = "gz" ]]; then
+        pv --name "$msg" -pert "$path" | gunzip | $run
+      else
+        pv --name "$msg" -pert "$path" | $run
+      fi
     fi
 
   # Else

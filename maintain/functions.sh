@@ -2553,6 +2553,45 @@ sqlserver_import_stream() {
   { printf 'SET NOCOUNT ON;\n'; cat; } | sqlcmd "$@"
 }
 
+# Parse SQL Server RESTORE STATS output and print pv-like progress.
+sqlserver_import_progress() {
+
+  # Pick progress title from --name argument, if given
+  local msg=""; [[ "${1:-}" == "--name" ]] && msg="$2" && shift 2
+
+  # Print progress in a pv-command style
+  awk -v msg="$msg" -v size="$(stat -c%s "$1")" '
+    function bytes(n, unit) {
+      split("B KiB MiB GiB TiB", unit)
+      for (i = 1; n >= 1024 && i < 5; i++) n /= 1024
+      return sprintf(i == 1 ? "%d%s" : "%.1f%s", n, unit[i])
+    }
+    function timefmt(s) {
+      return sprintf("%d:%02d:%02d", int(s / 3600), int(s % 3600 / 60), s % 60)
+    }
+    /^[0-9]+ percent processed\./ {
+      percent = $1
+      done = int(size * percent / 100)
+      elapsed = systime() - started
+      if (elapsed < 1) elapsed = 1
+      rate = done / elapsed
+      width = 24
+      filled = int(width * percent / 100)
+      bar = ""
+      for (i = 0; i < width; i++) bar = bar (i < filled - 1 ? "=" : (i == filled - 1 && percent <= 100 ? ">" : " "))
+      printf "\r%s: %s [%s/s] [%s] %3d%%", msg, timefmt(elapsed), bytes(rate), bar, percent > "/dev/stderr"
+      fflush("/dev/stderr")
+      next
+    }
+    /^Processed [0-9]+ pages for database / { next }
+    /^DBCC execution completed\./ { next }
+    /^RESTORE DATABASE successfully processed / { next }
+    { print > "/dev/stderr" }
+    BEGIN { started = systime() }
+  '
+  echo "" >&2
+}
+
 # Import dump with a given filename, or count
 import_possibly_chunked_dump() {
 
@@ -2574,7 +2613,8 @@ import_possibly_chunked_dump() {
     local passenv=PGPASSWORD
   elif [[ "$engine" == "sqlserver" ]]; then
     [[ "$dump" == "$system_dump" ]] && db_name="system"
-    local run="$cli -S $engine -U $DB_APP_USER -d master -C -b -Q"
+    local run="$cli -S $engine -U $DB_APP_USER -d master -C -b -i /dev/stdin"
+    local sql="RESTORE DATABASE [$db_name] FROM DISK = N'/$path' WITH REPLACE, KEEP_CDC, CHECKSUM, STATS = 1"
     local passenv=SQLCMDPASSWORD
   else
     [[ "$dump" == "$system_dump" ]] && db_name="system"
@@ -2588,34 +2628,15 @@ import_possibly_chunked_dump() {
   # If dump file exists in data/ directory - import
   if [[ -f "$path" ]]; then
 
+    # If we're on sqlserver
     if [[ "$engine" == "sqlserver" ]]; then
-      size=$(stat -c%s "$path")
-      $run "RESTORE DATABASE [$db_name] FROM DISK = N'/$path' WITH REPLACE, CHECKSUM, STATS = 1" | awk -v msg="$msg" -v size="$size" '
-        function bytes(n, unit) {
-          split("B KiB MiB GiB TiB", unit)
-          for (i = 1; n >= 1024 && i < 5; i++) n /= 1024
-          return sprintf(i == 1 ? "%d%s" : "%.1f%s", n, unit[i])
-        }
-        function timefmt(s) {
-          return sprintf("%d:%02d:%02d", int(s / 3600), int(s % 3600 / 60), s % 60)
-        }
-        /^[0-9]+ percent processed\./ {
-          percent = $1
-          done = int(size * percent / 100)
-          elapsed = systime() - started
-          if (elapsed < 1) elapsed = 1
-          rate = done / elapsed
-          width = 24
-          filled = int(width * percent / 100)
-          bar = ""
-          for (i = 0; i < width; i++) bar = bar (i < filled - 1 ? "=" : (i == filled - 1 && percent <= 100 ? ">" : " "))
-          printf "\r%s: %s [%s/s] [%s] %3d%%", msg, timefmt(elapsed), bytes(rate), bar, percent > "/dev/stderr"
-          fflush("/dev/stderr")
-        }
-        BEGIN { started = systime() }
-      '
-      echo "" >&2
+
+      # Run RESTORE DATABASE query and print progress output styled as in pv-command
+      echo "$sql" | $run | sqlserver_import_progress --name "$msg" "$path"
+
+    # Else
     else
+
       # If dump is gzipped - pipe to gunzip
       if [[ "${dump##*.}" = "gz" ]]; then
         pv --name "$msg" -pert "$path" | gunzip | $run

@@ -118,13 +118,29 @@ else
     # Export dump with printing progress
     msg="${pref}Exporting $(basename "$dump") into $dir/ dir...";
     if [[ "$engine" == "sqlserver" ]]; then
+
+      # Make target directory writable by sqlserver
+      chmod a+w "$dir"
+
+      # SQL Server can return a non-zero exit code after writing a valid .bak on Docker bind mounts,
+      # e.g. DiskChangeFileSize error 31. Let RESTORE VERIFYONLY below decide if the backup is usable.
+      set +e
       ${dump_cmd//~name~/"$name"} <<< "${dump_sql//~name~/"$name"}" | awk -v msg="$msg" '
         /^[0-9]+ percent processed\./ {
           percent = $1
           printf "\r%s %d%%", msg, percent > "/dev/stderr"
           fflush("/dev/stderr")
+          next
         }
+        /^Processed [0-9]+ pages for database / { next }
+        /^Msg 3634, / { next }
+        /DiskChangeFileSize/ && /31\(A device attached to the system is not functioning\.\)/ { next }
+        /^Msg 3013, / { next }
+        /^BACKUP DATABASE is terminating abnormally\./ { next }
+        { print > "/dev/stderr" }
       '
+      exit_code=${PIPESTATUS[0]}
+      set -e
     else
       ${dump_cmd//~name~/"$name"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$qty" -v msg="$msg" '{
           count += gsub(/\),\(/, "&") + 1

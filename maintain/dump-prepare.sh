@@ -141,6 +141,15 @@ else
       '
       exit_code=${PIPESTATUS[0]}
       set -e
+
+      # For sqlserver, backup must verified before chunking
+      if [[ $exit_code -ne 0 ]] && ! verify_backup "$name"; then
+        echo "$dump_bin exited with code $exit_code"
+        exit $exit_code
+      fi
+
+      # Split .bak file into chunks
+      split_file "$dump" "$GH_ASSET_MAX_SIZE"
     else
       ${dump_cmd//~name~/"$name"} | tee >(grep --line-buffered '^INSERT INTO' | awk -v total="$qty" -v msg="$msg" '{
           count += gsub(/\),\(/, "&") + 1
@@ -152,13 +161,13 @@ else
           }
         }' >&2) \
       | gzip_cmd | split --bytes=${GH_ASSET_MAX_SIZE^^} --numeric-suffixes=1 - $dump
-    fi
 
-    # Exit if above command failed
-    exit_code=${PIPESTATUS[0]};
-    if [[ $exit_code -ne 0 ]] && ! verify_backup "$name"; then
-      echo "$dump_bin exited with code $exit_code"
-      exit $exit_code
+      # Exit if dump command failed
+      exit_code=${PIPESTATUS[0]};
+      if [[ $exit_code -ne 0 ]] && ! verify_backup "$name"; then
+        echo "$dump_bin exited with code $exit_code"
+        exit $exit_code
+      fi
     fi
 
     echo ""

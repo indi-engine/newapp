@@ -2784,6 +2784,57 @@ db_shutdown_percona() {
   unset MYSQL_PWD
 }
 
+# Convert human-readable byte qty to bytes
+str_size2bytes() {
+  local value="${1^^}"; value="${value//[[:space:]]/}"
+  case "$value" in
+    *KIB) echo $((${value%KIB} * 1024)) ;;
+    *MIB) echo $((${value%MIB} * 1024 * 1024)) ;;
+    *GIB) echo $((${value%GIB} * 1024 * 1024 * 1024)) ;;
+    *TIB) echo $((${value%TIB} * 1024 * 1024 * 1024 * 1024)) ;;
+    *KB)  echo $((${value%KB}  * 1000)) ;;
+    *MB)  echo $((${value%MB}  * 1000 * 1000)) ;;
+    *GB)  echo $((${value%GB}  * 1000 * 1000 * 1000)) ;;
+    *TB)  echo $((${value%TB}  * 1000 * 1000 * 1000 * 1000)) ;;
+    *K)   echo $((${value%K}   * 1024)) ;;
+    *M)   echo $((${value%M}   * 1024 * 1024)) ;;
+    *G)   echo $((${value%G}   * 1024 * 1024 * 1024)) ;;
+    *T)   echo $((${value%T}   * 1024 * 1024 * 1024 * 1024)) ;;
+    *B)   echo ${value%B} ;;
+    *)    echo "$value" ;;
+  esac
+}
+
+# Split a file from the end, so peak extra disk usage is one chunk
+split_file() {
+
+  # Arguments
+  local file="$1"
+  local chunk="$(str_size2bytes "$2")"
+
+  # Variables
+  local size part width offset chunk_file
+  size=$(stat -c%s "$file")
+  part=$(( (size + chunk - 1) / chunk ))
+  width="${#part}"; (( width < 2 )) && width=2
+
+  # If less than two parts - return
+  (( part <= 1 )) && return 0
+
+  # Cut from the end and save as separate file, until single chunk left
+  while (( part > 1 )); do
+    offset=$(( (part - 1) * chunk ))
+    chunk_file="$file$(printf "%0${width}d" "$part")"
+    dd if="$file" of="$chunk_file" bs=1M iflag=skip_bytes,count_bytes skip="$offset" count="$((size - offset))" status=none
+    truncate -s "$offset" "$file"
+    size=$offset
+    part=$((part - 1))
+  done
+
+  # Rename the single remaining chunk of an original file
+  mv "$file" "$file$(printf "%0${width}d" 1)"
+}
+
 # Shut down postgres
 db_shutdown_postgres() {
 

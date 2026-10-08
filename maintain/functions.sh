@@ -1339,7 +1339,7 @@ db_import() {
   missing=""
   for dump in $DB_DUMPS; do
     local="data/$dump"
-    shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
+    shopt -s nullglob; chunks=("$local"+([0-9])); shopt -u nullglob
     if [[ ! -f "$local" && ${#chunks[@]} = "0" ]]; then
       if [[ "$missing" = "" ]]; then
         missing="$dump"
@@ -2303,7 +2303,7 @@ backup_prepared_assets() {
 
   # Backup dump
   for dump in $(get_DB_DUMPS); do
-    upload_asset "$dir/$dump" "$tag" "» "
+    upload_possibly_chunked_file "$tag" "$dir/$dump*" "» "
   done
 }
 
@@ -2362,6 +2362,7 @@ upload_possibly_chunked_file() {
   # Arguments
   local release="$1"
   local pattern="$2"
+  local prepend="${3:-}"
 
   # Get current repo
   local repo="$(get_current_repo)"
@@ -2377,9 +2378,9 @@ upload_possibly_chunked_file() {
   if (( local_chunks_qty > 1 )); then
 
     # Upload one by one
-    echo "Uploading chunks:"
+    echo "${prepend}Uploading chunks:"
     for local_chunk in $local_chunks; do
-      upload_asset "$local_chunk" "$release" "» "
+      upload_asset "$local_chunk" "$release" "$prepend» "
     done
 
     # Replace newlines with spaces in list of local chunks
@@ -2387,7 +2388,7 @@ upload_possibly_chunked_file() {
 
   # Else upload the single file, overwriting the existing one, if any
   else
-    upload_asset "$local_chunks" "$release"
+    upload_asset "$local_chunks" "$release" "$prepend"
   fi
 
   # Delete obsolete remote assets, if any remaining on github
@@ -2395,9 +2396,9 @@ upload_possibly_chunked_file() {
   for remote_chunk in $remote_chunks; do
     if [[ ! " $local_chunks " =~ [[:space:]]$(dirname "$pattern")/$remote_chunk[[:space:]] ]]; then
       if [[ $obsolete = "0" ]]; then
-        echo "Deleting obsolete remote chunk(s):" && obsolete="1"
+        echo "${prepend}Deleting obsolete remote chunk(s):" && obsolete="1"
       fi
-      echo -n "» " && delete_asset "$remote_chunk" "$release"
+      echo -n "${prepend}» " && delete_asset "$remote_chunk" "$release"
     fi
   done
 
@@ -2738,7 +2739,7 @@ download_possibly_chunked_file() {
   fi
 
   # Get file path and chunks paths, if any
-  local="$dir/$file"; shopt -s nullglob; chunks=("$local"[0-9][0-9]); shopt -u nullglob
+  local="$dir/$file"; shopt -s nullglob; chunks=("$local"+([0-9])); shopt -u nullglob
 
   # If neither file exists nor chunks - increment missing files counter
   if [[ ! -f "$local" && ${#chunks[@]} -eq 0 && $count_missing = true ]]; then

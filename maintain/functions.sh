@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Enable extended globbing, e.g. +([0-9]) for numeric chunk suffixes
+shopt -s extglob
+
 # Declare array of [repo name => releases qty] pairs
 declare -gA releaseQty=()
 
@@ -2649,16 +2652,26 @@ import_possibly_chunked_dump() {
   else
 
     # Get local chunks array, if any
-    shopt -s nullglob; chunks=("$path"[0-9][0-9]); shopt -u nullglob
+    shopt -s nullglob; chunks=("$path"+([0-9])); shopt -u nullglob
 
     # If chunks detected - import
     if [[ ${#chunks[@]} -gt 0 ]]; then
 
-      # If dump is gzipped - pipe to gunzip
-      if [[ "${dump##*.}" = "gz" ]]; then
-        pv --name "$msg" -pert "${path}"[0-9][0-9] | gunzip | $run;
+      # If we're on sqlserver
+      if [[ "$engine" == "sqlserver" ]]; then
+
+        # Join chunks back into .bak file, run restore and print progress output styled as in pv-command
+        join_file "$path"; echo "$sql" | $run | sqlserver_import_progress --name "$msg" "$path"
+
+      # Else
       else
-        pv --name "$msg" -pert "${path}"[0-9][0-9] | $run;
+
+        # If dump is gzipped - pipe to gunzip
+        if [[ "${dump##*.}" = "gz" ]]; then
+          pv --name "$msg" -pert "${path}"[0-9][0-9] | gunzip | $run;
+        else
+          pv --name "$msg" -pert "${path}"[0-9][0-9] | $run;
+        fi
       fi
     fi
   fi
@@ -2833,6 +2846,43 @@ split_file() {
 
   # Rename the single remaining chunk of an original file
   mv "$file" "$file$(printf "%0${width}d" 1)"
+}
+
+# Join file chunks back, deleting each chunk after appending
+join_file() {
+
+  # Arguments
+  local file="$1"
+
+  # Variables
+  local chunks chunk last suffix_plan suffix_fact width index
+  chunks="$(shopt -s nullglob; printf "%s\n" "$file"+([0-9]) | sort)"
+
+  # If no chunks exist - keep original file untouched
+  [[ -n "$chunks" ]] || return 0
+
+  # Check chunk sequence before touching files
+  last="$(echo "$chunks" | tail -n 1)"
+  width="${last#"$file"}"
+  width="${#width}"
+  index=1
+  while IFS= read -r chunk; do
+    suffix_fact="${chunk#"$file"}"
+    suffix_plan="$(printf "%0${width}d" "$index")"
+
+    if [[ "$suffix_fact" != "$suffix_plan" ]]; then
+      echo "Missing chunk: expected $file$suffix_plan, got $chunk"
+      return 1
+    fi
+
+    index=$((index + 1))
+  done <<< "$chunks"
+
+  # Join chunks into original file, removing each chunk on success
+  : > "$file"
+  while IFS= read -r chunk; do
+    cat "$chunk" >> "$file" && rm -f "$chunk"
+  done <<< "$chunks"
 }
 
 # Shut down postgres

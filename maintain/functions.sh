@@ -2810,9 +2810,24 @@ db_shutdown_postgres() {
 
 # Shut down sqlserver
 db_shutdown_sqlserver() {
+
+  # SQL Server closes the same connection that requested SHUTDOWN WITH NOWAIT,
+  # so sqlcmd can exit non-zero even when the shutdown request was accepted.
   export SQLCMDPASSWORD="$(get_env "DB_ROOT_PASSWORD")"
-  sqlcmd -S sqlserver -U "${DB_ROOT_USER:-sa}" -d master -C -b -Q "SHUTDOWN WITH NOWAIT"
+  set +e; local output exit_code
+  output=$(sqlcmd -S sqlserver -U "${DB_ROOT_USER:-sa}" -d master -C -b -Q "SHUTDOWN WITH NOWAIT" 2>&1)
+  exit_code=$?
+  set -e
   unset SQLCMDPASSWORD
+
+  # If this is an only message printed - treat this as successful shutdown
+  local ok="Server shut down by NOWAIT request"
+  if [[ $exit_code -ne 0 ]]; then
+    output="$(echo "$output" | awk "!/^$ok/")"
+    [[ -z "$output" ]] && return 0
+    echo "$output"
+    return $exit_code
+  fi
 }
 
 # Get db engine name
@@ -4372,8 +4387,20 @@ sqlserver_entrypoint() {
     fi
   fi
 
-  # Call the original entrypoint script as the image's standard mssql user
-  runuser -u mssql -- "$native" "$@"
+  # Call the original entrypoint script as the image's standard mssql user.
+  # SHUTDOWN WITH NOWAIT can make sqlservr/runuser exit non-zero because
+  # the administrative shutdown breaks the connection/process intentionally.
+  set +e
+  local output
+  output=$(runuser -u mssql -- "$native" "$@" 2>&1)
+  local exit_code=$?
+  set -e
+  if [[ $exit_code -ne 0 ]]; then
+    if [[ "$output" != *"Server shut down by NOWAIT request"* ]]; then
+      echo "$output"
+      return $exit_code
+    fi
+  fi
 
   # If we reached this line, it means db was shut down
   echo "$(get_engine_name) Server has been shut down"
